@@ -61,14 +61,16 @@ async def metric_events():
     return response
 
 
-@app.route('/api/calls/agent/<username>', methods=["GET", "POST"])
-async def agent_call_log(username):
+@app.route('/api/calls/agent', methods=["GET", "POST"])
+async def agent_call_log():
+    username = request.args.get("username")
     db = Db()
     await db.init()
     if request.method == 'GET':
         if not await db.verify_user(username):
             await db.add_user(username)
-        rows = await db.get_agent_calls(username)
+        max_records = request.args.get("max_records", None)
+        rows = await db.get_agent_calls(username=username, max_records=max_records)
         converted_rows = list()
         for row in rows:
             converted_row = {
@@ -91,11 +93,13 @@ async def agent_call_log(username):
         return '', HttpResponse.CREATED
 
 
-@app.route('/api/calls/number/<phone_number>')
-async def number_call_log(phone_number):
+@app.route('/api/calls/number')
+async def number_call_log():
     db = Db()
     await db.init()
-    rows = await db.get_phone_calls(phone_number)
+    phone_number = request.args.get("phone_number", None)
+    max_records = request.args.get("max_records", None)
+    rows = await db.get_phone_calls(phone_number=phone_number, max_records=max_records)
     converted_rows = list()
     for row in rows:
         converted_row = {

@@ -93,18 +93,26 @@ class Db:
             await session.commit()
         return obj
 
-    async def get_agent_calls(self, username):
+    async def get_agent_calls(self, username, max_records: int = None, asc: bool = False):
         stmt = select(PhoneLog) \
             .join(User) \
             .where(User.username == username)
+        if asc is False:
+            stmt = stmt.order_by(PhoneLog.created_on.desc())
+        if max_records is not None:
+            stmt = stmt.limit(max_records)
         async with self.sessionmaker() as session:
             query = (await session.execute(stmt)).all()
             query = cleanup_query(query)
         return query
 
-    async def get_phone_calls(self, phone_number) -> tuple:
+    async def get_phone_calls(self, phone_number, max_records: int = None, asc: bool = False) -> tuple:
         stmt = select(PhoneLog) \
             .where(PhoneLog.phone_number == phone_number)
+        if asc is False:
+            stmt = stmt.order_by(PhoneLog.created_on.desc())
+        if max_records is not None:
+            stmt = stmt.limit(max_records)
         async with self.sessionmaker() as session:
             query = (await session.execute(stmt)).all()
             query = cleanup_query(query)

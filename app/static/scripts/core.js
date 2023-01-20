@@ -7,8 +7,12 @@ const TABLE_INFO_CLASS = 'table-info'
 const TABLE_ALERT_CLASS = 'table-warning'
 const TABLE_DANGER_CLASS = 'table-danger'
 
-const sidelineStatuses = {"quick break": 1, "on a project": 1, "ticket break": 1}
-const excludedStatuses = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1}
+const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1}
+const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1}
+const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70}
+
+let JSON_HEADERS = new Headers();
+JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8')
 
 let queueCountAlert = 1;
 let containerDiv = document.querySelector('#ccp');
@@ -19,6 +23,8 @@ let phoneLog;
 let agentObj;
 
 let lastTagNotification = {};
+let sidelineNotificationInterval = 60;
+
 
 const INSTANCE_URL = "https://sps-connect-poc.my.connect.aws/connect/ccp-v2";
 connect.core.initCCP(containerDiv, {
@@ -120,13 +126,8 @@ function hookRefresh(agent) {
 // Refreshed on an interval
 async function hookIntervalRefresh(agent, interval = 30000) {
     function actions(agent) {
-        let breakReminders = {
-            "Quick Break": 20,
-            "AfterCallWork": 20,
-            "Lunch": 70,
-        }
-        let stateName = agent.getState().name;
-        checkStateDuration(agent, stateName, breakReminders[stateName]);
+        let stateName = agent.getState().name.toLowerCase();
+        checkStateDuration(agent, stateName, BREAK_STATUSES[stateName]);
     }
 
     setInterval(() => {
@@ -235,12 +236,13 @@ function Notifier(namespace = "") {
 function callHistory(agent) {
     this.agent = agent;
     this.username = agent.getConfiguration().username;
-    this.historyLimit = 50;
-    fetch(API + `/calls/agent/${this.username}`, {
+    this.searchParams = new URLSearchParams({
+        username: this.username,
+        max_records: "10",
+    });
+    fetch(API + '/calls/agent?' + this.searchParams, {
         method: 'GET',
-        headers: {
-            "Content-Type": "application/json;charset=UTF-8"
-        },
+        headers: JSON_HEADERS,
     })
         .then(r => r.json())
         .then(d => this.log = d)
@@ -254,11 +256,9 @@ function callHistory(agent) {
         }
         this.log.push(logItem);
 
-        fetch(API + `/calls/agent/${this.username}`, {
+        fetch(API + '/calls/agent?' + this.searchParams, {
             method: 'POST',
-            headers: {
-                "Content-Type": "application/json;charset=UTF-8"
-            },
+            headers: JSON_HEADERS,
             body: JSON.stringify(logItem),
         })
             .then(r => console.log(r))
@@ -306,7 +306,7 @@ function _realtimeUpdateQueueCount(data) {
         if (agentSideline()) {
             let queueNotifier = new Notifier("queueCount");
             queueNotifier.show(`Queue Count is ${value}!\nCan you help?`,
-                "Callers Waiting", "queueCount")
+                "Callers Waiting", "queueCount", sidelineNotificationInterval)
         }
         queueCountSection.classList.add(TABLE_ALERT_CLASS)
     } else {
@@ -325,7 +325,7 @@ function _realtimeUpdateAvailableCount(data) {
     // TODO : Should not count currently connected calls as on call : Test if done
     let sidelineAgents = [];
     for (let userlistElement of data.user_list) {
-        if (userlistElement.status.name.toLowerCase() in sidelineStatuses) {
+        if (userlistElement.status.name.toLowerCase() in SIDELINE_STATUSES) {
             sidelineAgents.push(userlistElement)
         }
     }
@@ -338,7 +338,7 @@ function _realtimeUpdateAvailableCount(data) {
             let tag = "availableAgents"
             let notify = new Notifier(tag)
             notify.show(`There are currently ${activeAgentCount} available agents`,
-                "Available Agents", tag, 60)
+                "Available Agents", tag, sidelineNotificationInterval)
         }
     } else {
         agentCountSection.classList.remove(TABLE_ALERT_CLASS);
@@ -347,7 +347,6 @@ function _realtimeUpdateAvailableCount(data) {
 
 
 // ######## Agents recent call list ########################
-
 function updateAgentCallList() {
     let callListSection = document.querySelector('#agentCallList');
     let convertedCalls = [];
@@ -374,10 +373,8 @@ async function updateNumberCallList(phoneNumber) {
     let convertedCalls = [];
 
     const url = API + `/calls/number/${phoneNumber}`
-    let headers = new Headers();
-    headers.append('Content-Type', 'application/json;charset=UTF-8')
 
-    const res = await fetch(url, {headers: headers});
+    const res = await fetch(url, {headers: JSON_HEADERS});
     if (res.ok) {
         const numberCallList = await res.json();
         let sortedNumberCallList = sortPropertyList(numberCallList, "timestamp", false);
@@ -410,7 +407,7 @@ function setToState(agent, state) {
 // If an agent is on the "SideLine" it means they are not routable, but can be.
 function agentSideline() {
     let not_routable = agentObj.getState().type === connect.AgentStateType.NOT_ROUTABLE;
-    return not_routable && ! agentObj.getState().name.toLowerCase() in excludedStatuses
+    return not_routable && !agentObj.getState().name.toLowerCase() in EXCLUDED_STATUSES
 
 }
 
@@ -448,8 +445,10 @@ function spinnerToggle(dom, show, spinner = 'spinner-border') {
 
 function formatPhoneNumber(phone) {
     let fn = String(phone).split(/ /)[0].replace(/\D/g, '');
-    if (fn > 10) { fn = fn.slice(fn.length - 10) }
-    let formattedNumber = `(${fn.slice(0, 3)}) ${fn.slice(3,6)}-${fn.slice(6, 10)}`
+    if (fn > 10) {
+        fn = fn.slice(fn.length - 10)
+    }
+    let formattedNumber = `(${fn.slice(0, 3)}) ${fn.slice(3, 6)}-${fn.slice(6, 10)}`
     return formattedNumber
 }
 
