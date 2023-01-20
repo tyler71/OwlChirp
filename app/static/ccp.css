@@ -32,7 +32,8 @@ html, body {
 /* Hide padding and circle for lists */
 #data div li,
 #data div ul {
-  list-style-type: none;
-  padding: 0;
-  cursor: pointer;
+    list-style-type: none;
+    padding: 0;
+    cursor: pointer;
+    border: none;
 }

@@ -318,7 +318,6 @@ function _realtimeUpdateQueueCount(data) {
 function _realtimeUpdateAvailableCount(data) {
     let availableCount = data.available_count;
     let activeAgentCount = data.active_agent_count;
-    console.log(data)
     let agentCountSection = document.querySelector('#availableAgentCount');
     let agentCountValue = document.querySelector('#availableAgentCount > .value');
 
@@ -360,7 +359,7 @@ function updateAgentCallList() {
             minute: 'numeric'
         }).format(new Date(call.timestamp))
         let c_username = call.agent.slice(0, (call.agent.indexOf('@')))
-        convertedCalls.push(`${call.phoneNumber} @ ${c_time}`)
+        convertedCalls.push(`${formatPhoneNumber(call.phoneNumber)} ${c_time}`)
     }
     let newSection = createCollapseList(convertedCalls, true, 'dblclick', 'agentCallList');
     spinnerToggle(callListSection, false);
@@ -389,7 +388,7 @@ async function updateNumberCallList(phoneNumber) {
                 minute: 'numeric'
             }).format(new Date(call.timestamp))
             let c_username = call.agent.slice(0, (call.agent.indexOf('@')))
-            convertedCalls.push(`Called ${c_username} @ ${c_time}`)
+            convertedCalls.push(`Called ${c_username} ${c_time}`)
         }
         let newSection = createCollapseList(convertedCalls, true, 'dblclick', 'numberCallList');
         numberListSection.parentNode.replaceChild(newSection, numberListSection);
@@ -445,6 +444,13 @@ function spinnerToggle(dom, show, spinner = 'spinner-border') {
     } else if (!show && ds.contains(spinner)) {
         ds.remove(spinner)
     }
+}
+
+function formatPhoneNumber(phone) {
+    let fn = String(phone).split(/ /)[0].replace(/\D/g, '');
+    if (fn > 10) { fn = fn.slice(fn.length - 10) }
+    let formattedNumber = `(${fn.slice(0, 3)}) ${fn.slice(3,6)}-${fn.slice(6, 10)}`
+    return formattedNumber
 }
 
 function createCollapseList(array, collapsed = false, action = "click", id = null) {
