@@ -1,0 +1,41 @@
+{% extends "skel.html" %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+      integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+<link href="{{ url_for('static', filename='ccp.css') }}" rel="stylesheet" type="text/css"/>
+<script src="{{ url_for('static', filename='lib/connect-streams.js') }}"></script>
+<script defer src="{{ url_for('static', filename='scripts/core.js') }}"></script>
+{% endblock %}
+
+{% block body %}
+<main id="content">
+    <div id="statusBar"></div>
+    <div id="alertSection"></div>
+    <div id="ccp"></div>
+    <div id="action"></div>
+    <div id="data">
+        <div id="metrics">
+            <table class="table table-sm">
+                <tbody>
+                <tr id='queueCount'>
+                    <td class="key">Calls in Queue</td>
+                    <td class="value spinner-border"></td>
+                </tr>
+                <tr id='availableAgentCount'>
+                    <td class="key">Available Agents</td>
+                    <td class="value spinner-border"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="statusDiv">
+            <div id="statusA">Recent Call List
+                <div class="spinner-border" id="agentCallList"></div>
+            </div>
+            <div id="statusB">Recently Called
+                <div id='numberCallList'></div>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

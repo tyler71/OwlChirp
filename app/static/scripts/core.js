@@ -1,0 +1,487 @@
+let notify = new Notifier();
+notify.authorize();
+
+const API = '/api'
+
+const TABLE_INFO_CLASS = 'table-info'
+const TABLE_ALERT_CLASS = 'table-warning'
+const TABLE_DANGER_CLASS = 'table-danger'
+
+const sidelineStatuses = {"quick break": 1, "on a project": 1, "ticket break": 1}
+const excludedStatuses = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1}
+
+let queueCountAlert = 1;
+let containerDiv = document.querySelector('#ccp');
+let statusDiv = document.querySelector('#statusDiv');
+let [statusDivA, statusDivB] = statusDiv.children;
+let phoneLog;
+
+let agentObj;
+
+let lastTagNotification = {};
+
+const INSTANCE_URL = "https://sps-connect-poc.my.connect.aws/connect/ccp-v2";
+connect.core.initCCP(containerDiv, {
+    ccpUrl: INSTANCE_URL,             // REQUIRED
+    loginPopup: true,                 // optional, defaults to `true`
+    loginPopupAutoClose: true,        // optional, defaults to `false`
+    loginOptions: {                   // optional, if provided opens login in new window
+        autoClose: true,              // optional, defaults to `false`
+        height: 578,                  // optional, defaults to 578
+        width: 400,                   // optional, defaults to 433
+        top: 0,                       // optional, defaults to 0
+        left: 0                       // optional, defaults to 0
+    },
+    softphone: {                      // optional, defaults below apply if not provided
+        allowFramedSoftphone: true,   // optional, defaults to false
+        disableRingtone: false,       // optional, defaults to false
+        // ringtoneUrl: "https://TLCCPFlask.tyler71.repl.co/static/ringtone/Intellection-Rob_Cosh-rt.mp3" // optional, defaults to CCP’s default ringtone if a falsy value is set
+    },
+    pageOptions: { //optional
+        enableAudioDeviceSettings: false, // optional, defaults to 'false'
+        enablePhoneTypeSettings: true     // optional, defaults to 'true'
+    },
+    shouldAddNamespaceToLogs: false, // optional, defaults to 'false'
+    ccpAckTimeout: 5000,             // optional, defaults to 3000 (ms)
+    ccpSynTimeout: 3000,             // optional, defaults to 1000 (ms)
+    ccpLoadTimeout: 10000            // optional, defaults to 5000 (ms)
+});
+
+connect.agent((agent) => {
+    agentObj = agent;
+    hookInit(agent);
+
+    agent.onRefresh((agent) => {
+        hookRefresh(agent);
+    })
+
+})
+
+
+connect.contact((contact) => {
+
+    contact.onConnecting((contact) => {
+        hookIncomingCall(contact)
+    });
+    // contact.onIncoming((contact) => {
+    //     incomingCall(contact)
+    // });
+
+    contact.onRefresh((contact) => {
+    });
+
+    contact.onAccepted((contact) => {
+    });
+
+    contact.onEnded(() => {
+    });
+
+    contact.onConnected(() => {
+        notify.log("Call has been connected, here is the object")
+        notify.log(contact);
+    });
+});
+
+// ######################## Event Hooks ########################
+
+// Run on first load
+async function hookInit(agent) {
+    phoneLog = new callHistory(agent);
+
+    // Update Agent call list once phoneLog has a phone log
+    // After this, it is hooked into incoming calls
+    let intervalVar = setInterval(() => {
+        if (phoneLog.getLog().length > 0) {
+            updateAgentCallList();
+            clearInterval(intervalVar);
+        }
+    }, 1000);
+
+    await hookIntervalRefresh(agent, 30000);
+
+    let eventSub = new Subscribe(API + '/metrics', (r) => {
+        let data = JSON.parse(r.data)
+        let available_events = {
+            'queue_count': _realtimeUpdateQueueCount,
+            'available_count': _realtimeUpdateAvailableCount,
+        }
+        for (let [key, value] of Object.entries(data)) {
+            if (available_events.hasOwnProperty(key)) {
+                available_events[key](data);
+            }
+        }
+    })
+}
+
+// Is periodically refreshed automatically when there is an agent change
+function hookRefresh(agent) {
+}
+
+// Refreshed on an interval
+async function hookIntervalRefresh(agent, interval = 30000) {
+    function actions(agent) {
+        let breakReminders = {
+            "Quick Break": 20,
+            "AfterCallWork": 20,
+            "Lunch": 70,
+        }
+        let stateName = agent.getState().name;
+        checkStateDuration(agent, stateName, breakReminders[stateName]);
+    }
+
+    setInterval(() => {
+        actions(agent)
+    }, interval);
+}
+
+// Actions to take when there is an action
+function hookIncomingCall(contact) {
+    notify.log("Incoming Call, here is the contact object");
+    notify.log(contact);
+    let phoneNumber = contact.getActiveInitialConnection().getEndpoint().phoneNumber;
+    let contactId = contact.getContactId();
+
+
+    notify.show(`Incoming Call from ${phoneNumber}`,
+        "Incoming Call", "incomingCall", 0);
+    // [{name:'click', handler:() => { contact.accept() }}])
+
+
+    // Update the recent calls for this number
+    updateNumberCallList(phoneNumber);
+
+    // Put this below updateNumberCallList so that a users most recent call is
+    // not the current call
+    phoneLog.add(contactId, phoneNumber);
+
+    // Agent's recent calls
+    updateAgentCallList();
+
+}
+
+// ######################## Function Constructors ##################
+
+// ######## HTML5 Notifier          ########################
+function Notifier(namespace = "") {
+    this.namespace = namespace;
+    this.list = [];
+    this.id = 1;
+
+    this.log = (msg) => {
+        console.log(msg)
+    }
+    this.compatible = () => {
+        if (typeof Notification === 'undefined') {
+            this.log("Notifications are not available for your browser.");
+            return false;
+        }
+        return true;
+    }
+    this.authorize = () => {
+        if (this.compatible()) {
+            Notification.requestPermission((permission) => {
+                this.log(`Permission to display: ${permission}`);
+            });
+        }
+    }
+    this.show = (message, title = "Notification", tag = this.id, interval = 0, events = []) => {
+        // TODO : Should not notify if user is offline.. Or In meeting?
+        if (this.compatible()) {
+            if (interval > 0) {
+                let now = Date.now();
+                let secondsSinceNotify = (now - lastTagNotification[tag]) / 1000;
+                if (isNaN(secondsSinceNotify) || secondsSinceNotify > interval) {
+                    let notification = this._show(message, title, tag, events)
+                    if (tag !== this.id) {
+                        lastTagNotification[tag] = now;
+                    }
+                }
+            }
+        } else {
+            let notification = this._show(message, title, tag, events)
+        }
+        this.id++;
+    }
+
+    this._show = (message, title, tag, events) => {
+        if (this.compatible()) {
+            this.list[tag] = new Notification(`${this.namespace} ${title}`, {
+                body: message,
+                tag: tag,
+                lang: "en-US",
+                dir: "auto",
+            });
+
+            // Available events for notifications: clicked, showed, errored, closed
+            // events should look like: [{name: 'clicked', handler: (e) => {console.log("Hello World")}}]
+            if (events.length > 0) {
+                for (let event of events) {
+                    notify.log("Event handler")
+                    notify.log(event)
+                    this.list[tag].addEventListener(event.name, event.handler);
+                }
+            }
+            return this.list[tag]; // Not used currently
+
+        }
+    }
+    this.logEvent = (id, event) => {
+        this.log(`Notification # ${id} ${event}`);
+    }
+}
+
+
+// ######## User Local Call History ########################
+function callHistory(agent) {
+    this.agent = agent;
+    this.username = agent.getConfiguration().username;
+    this.historyLimit = 50;
+    fetch(API + `/calls/agent/${this.username}`, {
+        method: 'GET',
+        headers: {
+            "Content-Type": "application/json;charset=UTF-8"
+        },
+    })
+        .then(r => r.json())
+        .then(d => this.log = d)
+
+    this.add = (contactId, phoneNumber) => {
+        let logItem = {
+            contactId: contactId,
+            phoneNumber: phoneNumber,
+            timestamp: Date.now(),
+            agent: this.username,
+        }
+        this.log.push(logItem);
+
+        fetch(API + `/calls/agent/${this.username}`, {
+            method: 'POST',
+            headers: {
+                "Content-Type": "application/json;charset=UTF-8"
+            },
+            body: JSON.stringify(logItem),
+        })
+            .then(r => console.log(r))
+        while (this.log.length > 50) {
+            this.log.pop()
+        }
+    }
+
+    this.getLog = (asc = false) => {
+        if (this.log !== undefined && this.log.length > 0) {
+            return sortPropertyList(this.log, "timestamp", asc)
+        }
+        return []
+    }
+}
+
+
+// ######## Event Subscribe         ########################
+
+function Subscribe(url, callback) {
+    this.url = url;
+    this.callback = callback
+    const eventSource = new EventSource(url);
+    eventSource.addEventListener('message', response => this.callback(response))
+    return eventSource
+}
+
+
+// ######################## Realtime Status Sections ########################
+// Takes functions starting with realtime and use them here
+// Events are sent from the server to this endpoint using Server Sent Events (SSE)
+// We can add as many functions as needed here. Only when something is changed for that 
+//  Server will something change
+
+// ######## Realtime Queue Count ########################
+function _realtimeUpdateQueueCount(data) {
+    let value = data.queue_count
+    let queueCountSection = document.querySelector('#queueCount');
+    let queueCountValue = document.querySelector('#queueCount > .value');
+
+    spinnerToggle(queueCountValue, false)
+    queueCountValue.innerHTML = value;
+
+    if (value >= queueCountAlert) {
+        if (agentSideline()) {
+            let queueNotifier = new Notifier("queueCount");
+            queueNotifier.show(`Queue Count is ${value}!\nCan you help?`,
+                "Callers Waiting", "queueCount")
+        }
+        queueCountSection.classList.add(TABLE_ALERT_CLASS)
+    } else {
+        queueCountSection.classList.remove(TABLE_ALERT_CLASS)
+    }
+}
+
+// ######## Realtime Available Agent Count ########################
+function _realtimeUpdateAvailableCount(data) {
+    let availableCount = data.available_count;
+    let activeAgentCount = data.active_agent_count;
+    console.log(data)
+    let agentCountSection = document.querySelector('#availableAgentCount');
+    let agentCountValue = document.querySelector('#availableAgentCount > .value');
+
+    spinnerToggle(agentCountValue, false);
+    // TODO : Should not count currently connected calls as on call : Test if done
+    let sidelineAgents = [];
+    for (let userlistElement of data.user_list) {
+        if (userlistElement.status.name.toLowerCase() in sidelineStatuses) {
+            sidelineAgents.push(userlistElement)
+        }
+    }
+    sidelineAgents.length > 0 ? agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}+${sidelineAgents.length}` :
+        agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}`
+
+    if (activeAgentCount <= 1) {
+        agentCountSection.classList.add(TABLE_ALERT_CLASS);
+        if (agentSideline()) {
+            let tag = "availableAgents"
+            let notify = new Notifier(tag)
+            notify.show(`There are currently ${activeAgentCount} available agents`,
+                "Available Agents", tag, 60)
+        }
+    } else {
+        agentCountSection.classList.remove(TABLE_ALERT_CLASS);
+    }
+}
+
+
+// ######## Agents recent call list ########################
+
+function updateAgentCallList() {
+    let callListSection = document.querySelector('#agentCallList');
+    let convertedCalls = [];
+    let calls = phoneLog.getLog();
+    for (let call of calls) {
+        let c_time = new Intl.DateTimeFormat('en-US', {
+            weekday: 'short',
+            hour: 'numeric',
+            minute: 'numeric'
+        }).format(new Date(call.timestamp))
+        let c_username = call.agent.slice(0, (call.agent.indexOf('@')))
+        convertedCalls.push(`${call.phoneNumber} @ ${c_time}`)
+    }
+    let newSection = createCollapseList(convertedCalls, true, 'dblclick', 'agentCallList');
+    spinnerToggle(callListSection, false);
+    callListSection.parentNode.replaceChild(newSection, callListSection);
+}
+
+// ######## Who a phone number called recently ########################
+
+async function updateNumberCallList(phoneNumber) {
+    let numberListSection = document.querySelector('#numberCallList');
+    // let phoneNumber = contact.getActiveInitialConnection().getEndpoint().phoneNumber;
+    let convertedCalls = [];
+
+    const url = API + `/calls/number/${phoneNumber}`
+    let headers = new Headers();
+    headers.append('Content-Type', 'application/json;charset=UTF-8')
+
+    const res = await fetch(url, {headers: headers});
+    if (res.ok) {
+        const numberCallList = await res.json();
+        let sortedNumberCallList = sortPropertyList(numberCallList, "timestamp", false);
+        for (let call of sortedNumberCallList) {
+            let c_time = new Intl.DateTimeFormat('en-US', {
+                weekday: 'short',
+                hour: 'numeric',
+                minute: 'numeric'
+            }).format(new Date(call.timestamp))
+            let c_username = call.agent.slice(0, (call.agent.indexOf('@')))
+            convertedCalls.push(`Called ${c_username} @ ${c_time}`)
+        }
+        let newSection = createCollapseList(convertedCalls, true, 'dblclick', 'numberCallList');
+        numberListSection.parentNode.replaceChild(newSection, numberListSection);
+    } else {
+        this.log("updateNumberCallList: Unable to update")
+    }
+
+
+}
+
+// ######################## Helper Functions ########################
+
+// Sets the agent to the specified state
+function setToState(agent, state) {
+    let availableState = agent.getAgentStates().find(listedStates => listedStates.name === state)
+    agent.setState(availableState);
+}
+
+// If an agent is on the "SideLine" it means they are not routable, but can be.
+function agentSideline() {
+    let not_routable = agentObj.getState().type === connect.AgentStateType.NOT_ROUTABLE;
+    return not_routable && ! agentObj.getState().name.toLowerCase() in excludedStatuses
+
+}
+
+// Will send notifications if this maxMinutes is reached
+function checkStateDuration(agent, stateName, maxMinutes) {
+    let agentStateLength = Math.floor(agent.getStateDuration() / 1000 / 60);
+    let notificationTag = "long-break";
+
+    if (agentStateLength > maxMinutes) {
+        notify.show(`Hi ${agent.getName()}! Letting you know you've been on ${stateName} for ${agentStateLength} minutes`,
+            stateName, notificationTag, 60)
+    }
+
+}
+
+// Converts milliseconds to minutes
+function ms_to_min(milliseconds) {
+    return milliseconds / 1000 / 60;
+}
+
+function sortPropertyList(array, property, asc = true) {
+    asc ? array.sort((a, b) => a[property] - b[property])
+        : array.sort((a, b) => b[property] - a[property])
+    return array
+}
+
+function spinnerToggle(dom, show, spinner = 'spinner-border') {
+    let ds = dom.classList
+    if (show && !ds.contains(spinner)) {
+        ds.add(spinner)
+    } else if (!show && ds.contains(spinner)) {
+        ds.remove(spinner)
+    }
+}
+
+function createCollapseList(array, collapsed = false, action = "click", id = null) {
+    let parentHide = "collapsed"
+    let childHide = "hide"
+
+    let ul = document.createElement('ul');
+    ul.classList.add('list-group')
+    if (id !== null) ul.id = id;
+
+    if (array.length > 0) {
+        for (let row of array) {
+            let li = document.createElement('li');
+            li.classList.add('list-group-item')
+            li.innerHTML = row;
+            li.setAttribute('data-data', row);
+            ul.appendChild(li);
+        }
+        if (collapsed === true) {
+            Array.from(ul.children).slice(1).forEach(e => e.classList.add(childHide));
+            ul.children[0].classList.add(parentHide);
+        }
+
+        ul.addEventListener(action, (e) => {
+            if (e.target.classList.contains(parentHide)) {
+                for (let item of ul.children) {
+                    item.classList.remove(childHide);
+                    e.target.classList.remove(parentHide);
+                }
+            } else {
+                let firstItem = ul.children[0]
+                for (let item of ul.children) {
+                    item === firstItem ? item.classList.add(parentHide) : item.classList.add(childHide)
+                }
+
+            }
+        })
+    }
+    return ul;
+}
