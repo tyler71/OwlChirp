@@ -19,7 +19,7 @@ class ConnectMetrics:
         self.connect_instance = connect_instance
         self.client = boto3.client('connect')
 
-    @cached(TTLCache(maxsize=1024 * 8, ttl=3600))
+    @cached(TTLCache(maxsize=1024 * 8, ttl=3600 * 6))
     def _refresh_queues(self) -> dict:
         queues = self.client.list_queues(
             InstanceId=os.getenv('CONNECT_INSTANCE', None),
