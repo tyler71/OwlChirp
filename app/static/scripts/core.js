@@ -372,8 +372,11 @@ async function updateNumberCallList(phoneNumber) {
     // let phoneNumber = contact.getActiveInitialConnection().getEndpoint().phoneNumber;
     let convertedCalls = [];
 
-    const url = API + `/calls/number/${phoneNumber}`
-
+    let searchParams = new URLSearchParams({
+        phone_number: phoneNumber,
+        max_records: "10",
+    });
+    const url = API + '/calls/number/' + searchParams;
     const res = await fetch(url, {headers: JSON_HEADERS});
     if (res.ok) {
         const numberCallList = await res.json();

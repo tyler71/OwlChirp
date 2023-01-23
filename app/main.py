@@ -67,9 +67,9 @@ async def agent_call_log():
     db = Db()
     await db.init()
     if request.method == 'GET':
+        max_records = request.args.get("max_records", None)
         if not await db.verify_user(username):
             await db.add_user(username)
-        max_records = request.args.get("max_records", None)
         rows = await db.get_agent_calls(username=username, max_records=max_records)
         converted_rows = list()
         for row in rows:
