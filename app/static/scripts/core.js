@@ -96,12 +96,7 @@ async function hookInit(agent) {
 
     // Update Agent call list once phoneLog has a phone log
     // After this, it is hooked into incoming calls
-    let intervalVar = setInterval(() => {
-        if (phoneLog.getLog().length > 0) {
-            updateAgentCallList();
-            clearInterval(intervalVar);
-        }
-    }, 1000);
+    await updateAgentCallList();
 
     await hookIntervalRefresh(agent, 30000);
 
@@ -240,14 +235,22 @@ function callHistory(agent) {
         username: this.username,
         max_records: "10",
     });
-    fetch(API + '/calls/agent?' + this.searchParams, {
-        method: 'GET',
-        headers: JSON_HEADERS,
-    })
-        .then(r => r.json())
-        .then(d => this.log = d)
+    this.log = undefined;
 
-    this.add = (contactId, phoneNumber) => {
+    this._refreshCalls = async () => {
+        let req = await fetch(API + '/calls/agent?' + this.searchParams, {
+            method: 'GET',
+            headers: JSON_HEADERS,
+        })
+        let res = await req.json();
+        this.log = res;
+        if(res === undefined) {
+            res = [];
+        }
+        return res;
+    }
+
+    this.add = async (contactId, phoneNumber) => {
         let logItem = {
             contactId: contactId,
             phoneNumber: phoneNumber,
@@ -256,22 +259,20 @@ function callHistory(agent) {
         }
         this.log.push(logItem);
 
-        fetch(API + '/calls/agent', {
+        let req = await fetch(API + '/calls/agent', {
             method: 'POST',
             headers: JSON_HEADERS,
             body: JSON.stringify(logItem),
         })
-            .then(r => console.log(r))
+        console.log(await req);
         while (this.log.length > 50) {
             this.log.pop()
         }
     }
 
-    this.getLog = (asc = false) => {
-        if (this.log !== undefined && this.log.length > 0) {
-            return sortPropertyList(this.log, "timestamp", asc)
-        }
-        return []
+    this.getLog = async (asc = false) => {
+        let log = await this._refreshCalls();
+        return sortPropertyList(log, "timestamp", asc)
     }
 }
 
@@ -347,10 +348,10 @@ function _realtimeUpdateAvailableCount(data) {
 
 
 // ######## Agents recent call list ########################
-function updateAgentCallList() {
+async function updateAgentCallList() {
     let callListSection = document.querySelector('#agentCallList');
     let convertedCalls = [];
-    let calls = phoneLog.getLog();
+    let calls = await phoneLog.getLog();
     for (let call of calls) {
         let c_time = new Intl.DateTimeFormat('en-US', {
             weekday: 'short',
