@@ -256,7 +256,7 @@ function callHistory(agent) {
         }
         this.log.push(logItem);
 
-        fetch(API + '/calls/agent?' + this.searchParams, {
+        fetch(API + '/calls/agent', {
             method: 'POST',
             headers: JSON_HEADERS,
             body: JSON.stringify(logItem),
@@ -376,7 +376,7 @@ async function updateNumberCallList(phoneNumber) {
         phone_number: phoneNumber,
         max_records: "10",
     });
-    const url = API + '/calls/number/' + searchParams;
+    const url = API + '/calls/number?' + searchParams;
     const res = await fetch(url, {headers: JSON_HEADERS});
     if (res.ok) {
         const numberCallList = await res.json();
