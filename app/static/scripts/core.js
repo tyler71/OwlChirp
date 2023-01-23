@@ -244,7 +244,7 @@ function callHistory(agent) {
         })
         let res = await req.json();
         this.log = res;
-        if(res === undefined) {
+        if (res === undefined) {
             res = [];
         }
         return res;
@@ -361,7 +361,8 @@ async function updateAgentCallList() {
         let c_username = call.agent.slice(0, (call.agent.indexOf('@')))
         convertedCalls.push(`${formatPhoneNumber(call.phoneNumber)} ${c_time}`)
     }
-    let newSection = createCollapseList(convertedCalls, true, 'dblclick', 'agentCallList');
+    // let newSection = createCollapseList(convertedCalls, true, 'dblclick', 'agentCallList');
+    let newSection = createRecentCallList(calls, "Recent Calls", 'recentCallList', 'click');
     spinnerToggle(callListSection, false);
     callListSection.parentNode.replaceChild(newSection, callListSection);
 }
@@ -493,4 +494,77 @@ function createCollapseList(array, collapsed = false, action = "click", id = nul
         })
     }
     return ul;
+}
+
+function createRecentCallList(array, title = "List", id = null, action = "click") {
+    const PARENT_HIDE = 'collapsed';
+    const CHILD_HIDE = 'hide';
+
+    let box = document.createElement('div');
+    if (id !== null) {
+        box.id = id;
+    }
+
+    let boxCaption = document.createElement("caption");
+    boxCaption.innerHTML = title;
+    boxCaption.classList.add("listTitle");
+    boxCaption.addEventListener(action, (e) => {
+        let table = e.target.nextElementSibling.children[0].children[0];
+        let rows = table.children;
+        if (rows[0].classList.contains(PARENT_HIDE)) {
+            for (let row of rows) {
+                row.classList.remove(CHILD_HIDE);
+                rows[0].classList.remove(PARENT_HIDE);
+            }
+        } else {
+            let firstRow = rows[0];
+            for (let row of rows) {
+                row === firstRow ? row.classList.add(PARENT_HIDE) : row.classList.add(CHILD_HIDE);
+            }
+        }
+    })
+
+
+    let boxList = document.createElement("div");
+    boxList.classList.add("list");
+
+    let table = document.createElement('table');
+    let tbody = document.createElement('tbody');
+    table.classList.add("table");
+    table.classList.add("table-striped");
+    table.classList.add("table-hover");
+    tbody.addEventListener('dblclick', (e) => {
+    	let row = e.target.parentElement;
+      alert(row.dataset.contactid);
+    });
+    table.appendChild(tbody);
+
+    boxList.appendChild(table);
+
+    box.appendChild(boxCaption);
+    box.appendChild(boxList);
+
+
+    for (let obj of array) {
+        let tr = document.createElement('tr');
+        let ts = document.createElement('td');
+        let pn = document.createElement('td');
+        pn.innerHTML = formatPhoneNumber(obj.phoneNumber);
+
+        let c_time = new Intl.DateTimeFormat('en-US', {
+            weekday: 'short',
+            hour: 'numeric',
+            minute: 'numeric'
+        }).format(new Date(obj.timestamp))
+        ts.innerHTML = c_time;
+
+        tr.setAttribute('data-contactid', obj.contactId);
+        tr.appendChild(ts);
+        tr.appendChild(pn);
+        tbody.appendChild(tr);
+    }
+    Array.from(tbody.children).slice(1).forEach(e => e.classList.add(CHILD_HIDE));
+    tbody.children[0].classList.add(PARENT_HIDE);
+
+    return box;
 }

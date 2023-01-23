@@ -28,6 +28,10 @@ html, body {
     flex-wrap: wrap;
     justify-content: space-around;
 }
+div > div > table > tbody > tr,
+div > caption {
+    cursor: pointer;
+}
 
 /* Hide padding and circle for lists */
 #data div li,
