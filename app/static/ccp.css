@@ -28,9 +28,13 @@ html, body {
     flex-wrap: wrap;
     justify-content: space-around;
 }
-div > div > table > tbody > tr,
-div > caption {
+#recentCallList > div > table > tbody > tr,
+#recentCallList > div > h2 {
     cursor: pointer;
+}
+
+.listTitle > h2 {
+    font-size: 1.2rem;
 }
 
 /* Hide padding and circle for lists */

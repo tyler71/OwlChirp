@@ -505,11 +505,13 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
         box.id = id;
     }
 
-    let boxCaption = document.createElement("caption");
-    boxCaption.innerHTML = title;
+    let boxCaption = document.createElement("div");
+    let listHeader = document.createElement('h2');
+    listHeader.innerHTML = title
+    boxCaption.appendChild(listHeader);
     boxCaption.classList.add("listTitle");
     boxCaption.addEventListener(action, (e) => {
-        let table = e.target.nextElementSibling.children[0].children[0];
+        let table = e.target.parentElement.nextElementSibling.children[0].children[0];
         let rows = table.children;
         if (rows[0].classList.contains(PARENT_HIDE)) {
             for (let row of rows) {
