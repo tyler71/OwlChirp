@@ -515,17 +515,19 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
     boxCaption.addEventListener(action, (e) => {
         let table = e.target.parentElement.nextElementSibling.children[0].children[0];
         let rows = table.children;
-        if (rows[0].classList.contains(PARENT_HIDE)) {
-            listHeader.innerHTML = `˅ ${title} (${rows.length}) ˅`
-            for (let row of rows) {
-                row.classList.remove(CHILD_HIDE);
-                rows[0].classList.remove(PARENT_HIDE);
-            }
-        } else {
-            listHeader.innerHTML = `˂ ${title} (${rows.length}) ˃`
-            let firstRow = rows[0];
-            for (let row of rows) {
-                row === firstRow ? row.classList.add(PARENT_HIDE) : row.classList.add(CHILD_HIDE);
+        if(rows.length > 0) {
+            if (rows[0].classList.contains(PARENT_HIDE)) {
+                listHeader.innerHTML = `˅ ${title} (${rows.length}) ˅`
+                for (let row of rows) {
+                    row.classList.remove(CHILD_HIDE);
+                    rows[0].classList.remove(PARENT_HIDE);
+                }
+            } else {
+                listHeader.innerHTML = `˂ ${title} (${rows.length}) ˃`
+                let firstRow = rows[0];
+                for (let row of rows) {
+                    row === firstRow ? row.classList.add(PARENT_HIDE) : row.classList.add(CHILD_HIDE);
+                }
             }
         }
     })

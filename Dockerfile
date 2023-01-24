@@ -21,9 +21,9 @@ RUN tar -xf oauth.tar.gz                \
 
 # caddy handles http/s termination. It is built from scratch
 # This allows for additional modules later if we need it.
-FROM caddy:2.4.1-builder AS build_reverse_proxy
+FROM caddy:2.6.2-builder AS build_reverse_proxy
 ENV XCADDY_SKIP_CLEANUP=1
-ENV BUILD_VERSION=v2.4.6
+ENV BUILD_VERSION=v2.6.2
 
 RUN xcaddy build $BUILD_VERSION
 
@@ -42,10 +42,6 @@ ENV TZ="America/Los_Angeles"
 
 ENV DATA_DIR /data
 
-COPY --from=build_app_environment /usr/local         /usr/local
-COPY --from=build_oauth           /opt/oauth-proxy   /opt/oauth-proxy
-COPY --from=build_reverse_proxy   /opt/reverse_proxy /opt/reverse_proxy
-
 RUN mkdir /app /data               \
  && groupadd application           \
       --gid 1000                   \
@@ -56,6 +52,10 @@ RUN mkdir /app /data               \
       --uid 1000                   \
       --gid 1000                   \
       --system
+
+COPY --from=build_app_environment /usr/local         /usr/local
+COPY --from=build_oauth           /opt/oauth-proxy   /opt/oauth-proxy
+COPY --from=build_reverse_proxy   /opt/reverse_proxy /opt/reverse_proxy
 
 RUN python -m pip install --no-cache-dir install supervisor
 
