@@ -147,14 +147,14 @@ async function hookIncomingCall(contact) {
 
 
     // Update the recent calls for this number
-    updateNumberCallList(phoneNumber);
+    // await updateNumberCallList(phoneNumber);
 
     // Put this below updateNumberCallList so that a users most recent call is
     // not the current call
     phoneLog.add(contactId, phoneNumber);
 
     // Agent's recent calls
-    updateAgentCallList();
+    await updateAgentCallList();
 
 }
 
