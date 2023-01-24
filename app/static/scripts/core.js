@@ -267,7 +267,6 @@ function callHistory(agent) {
             headers: JSON_HEADERS,
             body: JSON.stringify(logItem),
         })
-        console.log(await req);
         while (this.log.length > 50) {
             this.log.pop()
         }
@@ -573,8 +572,10 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
         tr.appendChild(pn);
         tbody.appendChild(tr);
     }
-    Array.from(tbody.children).slice(1).forEach(e => e.classList.add(CHILD_HIDE));
-    tbody.children[0].classList.add(PARENT_HIDE);
+    if (tbody.children.length > 0) {
+        Array.from(tbody.children).slice(1).forEach(e => e.classList.add(CHILD_HIDE));
+        tbody.children[0].classList.add(PARENT_HIDE);
+    }
 
     return box;
 }
