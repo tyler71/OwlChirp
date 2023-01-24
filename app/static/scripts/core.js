@@ -151,7 +151,7 @@ async function hookIncomingCall(contact) {
 
     // Put this below updateNumberCallList so that a users most recent call is
     // not the current call
-    phoneLog.add(contactId, phoneNumber);
+    await phoneLog.add(contactId, phoneNumber);
 
     // Agent's recent calls
     await updateAgentCallList();
@@ -351,7 +351,7 @@ function _realtimeUpdateAvailableCount(data) {
 
 // ######## Agents recent call list ########################
 async function updateAgentCallList() {
-    let callListSection = document.querySelector('#agentCallList');
+    let callListSection = document.querySelector('#recentCallList');
     let convertedCalls = [];
     let calls = await phoneLog.getLog();
     for (let call of calls) {
