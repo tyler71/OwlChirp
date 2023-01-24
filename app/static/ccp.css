@@ -45,3 +45,7 @@ html, body {
     cursor: pointer;
     border: none;
 }
+
+.noselect {
+    user-select: none;
+}

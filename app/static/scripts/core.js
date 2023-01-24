@@ -509,18 +509,20 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
 
     let boxCaption = document.createElement("div");
     let listHeader = document.createElement('h2');
-    listHeader.innerHTML = title
     boxCaption.appendChild(listHeader);
     boxCaption.classList.add("listTitle");
+    boxCaption.classList.add("noselect");
     boxCaption.addEventListener(action, (e) => {
         let table = e.target.parentElement.nextElementSibling.children[0].children[0];
         let rows = table.children;
         if (rows[0].classList.contains(PARENT_HIDE)) {
+            listHeader.innerHTML = `˅ ${title} (${rows.length}) ˅`
             for (let row of rows) {
                 row.classList.remove(CHILD_HIDE);
                 rows[0].classList.remove(PARENT_HIDE);
             }
         } else {
+            listHeader.innerHTML = `˂ ${title} (${rows.length}) ˃`
             let firstRow = rows[0];
             for (let row of rows) {
                 row === firstRow ? row.classList.add(PARENT_HIDE) : row.classList.add(CHILD_HIDE);
@@ -573,8 +575,11 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
         tbody.appendChild(tr);
     }
     if (tbody.children.length > 0) {
+        listHeader.innerHTML = `˂ ${title} (${tbody.children.length}) ˃`
         Array.from(tbody.children).slice(1).forEach(e => e.classList.add(CHILD_HIDE));
         tbody.children[0].classList.add(PARENT_HIDE);
+    } else {
+        listHeader.innerHTML = `˂ ${title} ˃`
     }
 
     return box;
