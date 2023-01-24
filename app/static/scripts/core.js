@@ -1,18 +1,21 @@
 let notify = new Notifier();
 notify.authorize();
 
-const API = '/api'
+const API = '/api';
 
-const TABLE_INFO_CLASS = 'table-info'
-const TABLE_ALERT_CLASS = 'table-warning'
-const TABLE_DANGER_CLASS = 'table-danger'
+const SPS_CONNECT_DOMAIN = new URL('https://sps-connect-poc.my.connect.aws');
+const TIME_ZONE = 'America/Los_Angeles';
 
-const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1}
-const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1}
-const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70}
+const TABLE_INFO_CLASS = 'table-info';
+const TABLE_ALERT_CLASS = 'table-warning';
+const TABLE_DANGER_CLASS = 'table-danger';
+
+const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1};
+const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
+const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70};
 
 let JSON_HEADERS = new Headers();
-JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8')
+JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8');
 
 let queueCountAlert = 1;
 let containerDiv = document.querySelector('#ccp');
@@ -55,7 +58,7 @@ connect.core.initCCP(containerDiv, {
 
 connect.agent((agent) => {
     agentObj = agent;
-    hookInit(agent);
+    hookInit(agent).then(r => console.log(r));
 
     agent.onRefresh((agent) => {
         hookRefresh(agent);
@@ -67,7 +70,7 @@ connect.agent((agent) => {
 connect.contact((contact) => {
 
     contact.onConnecting((contact) => {
-        hookIncomingCall(contact)
+        hookIncomingCall(contact).then(r => console.log(r))
     });
     // contact.onIncoming((contact) => {
     //     incomingCall(contact)
@@ -131,7 +134,7 @@ async function hookIntervalRefresh(agent, interval = 30000) {
 }
 
 // Actions to take when there is an action
-function hookIncomingCall(contact) {
+async function hookIncomingCall(contact) {
     notify.log("Incoming Call, here is the contact object");
     notify.log(contact);
     let phoneNumber = contact.getActiveInitialConnection().getEndpoint().phoneNumber;
@@ -271,7 +274,7 @@ function callHistory(agent) {
     }
 
     this.getLog = async (asc = false) => {
-        let log = await this._refreshCalls();
+        let log = this.log === undefined ? await this._refreshCalls() : this.log
         return sortPropertyList(log, "timestamp", asc)
     }
 }
@@ -537,7 +540,12 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
     table.classList.add("table-hover");
     tbody.addEventListener('dblclick', (e) => {
     	let row = e.target.parentElement;
-      alert(row.dataset.contactid);
+        if(row.nodeName === 'TR') {
+            let contactIdUrl = new URL(`contact-trace-records/details/${row.dataset.contactid}`, SPS_CONNECT_DOMAIN);
+            contactIdUrl.searchParams.set('tz', TIME_ZONE);
+            window.open(contactIdUrl);
+        }
+
     });
     table.appendChild(tbody);
 
