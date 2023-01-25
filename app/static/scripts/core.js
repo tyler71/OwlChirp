@@ -96,6 +96,10 @@ connect.contact((contact) => {
 // Run on first load
 async function hookInit(agent) {
     phoneLog = new callHistory(agent);
+    let metricEventSub = eventSub('/metrics', {
+        'queue_count': _realtimeUpdateQueueCount,
+        'available_count': _realtimeUpdateAvailableCount,
+    })
 
     // Update Agent call list once phoneLog has a phone log
     // After this, it is hooked into incoming calls
@@ -103,18 +107,6 @@ async function hookInit(agent) {
 
     await hookIntervalRefresh(agent, 30000);
 
-    let eventSub = new Subscribe(API + '/metrics', (r) => {
-        let data = JSON.parse(r.data)
-        let available_events = {
-            'queue_count': _realtimeUpdateQueueCount,
-            'available_count': _realtimeUpdateAvailableCount,
-        }
-        for (let [key, value] of Object.entries(data)) {
-            if (available_events.hasOwnProperty(key)) {
-                available_events[key](data);
-            }
-        }
-    })
 }
 
 // Is periodically refreshed automatically when there is an agent change
@@ -231,6 +223,20 @@ function Notifier(namespace = "") {
 
 
 // ######## User Local Call History ########################
+
+function eventSub(endpoint, events) {
+    let subObj = new Subscribe(API + `${endpoint}`, (r) => {
+        let data = JSON.parse(r.data)
+        for (let [key, value] of Object.entries(data)) {
+            if (events.hasOwnProperty(key)) {
+                events[key](data);
+            }
+        }
+    })
+    return subObj
+}
+
+// ######## User Local Call History ########################
 function callHistory(agent) {
     this.agent = agent;
     this.username = agent.getConfiguration().username;
@@ -280,12 +286,38 @@ function callHistory(agent) {
 
 // ######## Event Subscribe         ########################
 
-function Subscribe(url, callback) {
+function Subscribe(url, callback, reconnect=300000) {
     this.url = url;
-    this.callback = callback
-    const eventSource = new EventSource(url);
-    eventSource.addEventListener('message', response => this.callback(response))
-    return eventSource
+    this.callback = callback;
+    this.reconnectTimeout = reconnect;
+    this.lastUpdate = Date.now();
+    this.eventSource = new EventSource(this.url);
+
+    this._regenerateEventSource = (eventSource=undefined) => {
+        if (eventSource !== undefined && eventSource.toString() === "[object EventSource]") {
+            eventSource.close();
+        }
+        this.eventSource = new EventSource(this.url);
+        this.eventSource.addEventListener('message', response => {
+            this.lastUpdate = Date.now();
+            this.callback(response);
+        })
+
+    }
+
+    this._regenerateEventSource();
+
+    setInterval(() => {
+        if (Date.now() - this.lastUpdate > this.reconnectTimeout) {
+            this._regenerateEventSource(this.eventSource)
+        }
+
+    }, this.reconnectTimeout);
+
+    this.eventSource.addEventListener('error', e => {
+        console.log(e);
+        this._regenerateEventSource(this.eventSource);
+    })
 }
 
 
