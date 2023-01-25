@@ -44,7 +44,7 @@ connect.core.initCCP(containerDiv, {
     softphone: {                      // optional, defaults below apply if not provided
         allowFramedSoftphone: true,   // optional, defaults to false
         disableRingtone: false,       // optional, defaults to false
-        // ringtoneUrl: "https://TLCCPFlask.tyler71.repl.co/static/ringtone/Intellection-Rob_Cosh-rt.mp3" // optional, defaults to CCP’s default ringtone if a falsy value is set
+        // ringtoneUrl: "https://TLCCP.tyler71.repl.co/static/ringtone/Intellection-Rob_Cosh-rt.mp3" // optional, defaults to CCP’s default ringtone if a falsy value is set
     },
     pageOptions: { //optional
         enableAudioDeviceSettings: false, // optional, defaults to 'false'
@@ -246,11 +246,10 @@ function callHistory(agent) {
             headers: JSON_HEADERS,
         })
         let res = await req.json();
-        this.log = res;
-        if (res === undefined) {
-            res = [];
-        }
-        return res;
+        let result = res === undefined ? [] : res
+
+        this.log = result;
+        return result;
     }
 
     this.add = async (contactId, phoneNumber) => {

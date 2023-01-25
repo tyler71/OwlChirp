@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/TLCCPFlask.iml" filepath="$PROJECT_DIR$/.idea/TLCCPFlask.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/TLCCP.iml" filepath="$PROJECT_DIR$/.idea/TLCCP.iml" />
     </modules>
   </component>
 </project>
