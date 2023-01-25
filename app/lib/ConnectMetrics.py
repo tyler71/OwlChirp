@@ -107,19 +107,26 @@ class ConnectMetrics:
 
         for user in current_users:
             user_id = user['User']['Id']
-            user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
+            # user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
             res = {
                 'user_id': user_id,
                 'status': {
                     # 'start': user['Status']['StatusStartTimestamp'],
                     'name': user['Status']['StatusName'],
-                },
-                'user': {
-                    'username': user_data['User']['Username'],
-                    'first_name': user_data['User']['IdentityInfo']['FirstName'],
-                    'last_name': user_data['User']['IdentityInfo']['LastName'],
-                },
+                }
             }
+            # res = {
+            #     'user_id': user_id,
+            #     'status': {
+            #         # 'start': user['Status']['StatusStartTimestamp'],
+            #         'name': user['Status']['StatusName'],
+            #     },
+            #     'user': {
+            #         'username': user_data['User']['Username'],
+            #         'first_name': user_data['User']['IdentityInfo']['FirstName'],
+            #         'last_name': user_data['User']['IdentityInfo']['LastName'],
+            #     },
+            # }
             user_list.append(res)
 
         return user_list
