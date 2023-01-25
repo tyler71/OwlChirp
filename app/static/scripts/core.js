@@ -132,8 +132,7 @@ async function hookIncomingCall(contact) {
     let phoneNumber = contact.getActiveInitialConnection().getEndpoint().phoneNumber;
     let contactId = contact.getContactId();
 
-
-    notify.show(`Incoming Call from ${phoneNumber}`,
+    notify.show(`Incoming Call from ${formatPhoneNumber(phoneNumber)}`,
         "Incoming Call", "incomingCall", 0);
     // [{name:'click', handler:() => { contact.accept() }}])
 
