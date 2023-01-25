@@ -85,7 +85,7 @@ class ConnectMetrics:
 
         return metric_hist_data['MetricResults']
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
+    # @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
     def _refresh_current_user_data(self) -> dict:
         queues = [q['Id'] for q in self._refresh_queues()]
 
@@ -99,7 +99,7 @@ class ConnectMetrics:
 
         return current_users['UserDataList']
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
+    # @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
     def _refresh_userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         user_list = list()
 

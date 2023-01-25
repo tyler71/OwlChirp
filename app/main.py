@@ -35,6 +35,7 @@ async def ccp():
     return await render_template('ccp.html')
 
 
+# We're not sending static as this file will often change.
 @app.route('/ccp.js')
 async def js_ccp():
     dir_path = os.path.dirname(os.path.realpath(__file__))
