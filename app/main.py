@@ -1,4 +1,6 @@
-from quart import Quart, request, render_template, make_response, abort
+import os
+
+from quart import Quart, request, render_template, make_response, abort, send_file
 
 from lib.Database import Db
 from lib.Events import ServerSentEvents, get_metric_data
@@ -33,9 +35,17 @@ async def ccp():
     return await render_template('ccp.html')
 
 
-# @app.route('/api/metrics')
-# def metrics():
-#     return Response(events.get_data_generator(server_sent_event=True), mimetype=MIME_EVENT_STREAM)
+@app.route('/ccp.js')
+async def js_ccp():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    js_file = os.path.join(dir_path, "static/scripts/core.js")
+    content = await send_file(js_file,
+                              mimetype='application/javascript', as_attachment=False)
+    response = await make_response(content)
+    if 'Cache-Control' not in response.headers:
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
 
 @app.route('/api/metrics')
 async def metrics():
@@ -110,5 +120,3 @@ async def number_call_log():
         converted_rows.append(converted_row)
 
     return converted_rows
-
-
