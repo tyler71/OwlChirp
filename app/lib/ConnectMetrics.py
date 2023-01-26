@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
-from cachetools import cached, TTLCache
+from cachetools import cached, TTLCache, LRUCache
 
 cache_length = 15
 
@@ -99,6 +99,10 @@ class ConnectMetrics:
 
         return current_users['UserDataList']
 
+    @cached(LRUCache(maxsize=64))
+    def _describe_user(self, user_id):
+        return self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
+    
     # @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
     def _refresh_userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         user_list = list()
@@ -107,26 +111,19 @@ class ConnectMetrics:
 
         for user in current_users:
             user_id = user['User']['Id']
-            # user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
+            user = self._describe_user(user_id)
             res = {
                 'user_id': user_id,
                 'status': {
                     # 'start': user['Status']['StatusStartTimestamp'],
                     'name': user['Status']['StatusName'],
-                }
+                },
+                'user': {
+                    'username': user_data['User']['Username'],
+                    'first_name': user_data['User']['IdentityInfo']['FirstName'],
+                    'last_name': user_data['User']['IdentityInfo']['LastName'],
+                },
             }
-            # res = {
-            #     'user_id': user_id,
-            #     'status': {
-            #         # 'start': user['Status']['StatusStartTimestamp'],
-            #         'name': user['Status']['StatusName'],
-            #     },
-            #     'user': {
-            #         'username': user_data['User']['Username'],
-            #         'first_name': user_data['User']['IdentityInfo']['FirstName'],
-            #         'last_name': user_data['User']['IdentityInfo']['LastName'],
-            #     },
-            # }
             user_list.append(res)
 
         return user_list
