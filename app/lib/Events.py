@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import os
 import random
 import typing
 from concurrent.futures import ThreadPoolExecutor
@@ -12,6 +13,8 @@ from typing import Any, AsyncGenerator
 from cachetools import cached, TTLCache
 
 from . import ConnectMetrics
+
+cache_length = os.getenv('AWS_CONNECT_CACHE_LENGTH', 15)
 
 
 class ServerSentEvents:
@@ -125,6 +128,7 @@ class ServerSentEvent:
 cm = ConnectMetrics.ConnectMetrics()
 
 
+@cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
 def get_metric_data() -> dict:
     r = {
         'queue_count': cm.queue_count,

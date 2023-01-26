@@ -8,7 +8,6 @@ from typing import Any
 import boto3
 from cachetools import cached, TTLCache, LRUCache
 
-cache_length = 15
 
 
 class ConnectMetrics:
@@ -16,12 +15,12 @@ class ConnectMetrics:
                  accesskey=os.environ["AWS_ACCESS_KEY_ID"],
                  secretkey=os.environ["AWS_SECRET_ACCESS_KEY"],
                  region=os.environ["AWS_DEFAULT_REGION"],
-                 connect_instance=os.getenv("CONNECT_INSTANCE", None)
+                 connect_instance=os.getenv("CONNECT_INSTANCE", None),
                  ):
         self.connect_instance = connect_instance
         self.client = boto3.client('connect')
 
-    @cached(TTLCache(maxsize=1024 * 8, ttl=3600 * 6))
+    @cached(TTLCache(maxsize=1024 * 8, ttl=3600 * 6))  # 6 hours
     def _refresh_queues(self) -> dict:
         queues = self.client.list_queues(
             InstanceId=os.getenv('CONNECT_INSTANCE', None),
@@ -31,7 +30,7 @@ class ConnectMetrics:
             logging.error("_refresh_queue network failure")
         return queues['QueueSummaryList']
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
+    @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_metric(self) -> dict:
 
         queues = [q['Id'] for q in self._refresh_queues()]
@@ -85,7 +84,7 @@ class ConnectMetrics:
 
         return metric_hist_data['MetricResults']
 
-    # @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
+    @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_current_user_data(self) -> dict:
         queues = [q['Id'] for q in self._refresh_queues()]
 
@@ -100,13 +99,13 @@ class ConnectMetrics:
         return current_users['UserDataList']
 
     @cached(LRUCache(maxsize=64))
-    def _describe_user(self, user_id):
+    def _describe_user(self, user_id) -> dict:
         user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
         if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_userlist#current_users network failure")
         return user_data
 
-    # @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
+    @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         user_list = list()
 
