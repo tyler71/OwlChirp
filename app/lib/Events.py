@@ -6,30 +6,15 @@ import math
 import os
 import random
 import typing
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator
 
-from functools import partial, wraps
 from cachetools import cached, TTLCache
 
 from . import ConnectMetrics
+from .Helper import sync_to_async
 
 cache_length = os.getenv('AWS_CONNECT_CACHE_LENGTH', 15)
-
-
-def sync_to_async(func, *args, **kwargs):
-    lock = asyncio.Lock()
-
-    @wraps(func)
-    async def inner():
-        async with lock:
-            loop = asyncio.get_running_loop()
-            p_func = partial(func, *args, **kwargs)
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                return await loop.run_in_executor(executor, p_func)
-
-    return inner
 
 
 class ServerSentEvents:
