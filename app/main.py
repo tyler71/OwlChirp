@@ -3,7 +3,8 @@ import os
 from quart import Quart, request, render_template, make_response, abort, send_file
 
 from lib.Database import Db
-from lib.Events import ServerSentEvents, get_metric_data
+from lib.Events import ServerSentEvents, get_metric_data, cm
+from lib.Helper import sync_to_async
 
 events = ServerSentEvents(["queue_count",
                            "available_count",
@@ -121,3 +122,10 @@ async def number_call_log():
         converted_rows.append(converted_row)
 
     return converted_rows
+
+
+@app.route('/api/calls/detail/<contact_id>')
+async def contact_detailed_info(contact_id):
+    user_data = await sync_to_async(cm.describe_contact, contact_id)()
+    return user_data
+

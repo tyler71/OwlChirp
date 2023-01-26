@@ -98,7 +98,14 @@ class ConnectMetrics:
         return current_users['UserDataList']
 
     @cached(LRUCache(maxsize=64))
-    def describe_user(self, user_id) -> dict:
+    def describe_contact(self, contact_id):
+        user_data = self.client.describe_contact(InstanceId=self.connect_instance, ContactId=contact_id)
+        if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
+            logging.error("_refresh_userlist#current_users network failure")
+        return user_data['Contact']
+
+    @cached(LRUCache(maxsize=64))
+    def _describe_user(self, user_id) -> dict:
         user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
         if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_userlist#current_users network failure")
@@ -112,7 +119,7 @@ class ConnectMetrics:
 
         for user in current_users:
             user_id = user['User']['Id']
-            user_data = self.describe_user(user_id)
+            user_data = self._describe_user(user_id)
             res = {
                 'user_id': user_id,
                 'status': {

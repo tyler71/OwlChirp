@@ -35,9 +35,6 @@ class ServerSentEvents:
         self.get_data_lock = asyncio.Lock()
 
     async def _get_data(self):
-        # async with self.get_data_lock:
-        #     loop = asyncio.get_running_loop()
-        #     with ThreadPoolExecutor(max_workers=1) as executor:
         return await self.data_func()
 
     def get_data_generator(self, server_sent_event=False) -> AsyncGenerator[bytes | Any, Any]:
