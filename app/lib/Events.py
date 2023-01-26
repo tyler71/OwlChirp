@@ -10,11 +10,26 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator
 
+from functools import partial, wraps
 from cachetools import cached, TTLCache
 
 from . import ConnectMetrics
 
 cache_length = os.getenv('AWS_CONNECT_CACHE_LENGTH', 15)
+
+
+def sync_to_async(func, *args, **kwargs):
+    lock = asyncio.Lock()
+
+    @wraps(func)
+    async def inner():
+        async with lock:
+            loop = asyncio.get_running_loop()
+            p_func = partial(func, *args, **kwargs)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                return await loop.run_in_executor(executor, p_func)
+
+    return inner
 
 
 class ServerSentEvents:
@@ -31,14 +46,14 @@ class ServerSentEvents:
 
     def __init__(self, events: list, data_func: typing.Callable):
         self.events = events
-        self.data_func = data_func
+        self.data_func = sync_to_async(data_func)
         self.get_data_lock = asyncio.Lock()
 
     async def _get_data(self):
-        async with self.get_data_lock:
-            loop = asyncio.get_running_loop()
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                return await loop.run_in_executor(executor, self.data_func)
+        # async with self.get_data_lock:
+        #     loop = asyncio.get_running_loop()
+        #     with ThreadPoolExecutor(max_workers=1) as executor:
+        return await self.data_func()
 
     def get_data_generator(self, server_sent_event=False) -> AsyncGenerator[bytes | Any, Any]:
         """
