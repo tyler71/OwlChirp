@@ -101,8 +101,11 @@ class ConnectMetrics:
 
     @cached(LRUCache(maxsize=64))
     def _describe_user(self, user_id):
-        return self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
-    
+        user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
+        if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
+            logging.error("_refresh_userlist#current_users network failure")
+        return user_data
+
     # @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
     def _refresh_userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         user_list = list()
@@ -111,7 +114,7 @@ class ConnectMetrics:
 
         for user in current_users:
             user_id = user['User']['Id']
-            user = self._describe_user(user_id)
+            user_data = self._describe_user(user_id)
             res = {
                 'user_id': user_id,
                 'status': {
