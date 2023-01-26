@@ -9,7 +9,6 @@ import boto3
 from cachetools import cached, TTLCache, LRUCache
 
 
-
 class ConnectMetrics:
     def __init__(self,
                  accesskey=os.environ["AWS_ACCESS_KEY_ID"],
@@ -99,11 +98,11 @@ class ConnectMetrics:
         return current_users['UserDataList']
 
     @cached(LRUCache(maxsize=64))
-    def _describe_user(self, user_id) -> dict:
+    def describe_user(self, user_id) -> dict:
         user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
         if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_userlist#current_users network failure")
-        return user_data
+        return user_data['User']
 
     @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
@@ -113,7 +112,7 @@ class ConnectMetrics:
 
         for user in current_users:
             user_id = user['User']['Id']
-            user_data = self._describe_user(user_id)
+            user_data = self.describe_user(user_id)
             res = {
                 'user_id': user_id,
                 'status': {
@@ -121,9 +120,9 @@ class ConnectMetrics:
                     'name': user['Status']['StatusName'],
                 },
                 'user': {
-                    'username': user_data['User']['Username'],
-                    'first_name': user_data['User']['IdentityInfo']['FirstName'],
-                    'last_name': user_data['User']['IdentityInfo']['LastName'],
+                    'username': user_data['Username'],
+                    'first_name': user_data['IdentityInfo']['FirstName'],
+                    'last_name': user_data['IdentityInfo']['LastName'],
                 },
             }
             user_list.append(res)
