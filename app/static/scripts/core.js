@@ -285,14 +285,14 @@ function callHistory(agent) {
 
 // ######## Event Subscribe         ########################
 
-function Subscribe(url, callback, reconnect=300000) {
+function Subscribe(url, callback, reconnect = 300000) {
     this.url = url;
     this.callback = callback;
     this.reconnectTimeout = reconnect;
     this.lastUpdate = Date.now();
     this.eventSource = new EventSource(this.url);
 
-    this._regenerateEventSource = (eventSource=undefined) => {
+    this._regenerateEventSource = (eventSource = undefined) => {
         if (eventSource !== undefined && eventSource.toString() === "[object EventSource]") {
             eventSource.close();
         }
@@ -545,7 +545,7 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
     boxCaption.addEventListener(action, (e) => {
         let table = e.target.parentElement.nextElementSibling.children[0].children[0];
         let rows = table.children;
-        if(rows.length > 0) {
+        if (rows.length > 0) {
             if (rows[0].classList.contains(PARENT_HIDE)) {
                 listHeader.innerHTML = `˅ ${title} (${rows.length}) ˅`
                 for (let row of rows) {
@@ -568,15 +568,75 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
 
     let table = document.createElement('table');
     let tbody = document.createElement('tbody');
+
     table.classList.add("table");
     table.classList.add("table-striped");
     table.classList.add("table-hover");
-    tbody.addEventListener('dblclick', (e) => {
-    	let row = e.target.parentElement;
-        if(row.nodeName === 'TR') {
-            let contactIdUrl = new URL(`contact-trace-records/details/${row.dataset.contactid}`, SPS_CONNECT_DOMAIN);
-            contactIdUrl.searchParams.set('tz', TIME_ZONE);
-            window.open(contactIdUrl);
+    tbody.addEventListener('dblclick', async (e) => {
+        let row = e.target.parentElement;
+        if (row.nodeName === 'TR' && row.parentElement === tbody) {
+            // We'll dynamically create a sub table for relevant information about this call.
+            // There will also be a link to the contact page as well
+            // Double-clicking again will collapse this list
+            if (row.classList.contains("expandedData")) {
+                if (row.children[2] !== undefined) {
+                    let subTable = row.children[2]
+                    if (subTable.classList.contains("hide")) {
+                        subTable.classList.remove("hide")
+                    } else {
+                        subTable.classList.add("hide")
+                    }
+                }
+            } else {
+                row.classList.add("expandedData");
+                let searchParams = new URLSearchParams({
+                    contact_id: row.dataset.contactid,
+                });
+                let subTableDataUrl = API + '/calls/detail?' + searchParams;
+                let subTableReq = await fetch(subTableDataUrl, {headers: JSON_HEADERS})
+                if (subTableReq.ok) {
+                    let subTable = document.createElement('table');
+                    subTable.classList.add("table")
+                    subTable.classList.add("subTable")
+                    let subTableBody = document.createElement('tbody');
+                    subTable.appendChild(subTableBody);
+
+                    let subTableJson = await subTableReq.json()
+
+                    // Generate the structure for the contact id url
+                    let contactIdLink = document.createElement('a')
+                    contactIdLink.href = `${SPS_CONNECT_DOMAIN}contact-trace-records/details/${subTableJson["id"]}?tx=${TIME_ZONE}`;
+                    contactIdLink.target = "_blank"
+                    contactIdLink.textContent = subTableJson["id"].split("-")[0]
+
+                    let subTableData = {
+                        "Name": subTableJson["agent_name"],
+                        "Answered": subTableJson["answered_timestamp"],
+                        "Id": contactIdLink.outerHTML,
+                    }
+                    console.log(subTableData)
+                    for (let [key, value] of Object.entries(subTableData)) {
+                        let subTableRow = document.createElement("tr")
+                        let subTableKey = document.createElement('td');
+                        let subTableValue = document.createElement('td');
+                        subTableKey.innerHTML = key;
+                        subTableValue.innerHTML = value;
+                        subTableRow.appendChild(subTableKey);
+                        subTableRow.appendChild(subTableValue);
+                        subTableBody.append(subTableRow);
+                    }
+
+                    row.appendChild(subTable);
+
+
+                }
+
+
+            }
+
+            // let contactIdUrl = new URL(`contact-trace-records/details/${row.dataset.contactid}`, SPS_CONNECT_DOMAIN);
+            // contactIdUrl.searchParams.set('tz', TIME_ZONE);
+            // window.open(contactIdUrl);
         }
 
     });

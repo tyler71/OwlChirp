@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import boto3
+from botocore.exceptions import ClientError
 from cachetools import cached, TTLCache, LRUCache
 
 
@@ -98,18 +99,34 @@ class ConnectMetrics:
         return current_users['UserDataList']
 
     @cached(LRUCache(maxsize=64))
-    def describe_contact(self, contact_id):
+    def _describe_contact(self, contact_id):
         user_data = self.client.describe_contact(InstanceId=self.connect_instance, ContactId=contact_id)
         if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_userlist#current_users network failure")
         return user_data['Contact']
 
+    def describe_contact(self, contact_id):
+        data = self._describe_contact(contact_id)
+        agent_data = self._describe_user(data["AgentInfo"]["Id"])
+        response = {
+            "id": data["Id"],
+            "initiation_method": data["InitiationMethod"],
+            "agent_name": f'{agent_data["IdentityInfo"]["FirstName"]} {agent_data["IdentityInfo"]["LastName"]}',
+            "enqueue_timestamp": data["QueueInfo"]["EnqueueTimestamp"],
+            "answered_timestamp": data["InitiationTimestamp"],
+            "ended_timestamp": data["LastUpdateTimestamp"],
+        }
+        return response
+
     @cached(LRUCache(maxsize=64))
     def _describe_user(self, user_id) -> dict:
-        user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
-        if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
-            logging.error("_refresh_userlist#current_users network failure")
-        return user_data['User']
+        try:
+            user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
+            if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
+                logging.error("_refresh_userlist#current_users network failure")
+            return user_data['User']
+        except ClientError as e:
+            logging.error(e)
 
     @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:

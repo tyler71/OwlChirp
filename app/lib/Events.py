@@ -42,10 +42,10 @@ class ServerSentEvents:
         Returns a generator that returns all data on each change.
         """
 
-        async def obj(self_obj):
+        async def obj(func):
             previous_result = None
             while True:
-                value = await self_obj._get_data()
+                value = await func()
                 if value != previous_result:
                     previous_result = value
                     if server_sent_event is True:
@@ -56,7 +56,7 @@ class ServerSentEvents:
                         yield value
                 await asyncio.sleep(1)
 
-        return obj(self)
+        return obj(self._get_data)
 
     def get_data_event_generator(self, server_sent_event=False) -> AsyncGenerator[bytes | Any, Any]:
         """
@@ -85,7 +85,7 @@ class ServerSentEvents:
         return obj(self)
 
     # Generators hold state (previous_result), so we use it to not return anything
-    # if no new change has occured.
+    # if no new change has occurred.
     def _key_change(self, data: dict, key: str) -> typing.Generator[dict, dict, None]:
         """
         For a given key, returns a generator that will yield it back if that
