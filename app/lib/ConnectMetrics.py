@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -75,6 +76,7 @@ class ConnectMetrics:
             Filters={'Queues': queues},
             HistoricalMetrics=[
                 {'Name': 'CONTACTS_HANDLED_INCOMING', 'Statistic': 'SUM', 'Unit': 'COUNT'},
+                {'Name': 'CONTACTS_ABANDONED', 'Statistic': 'SUM', 'Unit': 'COUNT'},
                 {'Name': 'HANDLE_TIME', 'Statistic': 'AVG', 'Unit': 'SECONDS'},
                 {'Name': 'QUEUE_ANSWER_TIME', 'Statistic': 'AVG', 'Unit': 'SECONDS'},
             ],
@@ -82,7 +84,7 @@ class ConnectMetrics:
         if metric_hist_data['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_hist_metric network failure")
 
-        return metric_hist_data['MetricResults']
+        return metric_hist_data['MetricResults'][0]['Collections']
 
     @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_current_user_data(self) -> dict:
@@ -184,6 +186,16 @@ class ConnectMetrics:
         if len(data) > 0:
             m = int(data[0]['Collections'][2]['Value'])
             return m
+        return 0
+
+    def handled_incoming(self, date=None) -> int:
+        if date is None:
+            date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        data = self._refresh_hist_metric(date)
+        for row in data:
+            if row['Metric']['Name'] == 'CONTACTS_HANDLED_INCOMING':
+                result = math.floor(row['Value'])
+                return result
         return 0
 
     @property

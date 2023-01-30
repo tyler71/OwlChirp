@@ -132,6 +132,7 @@ def get_metric_data() -> dict:
         'available_count': cm.available_agents,
         'active_agent_count': cm.active_agents,
         'user_list': cm.userlist,
+        'handled_incoming': cm.handled_incoming(),
     }
     return r
 

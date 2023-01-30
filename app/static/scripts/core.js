@@ -99,6 +99,7 @@ async function hookInit(agent) {
     let metricEventSub = eventSub('/metrics', {
         'queue_count': _realtimeUpdateQueueCount,
         'available_count': _realtimeUpdateAvailableCount,
+        'handled_incoming': _realtimeUpdateHandledIncoming,
     })
 
     // Update Agent call list once phoneLog has a phone log
@@ -386,6 +387,11 @@ function _realtimeUpdateAvailableCount(data) {
     }
 }
 
+async function _realtimeUpdateHandledIncoming(data) {
+    let handledIncomingElement = document.querySelector('#handledIncoming');
+    let handledCalls = data.handled_incoming
+    handledIncomingElement.innerHTML = handledCalls;
+}
 
 // ######## Agents recent call list ########################
 async function updateAgentCallList() {
@@ -406,6 +412,7 @@ async function updateAgentCallList() {
     spinnerToggle(callListSection, false);
     callListSection.parentNode.replaceChild(newSection, callListSection);
 }
+
 
 // ######## Who a phone number called recently ########################
 

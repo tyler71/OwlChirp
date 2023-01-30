@@ -12,6 +12,7 @@ events = ServerSentEvents(["queue_count",
                            "available_count",
                            "active_agent_count",
                            'user_list',
+                           "handled_incoming",
                            ],
                           get_metric_data)
 

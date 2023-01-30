@@ -19,6 +19,10 @@ div#recentCallList div.list table.table tbody tr{
     /*overflow: hidden;*/
 }
 
+#statusBar > div {
+    padding: 2px 16px 2px 16px;
+}
+
 #ccp {
     width: 100%;
     height: 80%;
@@ -53,4 +57,11 @@ div#recentCallList div.list table.table tbody tr{
 
 .noselect {
     user-select: none;
+}
+
+#callerId:focus {
+    font-weight: bold;
+    border-width: 1px;
+    border-bottom-style: dashed;
+    border-color: greenyellow;
 }
