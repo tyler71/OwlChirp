@@ -4,7 +4,12 @@ html, body {
 }
 
 .hide {
-    display: none;
+    display: none !important;
+}
+
+div#recentCallList div.list table.table tbody,
+div#recentCallList div.list table.table tbody tr{
+  display: block;
 }
 
 #content {

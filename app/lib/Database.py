@@ -42,6 +42,16 @@ class PhoneLog(Base):
     agent = relationship("User", lazy='selectin')
 
 
+class CallerId(Base):
+    __tablename__ = "callerid"
+
+    id = Column(Integer(), primary_key=True)
+    phone_number = Column(String(20), index=True, unique=True)
+    name = Column(String(30), index=True)
+    created_on = Column(DateTime(), default=datetime.now)
+    updated_on = Column(DateTime(), default=datetime.now, onupdate=datetime.now)
+
+
 def cleanup_query(query):
     if query is not None:
         query = [r for (r,) in query]
@@ -119,3 +129,25 @@ class Db:
             query = (await session.execute(stmt)).all()
             query = cleanup_query(query)
         return query
+
+    async def get_caller_id(self, phone_number: str):
+        stmt = select(CallerId) \
+            .where(CallerId.phone_number == phone_number)
+        async with self.sessionmaker() as session:
+            query = (await session.execute(stmt)).scalar()
+        return query
+
+    async def update_caller_id(self, phone_number, name: str) -> bool:
+        stmt = select(CallerId) \
+            .where(CallerId.phone_number == phone_number)
+        async with self.sessionmaker() as session:
+            query = (await session.execute(stmt)).scalar()
+            if query is not None and query.__class__ == CallerId:
+                query.name = name
+                session.add(query)
+                await session.commit()
+            else:
+                log = CallerId(phone_number=phone_number, name=name)
+                session.add(log)
+                await session.commit()
+        return True

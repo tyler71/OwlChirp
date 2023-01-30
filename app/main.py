@@ -1,6 +1,5 @@
 import os
 
-import boto3.exceptions
 from botocore.exceptions import ClientError
 from quart import Quart, request, render_template, make_response, abort, send_file
 
@@ -137,3 +136,25 @@ async def contact_detailed_info():
         logging.error(e)
         return {}, 404
 
+
+@app.route('/api/calls/callerid', methods=["GET", "PUT"])
+async def caller_id():
+    db = Db()
+    await db.init()
+    if request.method == "GET":
+        phone_number = request.args.get("phone_number", None)
+        res = await db.get_caller_id(phone_number=phone_number)
+        if res is None:
+            return "Not Found", 404
+        else:
+            converted_output = {
+                "name": res.name,
+                "phoneNumber": res.phone_number,
+            }
+            return converted_output
+    elif request.method == "PUT":
+        data = await request.get_json()
+        phone_number = data['phone_number']
+        name = data['name']
+        if await db.update_caller_id(phone_number=phone_number, name=name) is True:
+            return {"Update": "Success"}, 204

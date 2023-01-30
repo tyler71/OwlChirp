@@ -105,6 +105,8 @@ async function hookInit(agent) {
     // After this, it is hooked into incoming calls
     await updateAgentCallList();
 
+    new SetupCallerId();
+
     await hookIntervalRefresh(agent, 30000);
 
 }
@@ -132,10 +134,16 @@ async function hookIncomingCall(contact) {
     let phoneNumber = contact.getActiveInitialConnection().getEndpoint().phoneNumber;
     let contactId = contact.getContactId();
 
+    // TODO : on each call, get the caller id for the phone number
+    // If it doesn't exist, show the phone number itself
+    // If someone changes it, PUT the update to the server for that phone number
+    await incomingCallCallerId(phoneNumber);
+
     notify.show(`Incoming Call from ${formatPhoneNumber(phoneNumber)}`,
         "Incoming Call", "incomingCall", 0);
     // [{name:'click', handler:() => { contact.accept() }}])
 
+    await incomingCallCallerId(phoneNumber);
 
     // Update the recent calls for this number
     // await updateNumberCallList(phoneNumber);
@@ -675,4 +683,49 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
     }
 
     return box;
+}
+
+function SetupCallerId() {
+    this.callerId = document.querySelector('#callerId');
+    this.oldNick = ""
+
+    this.callerId.addEventListener('dblclick', (e) => {
+        e.target.contentEditable = true;
+        e.target.classList.add("inEdit");
+        this.oldNick = e.target.innerHTML;
+    });
+    this.callerId.addEventListener('blur', async (e) => {
+        e.target.contentEditable = false;
+        e.target.classList.remove("inEdit");
+
+        if (e.target.innerHTML !== this.oldNick) {
+            let updateCallerId = await fetch(API + '/calls/callerid', {
+                method: "PUT",
+                headers: JSON_HEADERS,
+                body: JSON.stringify({
+                    phone_number: this.callerId.dataset.phoneNumber,
+                    name: this.callerId.innerHTML,
+                })
+            })
+            if (!updateCallerId.ok) {
+                console.error("Failed to update caller Id, network error")
+            }
+        }
+    })
+}
+
+async function incomingCallCallerId(phoneNumber) {
+    let callerId = document.querySelector('#callerId');
+    callerId.setAttribute('data-phone-number', phoneNumber);
+
+    let searchParams = new URLSearchParams({phone_number: phoneNumber});
+    let res = await fetch(API + '/calls/callerid?' + searchParams, {
+        headers: JSON_HEADERS,
+    });
+    if (res.ok) {
+        let data = await res.json();
+        callerId.innerHTML = data.name
+    } else {
+        callerId.innerHTML = formatPhoneNumber(phoneNumber)
+    }
 }
