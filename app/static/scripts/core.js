@@ -724,7 +724,7 @@ async function incomingCallCallerId(phoneNumber) {
     });
     if (res.ok) {
         let data = await res.json();
-        callerId.innerHTML = data.name
+        callerId.innerHTML = data.name;
     } else {
         callerId.innerHTML = formatPhoneNumber(phoneNumber)
     }

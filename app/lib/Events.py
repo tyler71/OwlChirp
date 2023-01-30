@@ -14,7 +14,7 @@ from cachetools import cached, TTLCache
 from . import ConnectMetrics
 from .Helper import sync_to_async
 
-cache_length = os.getenv('AWS_CONNECT_CACHE_LENGTH', 15)
+cache_length = int(os.getenv('AWS_CONNECT_CACHE_LENGTH', 15))
 
 
 class ServerSentEvents:
