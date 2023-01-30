@@ -135,7 +135,7 @@ async def contact_detailed_info():
         return user_data
     except ClientError as e:
         logging.error(e)
-        return {}, 404
+        return "", 404
 
 
 @app.route('/api/calls/callerid', methods=["GET", "PUT"])
@@ -146,7 +146,7 @@ async def caller_id():
         phone_number = request.args.get("phone_number", None)
         res = await db.get_caller_id(phone_number=phone_number)
         if res is None:
-            return "Not Found", 404
+            return "", 404
         else:
             converted_output = {
                 "name": res.name,
@@ -158,4 +158,4 @@ async def caller_id():
         phone_number = data['phone_number']
         name = data['name']
         if await db.update_caller_id(phone_number=phone_number, name=name) is True:
-            return {"Update": "Success"}, 204
+            return "", 204
