@@ -193,9 +193,9 @@ function Notifier(namespace = "") {
                         lastTagNotification[tag] = now;
                     }
                 }
+            } else {
+                let notification = this._show(message, title, tag, events)
             }
-        } else {
-            let notification = this._show(message, title, tag, events)
         }
         this.id++;
     }
