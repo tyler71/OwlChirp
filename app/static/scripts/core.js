@@ -14,6 +14,8 @@ const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
 const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70};
 
+const LOADING_SPINNER = 'spinner-border'
+
 let JSON_HEADERS = new Headers();
 JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8');
 
@@ -135,9 +137,6 @@ async function hookIncomingCall(contact) {
     let phoneNumber = contact.getActiveInitialConnection().getEndpoint().phoneNumber;
     let contactId = contact.getContactId();
 
-    // TODO : on each call, get the caller id for the phone number
-    // If it doesn't exist, show the phone number itself
-    // If someone changes it, PUT the update to the server for that phone number
     await incomingCallCallerId(phoneNumber);
 
     notify.show(`Incoming Call from ${formatPhoneNumber(phoneNumber)}`,
@@ -184,7 +183,6 @@ function Notifier(namespace = "") {
         }
     }
     this.show = (message, title = "Notification", tag = this.id, interval = 0, events = []) => {
-        // TODO : Should not notify if user is offline.. Or In meeting?
         if (this.compatible()) {
             if (interval > 0) {
                 let now = Date.now();
@@ -389,6 +387,9 @@ function _realtimeUpdateAvailableCount(data) {
 
 async function _realtimeUpdateHandledIncoming(data) {
     let handledIncomingElement = document.querySelector('#handledIncoming');
+    if (handledIncomingElement.classList.contains(LOADING_SPINNER)) {
+        handledIncomingElement.classList.remove(LOADING_SPINNER)
+    }
     let handledCalls = data.handled_incoming
     handledIncomingElement.innerHTML = handledCalls;
 }
@@ -486,7 +487,7 @@ function sortPropertyList(array, property, asc = true) {
     return array
 }
 
-function spinnerToggle(dom, show, spinner = 'spinner-border') {
+function spinnerToggle(dom, show, spinner = LOADING_SPINNER) {
     let ds = dom.classList
     if (show && !ds.contains(spinner)) {
         ds.add(spinner)
@@ -615,8 +616,11 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                     subTable.classList.add("subTable")
                     let subTableBody = document.createElement('tbody');
                     subTable.appendChild(subTableBody);
+                    row.appendChild(subTable);
 
+                    subTable.classList.add(LOADING_SPINNER)
                     let subTableJson = await subTableReq.json()
+                    subTable.classList.remove(LOADING_SPINNER)
 
                     // Generate the structure for the contact id url
                     let contactIdLink = document.createElement('a')
@@ -629,7 +633,6 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                         "Answered": subTableJson["answered_timestamp"],
                         "Id": contactIdLink.outerHTML,
                     }
-                    console.log(subTableData)
                     for (let [key, value] of Object.entries(subTableData)) {
                         let subTableRow = document.createElement("tr")
                         let subTableKey = document.createElement('td');
@@ -641,17 +644,11 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                         subTableBody.append(subTableRow);
                     }
 
-                    row.appendChild(subTable);
-
 
                 }
 
 
             }
-
-            // let contactIdUrl = new URL(`contact-trace-records/details/${row.dataset.contactid}`, SPS_CONNECT_DOMAIN);
-            // contactIdUrl.searchParams.set('tz', TIME_ZONE);
-            // window.open(contactIdUrl);
         }
 
     });
