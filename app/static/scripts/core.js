@@ -10,9 +10,9 @@ const TABLE_INFO_CLASS = 'table-info';
 const TABLE_ALERT_CLASS = 'table-warning';
 const TABLE_DANGER_CLASS = 'table-danger';
 
-const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1};
+const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1 }
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
-const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70};
+const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70, "missedcallagent": 5 }
 
 const LOADING_SPINNER = 'spinner-border'
 
@@ -453,8 +453,8 @@ async function updateNumberCallList(phoneNumber) {
 
 // Sets the agent to the specified state
 function setToState(agent, state) {
-    let availableState = agent.getAgentStates().find(listedStates => listedStates.name === state)
-    agent.setState(availableState);
+    let requestedState = agent.getAgentStates().find(listedStates => listedStates.name === state)
+    agent.setState(requestedState);
 }
 
 // If an agent is on the "SideLine" it means they are not routable, but can be.
