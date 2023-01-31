@@ -10,9 +10,9 @@ const TABLE_INFO_CLASS = 'table-info';
 const TABLE_ALERT_CLASS = 'table-warning';
 const TABLE_DANGER_CLASS = 'table-danger';
 
-const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1 }
+const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1}
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
-const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70, "missedcallagent": 5 }
+const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70, "missedcallagent": 5}
 
 const LOADING_SPINNER = 'spinner-border'
 
@@ -99,9 +99,9 @@ connect.contact((contact) => {
 async function hookInit(agent) {
     phoneLog = new callHistory(agent);
     let metricEventSub = eventSub('/metrics', {
-        'queue_count': _realtimeUpdateQueueCount,
-        'available_count': _realtimeUpdateAvailableCount,
-        'handled_incoming': _realtimeUpdateHandledIncoming,
+        'queue_count': [_realtimeUpdateQueueCount],
+        'available_count': [_realtimeUpdateAvailableCount, _realtimeUpdateVisualAgentList],
+        'handled_incoming': [_realtimeUpdateHandledIncoming],
     })
 
     // Update Agent call list once phoneLog has a phone log
@@ -235,7 +235,9 @@ function eventSub(endpoint, events) {
         let data = JSON.parse(r.data)
         for (let [key, value] of Object.entries(data)) {
             if (events.hasOwnProperty(key)) {
-                events[key](data);
+                for (let event of events[key]) {
+                    event(data);
+                }
             }
         }
     })
@@ -394,6 +396,29 @@ async function _realtimeUpdateHandledIncoming(data) {
     handledIncomingElement.innerHTML = handledCalls;
 }
 
+async function _realtimeUpdateVisualAgentList(data) {
+    let visualAgentList = document.querySelector('#visualAgentList');
+    if (visualAgentList.classList.contains(LOADING_SPINNER)) {
+        visualAgentList.classList.remove(LOADING_SPINNER)
+    }
+    visualAgentList.textContent = null;
+    for (let user of data.user_list) {
+        let span = document.createElement('span')
+        let firstLetter = user.user.first_name[0]
+        let configuredLetter = firstLetter
+        let sn = user.status.name.toLowerCase()
+
+        if (sn in SIDELINE_STATUSES) {
+            configuredLetter = `|${firstLetter}|`
+        } else if (sn in EXCLUDED_STATUSES) {
+            configuredLetter = `_`
+        }
+
+        span.innerHTML = `${configuredLetter} `
+        visualAgentList.appendChild(span);
+    }
+}
+
 // ######## Agents recent call list ########################
 async function updateAgentCallList() {
     let callListSection = document.querySelector('#recentCallList');
@@ -467,7 +492,7 @@ function agentSideline() {
 // Will send notifications if this maxMinutes is reached
 function checkStateDuration(agent, stateName, maxMinutes) {
     let agentStateLength = Math.floor(agent.getStateDuration() / 1000 / 60);
-    let notificationTag = "long-break";
+    let notificationTag = "Long Break";
 
     if (agentStateLength > maxMinutes) {
         notify.show(`Hi ${agent.getName()}! Letting you know you've been on ${stateName} for ${agentStateLength} minutes`,
