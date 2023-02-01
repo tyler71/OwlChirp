@@ -372,15 +372,24 @@ function _realtimeUpdateAvailableCount(data) {
     let agentCountValue = document.querySelector('#availableAgentCount > .value');
 
     spinnerToggle(agentCountValue, false);
-    // TODO : Should not count currently connected calls as on call : Test if done
     let sidelineAgents = [];
     for (let userlistElement of data.user_list) {
         if (userlistElement.status.name.toLowerCase() in SIDELINE_STATUSES) {
             sidelineAgents.push(userlistElement)
         }
     }
-    sidelineAgents.length > 0 ? agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}+${sidelineAgents.length}` :
+
+    agentCountValue.setAttribute("data-toggle", "tooltip")
+    agentCountValue.setAttribute("data-placement", "top")
+    if (sidelineAgents.length > 0) {
+        agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}+${sidelineAgents.length}`
+        agentCountValue.setAttribute("title", `${availableCount} able to take a call now, ${activeAgentCount} taking calls. ${sidelineAgents.length} ready to help`)
+    } else {
+        agentCountValue.setAttribute("title", `${availableCount} able to take a call now, ${activeAgentCount} taking calls.`)
         agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}`
+    }
+    // sidelineAgents.length > 0 ? agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}+${sidelineAgents.length}`
+    //     : agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}`
 
     if (activeAgentCount <= 1) {
         agentCountSection.classList.add(TABLE_ALERT_CLASS);
