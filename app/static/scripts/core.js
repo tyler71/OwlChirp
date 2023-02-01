@@ -402,7 +402,10 @@ async function _realtimeUpdateVisualAgentList(data) {
         visualAgentList.classList.remove(LOADING_SPINNER)
     }
     visualAgentList.textContent = null;
-    for (let user of data.user_list) {
+
+    // Ascending
+    let sortedUserList = Array.from(data.user_list).sort((a, b) => b.user.first_name < a.user.first_name)
+    for (let user of sortedUserList) {
         let span = document.createElement('span')
         let firstLetter = user.user.first_name[0]
         let configuredLetter = firstLetter
