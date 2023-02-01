@@ -412,9 +412,15 @@ async function _realtimeUpdateVisualAgentList(data) {
             configuredLetter = `|${firstLetter}|`
         } else if (sn in EXCLUDED_STATUSES) {
             configuredLetter = `_`
+        } else if (sn === "on call") {
+            configuredLetter = `$${firstLetter}`
         }
 
         span.innerHTML = `${configuredLetter} `
+        span.setAttribute("data-toggle", "tooltip")
+        span.setAttribute("data-placement", "bottom")
+        span.setAttribute("title", `${user.user.first_name} ${user.user.last_name}: ${user.status.name}`)
+            // <div id="statusB" data-toggle="tooltip" data-placement="right" title="Who has recently called this number? Triggers on a new call">
         visualAgentList.appendChild(span);
     }
 }
