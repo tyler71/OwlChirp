@@ -23,6 +23,8 @@ class ConnectMetrics:
 
     @cached(TTLCache(maxsize=1024 * 8, ttl=3600 * 6))  # 6 hours
     def _refresh_queues(self) -> dict:
+        """ Get queue list. This changes infrequently so we cache it for a long time
+        """
         queues = self.client.list_queues(
             InstanceId=os.getenv('CONNECT_INSTANCE', None),
             QueueTypes=['STANDARD']
@@ -33,6 +35,8 @@ class ConnectMetrics:
 
     @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_metric(self) -> dict:
+        """ Current metrics. No summation of data. Includes things like how many agents are available
+        """
 
         queues = [q['Id'] for q in self._refresh_queues()]
 
@@ -52,6 +56,9 @@ class ConnectMetrics:
 
     @cached(TTLCache(maxsize=1024 * 32, ttl=60))
     def _refresh_hist_metric(self, start_time) -> dict:
+        """ Historical data. Includes things like how many calls we have gotten today
+            start_time is either hours ago [int] or a datetime. It is converted internally to UTC
+        """
 
         queues = [q['Id'] for q in self._refresh_queues()]
 
