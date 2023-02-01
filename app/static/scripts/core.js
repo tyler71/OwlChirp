@@ -423,9 +423,20 @@ async function _realtimeUpdateVisualAgentList(data) {
 
     // Ascending
     let sortedUserList = Array.from(data.user_list).sort((a, b) => b.user.first_name < a.user.first_name)
+
+    // Check to see if any other user has an identical first name
+    // If so, use two letters instead. We do this by making a string of just first letters.
+    // For each user, it strips out all letters but theirs and checks the length. If > 1, it uses the first two letters
+    let userListFirstLetters = '';
+    for (let f of sortedUserList) {
+        userListFirstLetters += f.user.first_name[0]
+    }
     for (let user of sortedUserList) {
         let span = document.createElement('span')
-        let firstLetter = user.user.first_name[0]
+
+        let firstLetter = userListFirstLetters.replace(/[^a]/g, '').length > 1 ? user.user.first_name.slice(0, 2)
+            : user.user.first_name[0]
+
         let sn = user.status.name.toLowerCase()
 
         if (sn in SIDELINE_STATUSES) {
