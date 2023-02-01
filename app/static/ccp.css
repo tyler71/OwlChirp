@@ -65,3 +65,8 @@ div#recentCallList div.list table.table tbody tr{
     border-bottom-style: dashed;
     border-color: greenyellow;
 }
+
+#callerId:empty {
+  border-bottom: dashed 1px;
+  background-image: repeating-linear-gradient(130deg, rgba(0,0,0,0.2), rgba(0,0,0,0.0) 15%);
+}
