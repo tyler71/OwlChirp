@@ -14,7 +14,7 @@
         <div id="statusBar" class="d-flex justify-content-between">
             <div id="callerId" contenteditable="false"></div>
             <div id="visualAgentList" class="spinner-border noselect"></div>
-            <div id="handledIncoming" class="spinner-border"></div>
+            <div id="handledIncoming" class="spinner-border noselect"></div>
         </div>
         <div id="alertSection"></div>
         <div id="ccp"></div>
@@ -24,11 +24,11 @@
                 <table class="table table-sm">
                     <tbody>
                     <tr id='queueCount'>
-                        <td class="key">Calls in Queue</td>
+                        <td class="key noselect">Calls in Queue</td>
                         <td class="value spinner-border"></td>
                     </tr>
                     <tr id='availableAgentCount'>
-                        <td class="key">Available Agents</td>
+                        <td class="key noselect">Available Agents</td>
                         <td class="value spinner-border"></td>
                     </tr>
                     </tbody>
