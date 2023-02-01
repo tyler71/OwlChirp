@@ -93,7 +93,7 @@ class ConnectMetrics:
 
         return metric_hist_data['MetricResults'][0]['Collections']
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=10))
+    # @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_current_user_data(self) -> dict:
         queues = [q['Id'] for q in self._refresh_queues()]
 
@@ -137,7 +137,6 @@ class ConnectMetrics:
         except ClientError as e:
             logging.error(e)
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         user_list = list()
 
