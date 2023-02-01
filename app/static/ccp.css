@@ -70,3 +70,17 @@ div#recentCallList div.list table.table tbody tr{
   border-bottom: dashed 1px;
   background-image: repeating-linear-gradient(130deg, rgba(0,0,0,0.2), rgba(0,0,0,0.0) 15%);
 }
+#visualAgentList > span {
+    padding-left: 3px;
+    padding-right: 3px;
+}
+#visualAgentList > span.visual_list_excluded_status {
+        color: rgba(80,80,80, 0.4)
+}
+#visualAgentList > span.visual_list_on_call:before {
+    content: "*";
+}
+#visualAgentList > span.visual_list_sideline_status:before,
+#visualAgentList > span.visual_list_sideline_status:after {
+    content: "|";
+}

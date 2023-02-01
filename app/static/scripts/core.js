@@ -414,6 +414,7 @@ async function _realtimeUpdateHandledIncoming(data) {
 }
 
 async function _realtimeUpdateVisualAgentList(data) {
+    console.log(data)
     let visualAgentList = document.querySelector('#visualAgentList');
     if (visualAgentList.classList.contains(LOADING_SPINNER)) {
         visualAgentList.classList.remove(LOADING_SPINNER)
@@ -425,22 +426,21 @@ async function _realtimeUpdateVisualAgentList(data) {
     for (let user of sortedUserList) {
         let span = document.createElement('span')
         let firstLetter = user.user.first_name[0]
-        let configuredLetter = firstLetter
         let sn = user.status.name.toLowerCase()
 
         if (sn in SIDELINE_STATUSES) {
-            configuredLetter = `|${firstLetter}|`
+            span.classList.add('visual_list_sideline_status')
         } else if (sn in EXCLUDED_STATUSES) {
-            configuredLetter = `_`
+            span.classList.add('visual_list_excluded_status')
         } else if (sn === "on call") {
-            configuredLetter = `*${firstLetter}`
+            span.classList.add('visual_list_on_call')
         }
 
-        span.innerHTML = `${configuredLetter} `
+        span.innerHTML = firstLetter
         span.setAttribute("data-toggle", "tooltip")
         span.setAttribute("data-placement", "bottom")
         span.setAttribute("title", `${user.user.first_name} ${user.user.last_name}: ${user.status.name}`)
-        visualAgentList.appendChild(span);
+        visualAgentList.appendChild(span)
     }
 }
 
