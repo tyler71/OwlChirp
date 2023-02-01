@@ -752,13 +752,18 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
 
 function SetupCallerId() {
     this.callerId = document.querySelector('#callerId');
+    this.callerId.setAttribute("data-toggle", "tooltip")
+    this.callerId.setAttribute("data-placement", "top")
+
     this.oldNick = ""
 
-    this.callerId.addEventListener('dblclick', (e) => {
+    // Start editing the field
+    this.callerId.addEventListener('click', (e) => {
         e.target.contentEditable = true;
         e.target.classList.add("inEdit");
         this.oldNick = e.target.innerHTML;
     });
+    // Click away from the field to save it
     this.callerId.addEventListener('blur', async (e) => {
         e.target.contentEditable = false;
         e.target.classList.remove("inEdit");
@@ -790,6 +795,7 @@ async function incomingCallCallerId(phoneNumber) {
     if (res.ok) {
         let data = await res.json();
         callerId.innerHTML = data.name;
+        this.callerId.setAttribute("title", formatPhoneNumber(phoneNumber))
     } else {
         callerId.innerHTML = formatPhoneNumber(phoneNumber)
     }
