@@ -30,7 +30,8 @@ let agentObj;
 let lastTagNotification = {};
 let sidelineNotificationInterval = 60;
 
-
+// Starts the CCP instance.
+// The provided hooks are used for the rest of the program.
 const INSTANCE_URL = "https://sps-connect-poc.my.connect.aws/connect/ccp-v2";
 connect.core.initCCP(containerDiv, {
     ccpUrl: INSTANCE_URL,             // REQUIRED
@@ -59,6 +60,7 @@ connect.core.initCCP(containerDiv, {
 });
 
 connect.agent((agent) => {
+    // We use the agent object and set it right at the start. We also have a hookInit for all extra code we are running
     agentObj = agent;
     hookInit(agent).then(r => console.log(r));
 
@@ -72,6 +74,7 @@ connect.agent((agent) => {
 connect.contact((contact) => {
 
     contact.onConnecting((contact) => {
+        // Run our custom code for incoming calls
         hookIncomingCall(contact).then(r => console.log(r))
     });
     // contact.onIncoming((contact) => {
@@ -97,7 +100,12 @@ connect.contact((contact) => {
 
 // Run on first load
 async function hookInit(agent) {
+    // Tracks our call history. Is database backed
     phoneLog = new callHistory(agent);
+
+    // Using Server Sent Events, we subscribe to the endpoint and listen for events.
+    // When a change occurs, a "data" object is sent to the function, allowing it to update.
+    // It is only run when a change occurs.
     let metricEventSub = eventSub('/metrics', {
         'queue_count': [_realtimeUpdateQueueCount],
         'available_count': [_realtimeUpdateAvailableCount, _realtimeUpdateVisualAgentList],
@@ -416,14 +424,13 @@ async function _realtimeUpdateVisualAgentList(data) {
         } else if (sn in EXCLUDED_STATUSES) {
             configuredLetter = `_`
         } else if (sn === "on call") {
-            configuredLetter = `$${firstLetter}`
+            configuredLetter = `*${firstLetter}`
         }
 
         span.innerHTML = `${configuredLetter} `
         span.setAttribute("data-toggle", "tooltip")
         span.setAttribute("data-placement", "bottom")
         span.setAttribute("title", `${user.user.first_name} ${user.user.last_name}: ${user.status.name}`)
-            // <div id="statusB" data-toggle="tooltip" data-placement="right" title="Who has recently called this number? Triggers on a new call">
         visualAgentList.appendChild(span);
     }
 }
