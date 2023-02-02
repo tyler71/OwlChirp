@@ -28,7 +28,7 @@ let phoneLog;
 let agentObj;
 
 let lastTagNotification = {};
-let sidelineNotificationInterval = 60;
+let sidelineNotificationInterval = 300;
 
 // Starts the CCP instance.
 // The provided hooks are used for the rest of the program.
