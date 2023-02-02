@@ -105,6 +105,12 @@ class ConnectMetrics:
         if current_users['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_userlist#current_users network failure")
 
+        # Pending resolution of AWS Case Id 11904141851
+        # Hack to ensure on call is set as on call and not available
+        for user in current_users['UserDataList']:
+            if user['Status']['StatusName'] == 'Available' and len(user['Contacts']) > 0 and user['Contacts'][0]['AgentContactState'].upper() == 'CONNECTED':
+                user['Status']['StatusName'] = 'On call'
+
         return current_users['UserDataList']
 
     @cached(LRUCache(maxsize=64))
