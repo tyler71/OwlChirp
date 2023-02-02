@@ -196,7 +196,7 @@ class ConnectMetrics:
 
     def handled_incoming(self, date=None) -> int:
         if date is None:
-            date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            date = datetime.now().replace(hour=1, minute=0, second=0, microsecond=0)
         data = self._refresh_hist_metric(date)
         for row in data:
             if row['Metric']['Name'] == 'CONTACTS_HANDLED_INCOMING':
