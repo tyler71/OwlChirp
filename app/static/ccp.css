@@ -21,6 +21,9 @@ html, body {
 
 /* CallerID */
 
+#callerId {
+    white-space: nowrap;
+}
 #callerId:focus {
     font-weight: bold;
     border-width: 1px;

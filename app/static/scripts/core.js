@@ -12,7 +12,7 @@ const TABLE_DANGER_CLASS = 'table-danger';
 
 const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1}
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
-const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 70, "missedcallagent": 5}
+const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 65, "missedcallagent": 5}
 
 const LOADING_SPINNER = 'spinner-border'
 
@@ -118,7 +118,7 @@ async function hookInit(agent) {
 
     new SetupCallerId();
 
-    await hookIntervalRefresh(agent, 30000);
+    await hookIntervalRefresh(agent, 5000);
 
 }
 
