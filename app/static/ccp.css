@@ -76,6 +76,21 @@ html, body {
     flex-wrap: wrap;
     justify-content: space-around;
 }
+#recentCallList > div > h2.expanded:before,
+#recentCallList > div > h2.expanded:after {
+    padding-right: 1px;
+    padding-left: 1px;
+    content: "˅"
+}
+#recentCallList > div > h2:not([class^=expanded]):before {
+    padding-right: 1px;
+    content: "<"
+}
+#recentCallList > div > h2:not([class^=expanded]):after {
+    padding-left: 1px;
+    content: ">"
+}
+
 #recentCallList > div > table > tbody > tr,
 #recentCallList > div > h2 {
     cursor: pointer;

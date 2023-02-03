@@ -612,6 +612,7 @@ function createCollapseList(array, collapsed = false, action = "click", id = nul
 }
 
 function createRecentCallList(array, title = "List", id = null, action = "click") {
+    const HEADER_EXPANDED = 'expanded';
     const PARENT_HIDE = 'collapsed';
     const CHILD_HIDE = 'hide';
 
@@ -630,13 +631,15 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
         let rows = table.children;
         if (rows.length > 0) {
             if (rows[0].classList.contains(PARENT_HIDE)) {
-                listHeader.innerHTML = `˅ ${title} (${rows.length}) ˅`
+                listHeader.innerHTML = `${title} (${rows.length})`
+                listHeader.classList.add(HEADER_EXPANDED);
                 for (let row of rows) {
                     row.classList.remove(CHILD_HIDE);
                     rows[0].classList.remove(PARENT_HIDE);
                 }
             } else {
-                listHeader.innerHTML = `˂ ${title} (${rows.length}) ˃`
+                listHeader.innerHTML = `${title} (${rows.length})`
+                listHeader.classList.remove(HEADER_EXPANDED);
                 let firstRow = rows[0];
                 for (let row of rows) {
                     row === firstRow ? row.classList.add(PARENT_HIDE) : row.classList.add(CHILD_HIDE);
@@ -746,11 +749,11 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
         tbody.appendChild(tr);
     }
     if (tbody.children.length > 0) {
-        listHeader.innerHTML = `˂ ${title} (${tbody.children.length}) ˃`
+        listHeader.innerHTML = `${title} (${tbody.children.length})`
         Array.from(tbody.children).slice(1).forEach(e => e.classList.add(CHILD_HIDE));
         tbody.children[0].classList.add(PARENT_HIDE);
     } else {
-        listHeader.innerHTML = `˂ ${title} ˃`
+        listHeader.innerHTML = `${title}`
     }
 
     return box;
