@@ -19,7 +19,7 @@ const LOADING_SPINNER = 'spinner-border'
 let JSON_HEADERS = new Headers();
 JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8');
 
-const QUEUE_COUNT_ALERT = 1;
+const MAX_QUEUE_COUNT = 1;
 const MIN_AGENT_STAFFED = 1;
 let containerDiv = document.querySelector('#ccp');
 let statusDiv = document.querySelector('#statusDiv');
@@ -353,15 +353,15 @@ function _realtimeUpdateQueueCount(data) {
     spinnerToggle(queueCountValue, false)
     queueCountValue.innerHTML = value;
 
-    if (value >= QUEUE_COUNT_ALERT) {
+    queueCountValue >= MAX_QUEUE_COUNT ? queueCountSection.classList.add(TABLE_ALERT_CLASS)
+        : queueCountSection.classList.remove(TABLE_ALERT_CLASS)
+
+    if (value > MAX_QUEUE_COUNT) {
         if (agentSideline()) {
             let queueNotifier = new Notifier("queueCount");
             queueNotifier.show(`Queue Count is ${value}!\nCan you help?`,
                 "Callers Waiting", "queueCount", sidelineNotificationInterval)
         }
-        queueCountSection.classList.add(TABLE_ALERT_CLASS)
-    } else {
-        queueCountSection.classList.remove(TABLE_ALERT_CLASS)
     }
 }
 
@@ -389,19 +389,17 @@ function _realtimeUpdateAvailableCount(data) {
         agentCountValue.setAttribute("title", `${availableCount} able to take a call now, ${activeAgentCount} taking calls.`)
         agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}`
     }
-    // sidelineAgents.length > 0 ? agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}+${sidelineAgents.length}`
-    //     : agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}`
+
+    activeAgentCount <= MIN_AGENT_STAFFED ? agentCountSection.classList.add(TABLE_ALERT_CLASS)
+        : agentCountSection.classList.remove(TABLE_ALERT_CLASS)
 
     if (activeAgentCount < MIN_AGENT_STAFFED) {
-        agentCountSection.classList.add(TABLE_ALERT_CLASS);
         if (agentSideline()) {
             let tag = "availableAgents"
             let notify = new Notifier(tag)
             notify.show(`There are currently ${activeAgentCount} available agents`,
                 "Available Agents", tag, sidelineNotificationInterval)
         }
-    } else {
-        agentCountSection.classList.remove(TABLE_ALERT_CLASS);
     }
 }
 
