@@ -19,7 +19,8 @@ const LOADING_SPINNER = 'spinner-border'
 let JSON_HEADERS = new Headers();
 JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8');
 
-let queueCountAlert = 1;
+const QUEUE_COUNT_ALERT = 1;
+const MIN_AGENT_STAFFED = 1;
 let containerDiv = document.querySelector('#ccp');
 let statusDiv = document.querySelector('#statusDiv');
 let [statusDivA, statusDivB] = statusDiv.children;
@@ -47,7 +48,7 @@ connect.core.initCCP(containerDiv, {
     softphone: {                      // optional, defaults below apply if not provided
         allowFramedSoftphone: true,   // optional, defaults to false
         disableRingtone: false,       // optional, defaults to false
-        // ringtoneUrl: "https://TLCCP.tyler71.repl.co/static/ringtone/Intellection-Rob_Cosh-rt.mp3" // optional, defaults to CCP’s default ringtone if a falsy value is set
+        // ringtoneUrl: "" // optional, defaults to CCP’s default ringtone if a falsy value is set
     },
     pageOptions: { //optional
         enableAudioDeviceSettings: false, // optional, defaults to 'false'
@@ -352,7 +353,7 @@ function _realtimeUpdateQueueCount(data) {
     spinnerToggle(queueCountValue, false)
     queueCountValue.innerHTML = value;
 
-    if (value >= queueCountAlert) {
+    if (value >= QUEUE_COUNT_ALERT) {
         if (agentSideline()) {
             let queueNotifier = new Notifier("queueCount");
             queueNotifier.show(`Queue Count is ${value}!\nCan you help?`,
@@ -391,7 +392,7 @@ function _realtimeUpdateAvailableCount(data) {
     // sidelineAgents.length > 0 ? agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}+${sidelineAgents.length}`
     //     : agentCountValue.innerHTML = `${availableCount}/${activeAgentCount}`
 
-    if (activeAgentCount <= 1) {
+    if (activeAgentCount < MIN_AGENT_STAFFED) {
         agentCountSection.classList.add(TABLE_ALERT_CLASS);
         if (agentSideline()) {
             let tag = "availableAgents"
