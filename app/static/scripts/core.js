@@ -532,7 +532,13 @@ function checkStateDuration(agent, stateName, maxMinutes) {
 
     if (agentStateLength > maxMinutes) {
         notify.show(`Hi ${agent.getName()}! Letting you know you've been on ${stateName} for ${agentStateLength} minutes`,
-            stateName, notificationTag, 60)
+            stateName, notificationTag, 60, [{
+                event: "click",
+                handler: () => {
+                    let d = new Date();
+                    lastTagNotification[notificationTag] = d.setMinutes(d.getMinutes() + 15);
+                }
+            }])
     }
 
 }
