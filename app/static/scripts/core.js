@@ -353,7 +353,7 @@ function _realtimeUpdateQueueCount(data) {
     spinnerToggle(queueCountValue, false)
     queueCountValue.innerHTML = value;
 
-    queueCountValue >= MAX_QUEUE_COUNT ? queueCountSection.classList.add(TABLE_ALERT_CLASS)
+    value >= MAX_QUEUE_COUNT ? queueCountSection.classList.add(TABLE_ALERT_CLASS)
         : queueCountSection.classList.remove(TABLE_ALERT_CLASS)
 
     if (value > MAX_QUEUE_COUNT) {
