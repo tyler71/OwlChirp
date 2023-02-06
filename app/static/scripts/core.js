@@ -433,7 +433,8 @@ async function _realtimeUpdateVisualAgentList(data) {
     for (let user of sortedUserList) {
         let span = document.createElement('span')
 
-        let firstLetter = userListFirstLetters.replace(/[^a]/g, '').length > 1 ? user.user.first_name.slice(0, 2)
+        let fl = user.user.first_name[0].toUpperCase()
+        let firstLetter = userListFirstLetters.replace(new RegExp(`[^${fl}]`, 'g'), '').length > 1 ? user.user.first_name.slice(0, 2)
             : user.user.first_name[0]
 
         let sn = user.status.name.toLowerCase()
