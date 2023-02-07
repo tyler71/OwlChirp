@@ -307,13 +307,23 @@ function Subscribe(url, callback, reconnect = 300000) {
     this.url = url;
     this.callback = callback;
     this.reconnectTimeout = reconnect;
-    this.lastUpdate = Date.now();
+    this.initTimeout = 10000;
+    this.lastUpdate = null;
     this.eventSource = new EventSource(this.url);
 
     this._regenerateEventSource = (eventSource = undefined) => {
         if (eventSource !== undefined && eventSource.toString() === "[object EventSource]") {
             eventSource.close();
         }
+        // If no data sent in 10 seconds, close and retry, extend by 1.5x
+        setTimeout(() => {
+            if (this.lastUpdate === null) {
+                this._regenerateEventSource(this.eventSource);
+                this.initTimeout *= 1.5;
+            }
+        }, this.initTimeout)
+
+        // Generate the new EventSource.
         this.eventSource = new EventSource(this.url);
         this.eventSource.addEventListener('message', response => {
             this.lastUpdate = Date.now();
@@ -323,6 +333,7 @@ function Subscribe(url, callback, reconnect = 300000) {
     }
 
     this._regenerateEventSource();
+
 
     setInterval(() => {
         if (Date.now() - this.lastUpdate > this.reconnectTimeout) {
