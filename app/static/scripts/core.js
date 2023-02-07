@@ -303,7 +303,7 @@ function callHistory(agent) {
 
 // ######## Event Subscribe         ########################
 
-function Subscribe(url, callback, reconnect = 300000) {
+function Subscribe(url, callback, reconnect = 100000) {
     this.url = url;
     this.callback = callback;
     this.reconnectTimeout = reconnect;
@@ -326,6 +326,7 @@ function Subscribe(url, callback, reconnect = 300000) {
         // Generate the new EventSource.
         this.eventSource = new EventSource(this.url);
         this.eventSource.addEventListener('message', response => {
+            this.reconnectTimeout = this.reconnectTimeout <= 300000 ? 300000 : this.reconnectTimeout * 0.7
             this.lastUpdate = Date.now();
             this.callback(response);
         })
@@ -337,6 +338,7 @@ function Subscribe(url, callback, reconnect = 300000) {
 
     setInterval(() => {
         if (Date.now() - this.lastUpdate > this.reconnectTimeout) {
+            this.reconnectTimeout = this.reconnectTimeout >= 1000000 ? 1000000 : this.reconnectTimeout * 1.5
             this._regenerateEventSource(this.eventSource)
         }
 
