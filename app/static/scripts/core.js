@@ -14,7 +14,7 @@ const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
 const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 65, "missedcallagent": 5}
 
-const LOADING_SPINNER = 'spinner-border'
+const LOADING_CLASS = 'alert-secondary'
 
 let JSON_HEADERS = new Headers();
 JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8');
@@ -416,8 +416,8 @@ function _realtimeUpdateAvailableCount(data) {
 
 async function _realtimeUpdateHandledIncoming(data) {
     let handledIncomingElement = document.querySelector('#handledIncoming');
-    if (handledIncomingElement.classList.contains(LOADING_SPINNER)) {
-        handledIncomingElement.classList.remove(LOADING_SPINNER)
+    if (handledIncomingElement.classList.contains(LOADING_CLASS)) {
+        handledIncomingElement.classList.remove(LOADING_CLASS)
     }
     let handledCalls = data.handled_incoming
     handledIncomingElement.innerHTML = handledCalls;
@@ -426,8 +426,8 @@ async function _realtimeUpdateHandledIncoming(data) {
 async function _realtimeUpdateVisualAgentList(data) {
     console.log(data)
     let visualAgentList = document.querySelector('#visualAgentList');
-    if (visualAgentList.classList.contains(LOADING_SPINNER)) {
-        visualAgentList.classList.remove(LOADING_SPINNER)
+    if (visualAgentList.classList.contains(LOADING_CLASS)) {
+        visualAgentList.classList.remove(LOADING_CLASS)
     }
     visualAgentList.textContent = null;
 
@@ -565,7 +565,7 @@ function sortPropertyList(array, property, asc = true) {
     return array
 }
 
-function spinnerToggle(dom, show, spinner = LOADING_SPINNER) {
+function spinnerToggle(dom, show, spinner = LOADING_CLASS) {
     let ds = dom.classList
     if (show && !ds.contains(spinner)) {
         ds.add(spinner)
@@ -699,9 +699,9 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                     subTable.appendChild(subTableBody);
                     row.appendChild(subTable);
 
-                    subTable.classList.add(LOADING_SPINNER)
+                    subTable.classList.add(LOADING_CLASS)
                     let subTableJson = await subTableReq.json()
-                    subTable.classList.remove(LOADING_SPINNER)
+                    subTable.classList.remove(LOADING_CLASS)
 
                     // Generate the structure for the contact id url
                     let contactIdLink = document.createElement('a')

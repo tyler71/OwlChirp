@@ -13,8 +13,8 @@
     <main id="content">
         <div id="statusBar">
             <div id="callerId" contenteditable="false"></div>
-            <div id="visualAgentList" class="spinner-border noselect"></div>
-            <div id="handledIncoming" class="spinner-border noselect"></div>
+            <div id="visualAgentList" class="{{ LOADING_CLASS }} noselect"></div>
+            <div id="handledIncoming" class="{{ LOADING_CLASS }} noselect"></div>
         </div>
         <div id="alertSection"></div>
         <div id="ccp"></div>
@@ -25,18 +25,18 @@
                     <tbody>
                     <tr id='queueCount'>
                         <td class="key noselect">Calls in Queue</td>
-                        <td class="value spinner-border"></td>
+                        <td class="value {{ LOADING_CLASS }}"></td>
                     </tr>
                     <tr id='availableAgentCount'>
                         <td class="key noselect">Available Agents</td>
-                        <td class="value spinner-border"></td>
+                        <td class="value {{ LOADING_CLASS }}"></td>
                     </tr>
                     </tbody>
                 </table>
             </div>
             <div id="statusDiv">
                 <div id="statusA">
-                    <div class="spinner-border" id="recentCallList"></div>
+                    <div class="{{ LOADING_CLASS }}" id="recentCallList"></div>
                 </div>
                 {#            <div id="statusB">Recently Called#}
                 {#                <div id='numberCallList'></div>#}

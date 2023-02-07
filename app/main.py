@@ -36,7 +36,8 @@ async def index():
 
 @app.route('/ccp')
 async def ccp():
-    return await render_template('ccp.html')
+    return await render_template('ccp.html',
+                                 LOADING_CLASS="alert-secondary")
 
 
 # We're not sending static as this file will often change.
