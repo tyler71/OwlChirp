@@ -9,6 +9,7 @@ const TIME_ZONE = 'America/Los_Angeles';
 const TABLE_INFO_CLASS = 'table-info';
 const TABLE_ALERT_CLASS = 'table-warning';
 const TABLE_DANGER_CLASS = 'table-danger';
+const CURSOR_HELP_CLASS = 'helpCursor';
 
 const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1}
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
@@ -445,6 +446,7 @@ async function _realtimeUpdateVisualAgentList(data) {
     }
     for (let user of sortedUserList) {
         let span = document.createElement('span')
+        span.classList.add(CURSOR_HELP_CLASS);
 
         let fl = user.user.first_name[0].toUpperCase()
         let firstLetter = userListFirstLetters.replace(new RegExp(`[^${fl}]`, 'g'), '').length > 1 ? user.user.first_name.slice(0, 2)
@@ -461,9 +463,12 @@ async function _realtimeUpdateVisualAgentList(data) {
         }
 
         span.innerHTML = firstLetter
+
+        // Tooltip info
         span.setAttribute("data-toggle", "tooltip")
         span.setAttribute("data-placement", "bottom")
         span.setAttribute("title", `${user.user.first_name} ${user.user.last_name}: ${user.status.name}`)
+
         visualAgentList.appendChild(span)
     }
 }

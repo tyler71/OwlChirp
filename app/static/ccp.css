@@ -124,3 +124,7 @@ div#recentCallList div.list table.table tbody tr{
 .hide {
     display: none !important;
 }
+
+.helpCursor {
+    cursor: help;
+}
