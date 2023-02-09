@@ -590,6 +590,13 @@ function formatPhoneNumber(phone) {
     return formattedNumber
 }
 
+function formatSecondsToTime(seconds) {
+    let date = new Date(0);
+    date.setSeconds(seconds);
+    let timeString = date.toISOString().substring(11, 19);
+    return timeString
+}
+
 function createCollapseList(array, collapsed = false, action = "click", id = null) {
     let parentHide = "collapsed"
     let childHide = "hide"
@@ -716,9 +723,16 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                     contactIdLink.target = "_blank"
                     contactIdLink.textContent = subTableJson["id"].split("-")[0]
 
+                    let c_time = new Intl.DateTimeFormat('en-US', {
+                        weekday: 'short',
+                        hour: 'numeric',
+                        minute: 'numeric'
+                    }).format(new Date(subTableJson["answered_timestamp"]))
                     let subTableData = {
                         "Name": subTableJson["agent_name"],
-                        "Answered": subTableJson["answered_timestamp"],
+                        "Answered": c_time,
+                        "Menu Time": formatSecondsToTime(subTableJson["call_to_queue_time"]),
+                        "Answer Time": formatSecondsToTime(subTableJson["call_to_queue_time"] + subTableJson["queue_time"]),
                         "Id": contactIdLink.outerHTML,
                     }
                     for (let [key, value] of Object.entries(subTableData)) {

@@ -123,6 +123,10 @@ class ConnectMetrics:
     def describe_contact(self, contact_id):
         data = self._describe_contact(contact_id)
         agent_data = self._describe_user(data["AgentInfo"]["Id"])
+
+        queue_time = data['AgentInfo']['ConnectedToAgentTimestamp'] - data['QueueInfo']['EnqueueTimestamp']
+        call_to_queue_time = data['AgentInfo']['ConnectedToAgentTimestamp'] - data['InitiationTimestamp']
+
         response = {
             "id": data["Id"],
             "initiation_method": data["InitiationMethod"],
@@ -130,6 +134,8 @@ class ConnectMetrics:
             "enqueue_timestamp": data["QueueInfo"]["EnqueueTimestamp"],
             "answered_timestamp": data["InitiationTimestamp"],
             "ended_timestamp": data["LastUpdateTimestamp"],
+            "queue_time": queue_time.seconds,
+            "call_to_queue_time": call_to_queue_time.seconds,
         }
         return response
 
