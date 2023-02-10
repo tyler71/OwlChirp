@@ -13,7 +13,7 @@ const CURSOR_HELP_CLASS = 'helpCursor';
 
 const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1}
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
-const BREAK_STATUSES = {"quick break": 20, "aftercallwork": 20, "lunch": 65, "missedcallagent": 5}
+const BREAK_STATUSES = {"quick break": 15, "aftercallwork": 15, "lunch": 65, "missedcallagent": 5}
 
 const LOADING_CLASS = 'alert-secondary'
 
