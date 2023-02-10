@@ -729,30 +729,32 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                         minute: 'numeric'
                     }).format(new Date(subTableJson["answered_timestamp"]))
                     let subTableData = {
-                        "Name": subTableJson["agent_name"],
-                        "Answered": c_time,
-                        "Menu Time": formatSecondsToTime(subTableJson["call_to_queue_time"]),
-                        "Answer Time": formatSecondsToTime(subTableJson["call_to_queue_time"] + subTableJson["queue_time"]),
-                        "Id": contactIdLink.outerHTML,
+                        "Name": {value: subTableJson["agent_name"]},
+                        "Answered": {value: c_time,
+                            tooltip: subTableJson["answered_timestamp"]},
+                        "Answer Time": {value: formatSecondsToTime(subTableJson["call_to_queue_time"] + subTableJson["queue_time"]),
+                            tooltip: `${formatSecondsToTime(subTableJson["call_to_queue_time"])} spent in menu + ${formatSecondsToTime(subTableJson["queue_time"])} spent in queue`},
+                        "Id": {value: contactIdLink.outerHTML},
                     }
                     for (let [key, value] of Object.entries(subTableData)) {
                         let subTableRow = document.createElement("tr")
                         let subTableKey = document.createElement('td');
                         let subTableValue = document.createElement('td');
                         subTableKey.innerHTML = key;
-                        subTableValue.innerHTML = value;
+                        subTableValue.innerHTML = value.value;
+                        if (value.tooltip !== undefined) {
+                            subTableRow.classList.add(CURSOR_HELP_CLASS);
+                            subTableRow.setAttribute("data-toggle", "tooltip")
+                            subTableRow.setAttribute("data-placement", "top")
+                            subTableRow.setAttribute("title", value.tooltip)
+                        }
                         subTableRow.appendChild(subTableKey);
                         subTableRow.appendChild(subTableValue);
                         subTableBody.append(subTableRow);
                     }
-
-
                 }
-
-
             }
         }
-
     });
     table.appendChild(tbody);
 
