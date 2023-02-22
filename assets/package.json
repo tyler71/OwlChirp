@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "webpack --mode=development",
+    "watch": "webpack --mode=development --watch",
+    "prod": "webpack --mode=production"
+  },
+  "dependencies": {
+    "@microsoft/fetch-event-source": "^2.0.1",
+    "amazon-connect-streams": "^2.4.5",
+    "bootstrap": "^4.6.2",
+    "webpack": "^5.75.0"
+  }
+}
