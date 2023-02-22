@@ -108,7 +108,8 @@ class ConnectMetrics:
         # Pending resolution of AWS Case Id 11904141851
         # Hack to ensure on call is set as on call and not available
         for user in current_users['UserDataList']:
-            if user['Status']['StatusName'] == 'Available' and len(user['Contacts']) > 0 and user['Contacts'][0]['AgentContactState'].upper() == 'CONNECTED':
+            if user['Status']['StatusName'] == 'Available' and len(user['Contacts']) > 0 and user['Contacts'][0][
+                'AgentContactState'].upper() == 'CONNECTED':
                 user['Status']['StatusName'] = 'On call'
 
         return current_users['UserDataList']
@@ -219,3 +220,6 @@ class ConnectMetrics:
     @property
     def userlist(self) -> list[dict[str, dict[str, str]]]:
         return self._refresh_userlist()
+
+
+cm = ConnectMetrics()

@@ -11,7 +11,7 @@ from typing import Any, AsyncGenerator
 
 from cachetools import cached, TTLCache
 
-from . import ConnectMetrics
+from .ConnectMetrics import cm
 from .Helper import sync_to_async
 
 cache_length = int(os.getenv('AWS_CONNECT_CACHE_LENGTH', 15))
@@ -120,9 +120,6 @@ class ServerSentEvent:
             message = f"{message}\nretry: {self.retry}"
         message = f"{message}\r\n\r\n"
         return message.encode('utf-8')
-
-
-cm = ConnectMetrics.ConnectMetrics()
 
 
 @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))

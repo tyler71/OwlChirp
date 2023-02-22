@@ -7,6 +7,7 @@ from lib.Database import Db
 from lib.Events import ServerSentEvents, get_metric_data, cm
 from lib.Helper import sync_to_async
 import logging
+from lib.Authentication import require_api_key
 
 events = ServerSentEvents(["queue_count",
                            "available_count",
@@ -80,6 +81,7 @@ async def metric_events():
 
 
 @app.route('/api/calls/agent', methods=["GET", "POST"])
+@require_api_key
 async def agent_call_log():
     username = request.args.get("username")
     db = Db()
@@ -112,6 +114,7 @@ async def agent_call_log():
 
 
 @app.route('/api/calls/number')
+@require_api_key
 async def number_call_log():
     db = Db()
     await db.init()
@@ -131,6 +134,7 @@ async def number_call_log():
 
 
 @app.route('/api/calls/detail')
+@require_api_key
 async def contact_detailed_info():
     contact_id = request.args.get("contact_id", None)
     try:
@@ -142,6 +146,7 @@ async def contact_detailed_info():
 
 
 @app.route('/api/calls/callerid', methods=["GET", "PUT"])
+@require_api_key
 async def caller_id():
     db = Db()
     await db.init()
