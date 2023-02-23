@@ -1,8 +1,9 @@
 import datetime
 import hashlib
-import time
+import math
 from functools import wraps
 
+import pytz
 from quart import request, abort
 
 from cachetools import cached, LRUCache
@@ -17,22 +18,28 @@ class AuthApiKey:
         self.valid_user_tokens = dict()
         self.cm = cm
 
-    def _generate_token(self, date: datetime.datetime, agent_id: str, agent_username: str) -> str:
-        # Set to javascript timestamp
-        timestamp = int(time.mktime(date.timetuple())) * 1000
-        unencoded_str = str(timestamp) + agent_id + agent_username
+    def _generate_token(self, agent_id: str, agent_username: str) -> str:
         sha256 = hashlib.sha256()
+
+        # Set to javascript timestamp in UTC
+        utc_tz = pytz.timezone("UTC")
+        now = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=utc_tz)
+        timestamp = math.floor(now.timestamp())
+
+        unencoded_str = str(timestamp) + agent_id + agent_username
+
         sha256.update(unencoded_str.encode('utf-8'))
+        logging.error(timestamp)
+        logging.error("Expecting " + sha256.hexdigest())
         return sha256.hexdigest()
 
     @cached(LRUCache(maxsize=32))
     def verify_token(self, provided_token: str) -> bool:
-        now = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         users = self.cm.userlist
 
         try:
             for user in users:
-                generated_token = self._generate_token(now, agent_id=user["user_id"],
+                generated_token = self._generate_token(agent_id=user["user_id"],
                                                        agent_username=user["user"]["username"])
                 if generated_token == provided_token:
                     return True

@@ -57,6 +57,7 @@ async def js_ccp():
 
 
 @app.route('/api/metrics')
+@require_api_key
 async def metrics():
     if "text/event-stream" not in request.accept_mimetypes:
         abort(400)
@@ -69,6 +70,7 @@ async def metrics():
 
 
 @app.route('/api/metrics/events')
+@require_api_key
 async def metric_events():
     if "text/event-stream" not in request.accept_mimetypes:
         abort(400)

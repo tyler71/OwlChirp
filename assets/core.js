@@ -1,3 +1,7 @@
+import "amazon-connect-streams";
+import {fetchEventSource} from "@microsoft/fetch-event-source";
+
+
 let notify = new Notifier();
 notify.authorize();
 
@@ -11,17 +15,18 @@ const TABLE_ALERT_CLASS = 'table-warning';
 const TABLE_DANGER_CLASS = 'table-danger';
 const CURSOR_HELP_CLASS = 'helpCursor';
 
+// Sideline statuses can receive notifications.
+// Excluded statuses are not notified
 const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1}
 const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
-const BREAK_STATUSES = {"quick break": 15, "aftercallwork": 15, "lunch": 65, "missedcallagent": 5}
-
-const LOADING_CLASS = 'alert-secondary'
-
-let JSON_HEADERS = new Headers();
-JSON_HEADERS.append('Content-Type', 'application/json;charset=UTF-8');
+const BREAK_STATUSES = {"quick break": 10, "aftercallwork": 10, "lunch": 65, "missedcallagent": 5}
 
 const MAX_QUEUE_COUNT = 1;
 const MIN_AGENT_STAFFED = 1;
+
+const LOADING_CLASS = 'alert-secondary'
+
+
 let containerDiv = document.querySelector('#ccp');
 let statusDiv = document.querySelector('#statusDiv');
 let [statusDivA, statusDivB] = statusDiv.children;
@@ -108,7 +113,7 @@ async function hookInit(agent) {
     // Using Server Sent Events, we subscribe to the endpoint and listen for events.
     // When a change occurs, a "data" object is sent to the function, allowing it to update.
     // It is only run when a change occurs.
-    let metricEventSub = eventSub('/metrics', {
+    let metricEventSub = await eventSub('/metrics', {
         'queue_count': [_realtimeUpdateQueueCount],
         'available_count': [_realtimeUpdateAvailableCount, _realtimeUpdateVisualAgentList],
         'handled_incoming': [_realtimeUpdateHandledIncoming],
@@ -240,8 +245,8 @@ function Notifier(namespace = "") {
 
 // ######## User Local Call History ########################
 
-function eventSub(endpoint, events) {
-    let subObj = new Subscribe(API + `${endpoint}`, (r) => {
+async function eventSub(endpoint, events) {
+    let subObj = await asyncSubscribe(API + `${endpoint}`, (r) => {
         let data = JSON.parse(r.data)
         for (let [key, value] of Object.entries(data)) {
             if (events.hasOwnProperty(key)) {
@@ -267,7 +272,7 @@ function callHistory(agent) {
     this._refreshCalls = async () => {
         let req = await fetch(API + '/calls/agent?' + this.searchParams, {
             method: 'GET',
-            headers: JSON_HEADERS,
+            headers: await generateBaseHeader(),
         })
         let res = await req.json();
         let result = res === undefined ? [] : res
@@ -287,7 +292,7 @@ function callHistory(agent) {
 
         let req = await fetch(API + '/calls/agent', {
             method: 'POST',
-            headers: JSON_HEADERS,
+            headers: await generateBaseHeader(),
             body: JSON.stringify(logItem),
         })
         while (this.log.length > 50) {
@@ -301,6 +306,15 @@ function callHistory(agent) {
     }
 }
 
+async function asyncSubscribe(url, callback) {
+    let res = await fetchEventSource(url, {
+        headers: await generateBaseHeader(),
+        onmessage(ev) {
+            callback(ev)
+        }
+    })
+    return res
+}
 
 // ######## Event Subscribe         ########################
 
@@ -310,9 +324,11 @@ function Subscribe(url, callback, reconnect = 100000) {
     this.reconnectTimeout = reconnect;
     this.initTimeout = 10000;
     this.lastUpdate = null;
-    this.eventSource = new EventSource(this.url);
+    // this.eventSource = new EventSource(this.url);
+    this.eventSource = fetchEventSource(this.url)
 
-    this._regenerateEventSource = (eventSource = undefined) => {
+    // TODO: Need to figure out a way to add headers to EventSource for security
+    this._regenerateEventSource = async (eventSource = undefined) => {
         if (eventSource !== undefined && eventSource.toString() === "[object EventSource]") {
             eventSource.close();
         }
@@ -355,7 +371,7 @@ function Subscribe(url, callback, reconnect = 100000) {
 // ######################## Realtime Status Sections ########################
 // Takes functions starting with realtime and use them here
 // Events are sent from the server to this endpoint using Server Sent Events (SSE)
-// We can add as many functions as needed here. Only when something is changed for that 
+// We can add as many functions as needed here. Only when something is changed for that
 //  Server will something change
 
 // ######## Realtime Queue Count ########################
@@ -493,6 +509,39 @@ async function updateAgentCallList() {
     callListSection.parentNode.replaceChild(newSection, callListSection);
 }
 
+async function getAgentRegex() {
+    const AGENT_QUEUE_PATTERN = new RegExp('arn:aws:connect:([\\w|\\-]+):(\\w+):instance/([\\w|\\-]+)/queue/agent/([\\w|\\-]+)');
+
+    const agentQueue = agentObj.getConfiguration().routingProfile.queues.filter(queue => queue.name === null)
+    // group[0] all
+    // group[1] region
+    // group[2] AWS AccountID
+    // group[3] Amazon Connect InstanceID
+    // group[4] AgentID
+    const groups = AGENT_QUEUE_PATTERN.exec(agentQueue[0].queueARN);
+    // const agentArn = `arn:aws:connect:${groups[1]}:${groups[2]}:instance/${groups[3]}/agent/${groups[4]}`;
+    return groups
+}
+
+async function checksum(string, algorithm = 'SHA-256') {
+    let textAsBuffer = new TextEncoder().encode(string);
+    let hashBuffer = await window.crypto.subtle.digest(algorithm, textAsBuffer);
+    let hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function hashRequest() {
+    let date = new Date();
+    date.setUTCHours(0, 0, 0, 0)
+    let timestamp = Math.floor(date.getTime() / 1000);
+
+
+    let agentID = (await getAgentRegex())[4]
+    let agentUsername = agentObj.getConfiguration().username
+
+    return await checksum(`${timestamp}${agentID}${agentUsername}`)
+}
+
 
 // ######## Who a phone number called recently ########################
 
@@ -506,7 +555,7 @@ async function updateNumberCallList(phoneNumber) {
         max_records: "10",
     });
     const url = API + '/calls/number?' + searchParams;
-    const res = await fetch(url, {headers: JSON_HEADERS});
+    const res = await fetch(url, {headers: await generateBaseHeader()});
     if (res.ok) {
         const numberCallList = await res.json();
         let sortedNumberCallList = sortPropertyList(numberCallList, "timestamp", false);
@@ -565,6 +614,18 @@ function checkStateDuration(agent, stateName, maxMinutes) {
 function ms_to_min(milliseconds) {
     return milliseconds / 1000 / 60;
 }
+
+async function generateBaseHeader(hash = true) {
+    // let baseHeaders = new Headers();
+    let baseHeaders = {
+        'Content-Type': 'application/json;charset=UTF-8'
+    }
+    if (hash === true) {
+        baseHeaders['X-Api-Key'] = await hashRequest();
+    }
+    return baseHeaders
+}
+
 
 function sortPropertyList(array, property, asc = true) {
     asc ? array.sort((a, b) => a[property] - b[property])
@@ -704,7 +765,7 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                     contact_id: row.dataset.contactid,
                 });
                 let subTableDataUrl = API + '/calls/detail?' + searchParams;
-                let subTableReq = await fetch(subTableDataUrl, {headers: JSON_HEADERS})
+                let subTableReq = await fetch(subTableDataUrl, {headers: await generateBaseHeader()})
                 if (subTableReq.ok) {
                     let subTable = document.createElement('table');
                     subTable.classList.add("table")
@@ -730,10 +791,14 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                     }).format(new Date(subTableJson["answered_timestamp"]))
                     let subTableData = {
                         "Name": {value: subTableJson["agent_name"]},
-                        "Answered": {value: c_time,
-                            tooltip: subTableJson["answered_timestamp"]},
-                        "Answer Time": {value: formatSecondsToTime(subTableJson["call_to_queue_time"] + subTableJson["queue_time"]),
-                            tooltip: `${formatSecondsToTime(subTableJson["call_to_queue_time"])} spent in menu + ${formatSecondsToTime(subTableJson["queue_time"])} spent in queue`},
+                        "Answered": {
+                            value: c_time,
+                            tooltip: subTableJson["answered_timestamp"]
+                        },
+                        "Answer Time": {
+                            value: formatSecondsToTime(subTableJson["call_to_queue_time"] + subTableJson["queue_time"]),
+                            tooltip: `${formatSecondsToTime(subTableJson["call_to_queue_time"])} spent in menu + ${formatSecondsToTime(subTableJson["queue_time"])} spent in queue`
+                        },
                         "Id": {value: contactIdLink.outerHTML},
                     }
                     for (let [key, value] of Object.entries(subTableData)) {
@@ -814,7 +879,7 @@ function SetupCallerId() {
         if (e.target.innerHTML !== this.oldNick) {
             let updateCallerId = await fetch(API + '/calls/callerid', {
                 method: "PUT",
-                headers: JSON_HEADERS,
+                headers: await generateBaseHeader(),
                 body: JSON.stringify({
                     phone_number: this.callerId.dataset.phoneNumber,
                     name: this.callerId.innerHTML,
@@ -833,7 +898,7 @@ async function incomingCallCallerId(phoneNumber) {
 
     let searchParams = new URLSearchParams({phone_number: phoneNumber});
     let res = await fetch(API + '/calls/callerid?' + searchParams, {
-        headers: JSON_HEADERS,
+        headers: await generateBaseHeader(),
     });
     if (res.ok) {
         let data = await res.json();

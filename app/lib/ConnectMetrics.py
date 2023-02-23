@@ -4,7 +4,7 @@ import logging
 import math
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, List, Dict
 
 import boto3
 from botocore.exceptions import ClientError
@@ -218,7 +218,7 @@ class ConnectMetrics:
         return 0
 
     @property
-    def userlist(self) -> list[dict[str, dict[str, str]]]:
+    def userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         return self._refresh_userlist()
 
 

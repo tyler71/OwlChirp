@@ -4,20 +4,13 @@ FROM python:3.10-slim AS build_app_environment
 COPY ./requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
+FROM node:18.13.0 AS build_js_dist
+COPY ./assets /assets
+WORKDIR /assets
 
-FROM python:3.10-slim AS build_oauth
-ENV OAUTH_DOWNLOAD="https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v7.4.0/oauth2-proxy-v7.4.0.linux-amd64.tar.gz"
+RUN npm install
+RUN npm run prod
 
-RUN apt-get update \
- && apt-get -y install wget \
- && rm -r /var/lib/apt/lists/*
-
-WORKDIR /tmp/download-oauth
-RUN wget "$OAUTH_DOWNLOAD" -O oauth.tar.gz
-RUN tar -xf oauth.tar.gz                \
- && mkdir -p /opt/oauth-proxy           \
- && mv oauth2-proxy-*/oauth2-proxy /opt/oauth-proxy/oauth2-proxy \
- && rm oauth.tar.gz
 
 # caddy handles http/s termination. It is built from scratch
 # This allows for additional modules later if we need it.
@@ -53,15 +46,14 @@ RUN mkdir /app /data               \
       --gid 1000                   \
       --system
 
-COPY --from=build_app_environment /usr/local         /usr/local
-COPY --from=build_oauth           /opt/oauth-proxy   /opt/oauth-proxy
-COPY --from=build_reverse_proxy   /opt/reverse_proxy /opt/reverse_proxy
+COPY --from=build_js_dist         app/static/lib/main.js app/static/lib/main.js
+COPY --from=build_reverse_proxy   /opt/reverse_proxy     /opt/reverse_proxy
+COPY --from=build_app_environment /usr/local             /usr/local
 
 RUN python -m pip install --no-cache-dir install supervisor
 
 COPY ./config/init/supervisord.conf   /etc/supervisord.conf
 COPY ./config/init.sh                 /init.sh
-COPY ./config/oauth/oauth.sh          /opt/oauth-proxy/
 COPY ./config/reverse_proxy/Caddyfile /etc/Caddyfile
 
 EXPOSE 8080

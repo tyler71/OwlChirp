@@ -5,3 +5,4 @@ asyncache==0.3.1
 cachetools==5.3.0
 quart==0.18.3
 uvicorn==0.20.0
+pytz==2022.7.1
