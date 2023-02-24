@@ -6,7 +6,7 @@ from quart import Quart, request, render_template, make_response, abort, send_fi
 
 from lib.Database import Db
 from lib.Events import ServerSentEvents, get_metric_data, cm
-from lib.Helper import sync_to_async, get_sha256_hash
+from lib.Helper import sync_to_async, get_sha384_hash
 import logging
 from lib.Authentication import require_api_key
 
@@ -39,7 +39,7 @@ async def index():
 @app.route('/ccp')
 async def ccp():
     globbed_file = glob.glob("./static/dist/main.*.js")
-    core_hash = get_sha256_hash(globbed_file[0])
+    core_hash = get_sha384_hash(globbed_file[0])
 
     globbed_file = globbed_file[0].split(os.path.sep)
     globbed_file = globbed_file[2:]
@@ -47,7 +47,7 @@ async def ccp():
 
     return await render_template('ccp.html',
                                  core_file=globbed_file,
-                                 core_hash=f"sha256-{core_hash}",
+                                 core_hash=f"sha384-{core_hash}",
                                  LOADING_CLASS="alert-secondary",
                                  HELP_CURSOR_CLASS="helpCursor",
                                  )

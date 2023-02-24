@@ -17,12 +17,12 @@ def sync_to_async(func, *args, **kwargs):
 
     return inner
 
-def get_sha256_hash(file_path: str) -> str:
+def get_sha384_hash(file_path: str) -> str:
     with open(file_path, 'rb') as f:
-        sha256 = hashlib.sha256()
+        sha384 = hashlib.sha384()
         while True:
             chunk = f.read(4096)
             if not chunk:
                 break
-            sha256.update(chunk)
-        return sha256.hexdigest()
+            sha384.update(chunk)
+        return sha384.hexdigest()
