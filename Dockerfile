@@ -4,7 +4,7 @@ FROM python:3.10-slim AS build_app_environment
 COPY ./requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
-FROM node:18.13.0 AS build_js_dist
+FROM node:18.14.2 AS build_js_dist
 COPY ./app/client /assets
 WORKDIR /assets
 
@@ -33,8 +33,6 @@ ARG SET_GIT_SHA=dev
 ENV GIT_SHA=$SET_GIT_SHA
 ENV TZ="America/Los_Angeles"
 
-ENV DATA_DIR /data
-
 RUN mkdir /app /data               \
  && groupadd application           \
       --gid 1000                   \
@@ -46,11 +44,11 @@ RUN mkdir /app /data               \
       --gid 1000                   \
       --system
 
-COPY --from=build_js_dist         /assets/dist/main.*.js app/server/static/
 COPY --from=build_reverse_proxy   /opt/reverse_proxy     /opt/reverse_proxy
 COPY --from=build_app_environment /usr/local             /usr/local
 
 RUN python -m pip install --no-cache-dir install supervisor
+
 
 COPY ./config/init/supervisord.conf   /etc/supervisord.conf
 COPY ./config/init.sh                 /init.sh
@@ -59,6 +57,7 @@ COPY ./config/reverse_proxy/Caddyfile /etc/Caddyfile
 EXPOSE 8080
 EXPOSE 4443
 
-COPY --chown=application:application ./app /app
+COPY --from=build_js_dist            /assets/dist /app/server/static/dist
+COPY --chown=application:application ./app        /app
 
 CMD bash /init.sh

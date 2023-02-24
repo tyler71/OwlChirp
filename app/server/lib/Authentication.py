@@ -14,7 +14,6 @@ import logging
 
 class AuthApiKey:
     def __init__(self, cm: ConnectMetrics):
-        self.valid_user_tokens = dict()
         self.cm = cm
 
     @staticmethod

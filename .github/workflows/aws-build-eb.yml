@@ -74,7 +74,7 @@ jobs:
           aws_secret_key:                    ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           application_name:                  ${{ secrets.EB_APP_NAME }}
           environment_name:                  ${{ secrets.EB_ENV_NAME }}
-          version_label:                     tl-analytics-source-${{ github.run_number }}
+          version_label:                     tlccp-source-${{ github.run_number }}
           use_existing_version_if_available: true
           region:                            ${{ secrets.AWS_REGION }}
           existing_bucket_name:              ${{ secrets.EB_BUCKET }}
