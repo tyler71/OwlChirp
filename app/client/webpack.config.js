@@ -13,7 +13,7 @@ module.exports = (env, argv) => {
         output: {
             filename: 'main.[fullhash].js',
             path: pathLocation,
-            clean: false
+            clean: true
         },
     }
 };
