@@ -2,7 +2,8 @@
 import {incomingCallCallerId} from "../component/callerId";
 import {formatPhoneNumber} from "../helper";
 import {updateAgentCallList} from "../component/recentCallList";
-import {notify, phoneLog} from "../core";
+import {notify} from "../core";
+import {phoneLog} from "./init";
 
 export async function hookIncomingCall(contact) {
     notify.log("Incoming Call, here is the contact object");

@@ -3,13 +3,14 @@ import {CallHistory} from "../service/callHistory";
 import {updateAgentCallList} from "../component/recentCallList";
 import {SetupCallerId} from "../component/callerId";
 import {eventSub} from "../service/realtime";
-import {phoneLog} from "../core";
 import {hookIntervalRefresh} from "./intervalRefresh";
+
+export let phoneLog;
 
 export async function hookInit(agent) {
     // Tracks our call history. Is database backed
     phoneLog = new CallHistory(agent);
-    window.phoneLog = phoneLog;
+    // window.phoneLog = phoneLog
 
     // Update Agent call list once phoneLog has a phone log
     // After this, it is hooked into incoming calls

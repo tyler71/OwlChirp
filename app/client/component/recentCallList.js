@@ -1,7 +1,7 @@
 import {API, CURSOR_HELP_CLASS, SPS_CONNECT_DOMAIN, TIME_ZONE, LOADING_CLASS} from "../const";
 import {generateBaseHeader} from "../authentication";
 import {formatPhoneNumber, formatSecondsToTime, spinnerToggle} from "../helper";
-import {phoneLog} from "../core";
+import {phoneLog} from "../hook/init";
 
 export async function updateAgentCallList() {
     console.log("AAAAA - Updating Agent call list")

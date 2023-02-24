@@ -11,7 +11,6 @@ notify.authorize();
 let containerDiv = document.querySelector('#ccp');
 let statusDiv = document.querySelector('#statusDiv');
 let [statusDivA, statusDivB] = statusDiv.children;
-export let phoneLog;
 
 export let agentObj;
 
