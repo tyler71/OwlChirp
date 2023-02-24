@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -xv
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 (
   cd "$SCRIPT_DIR"
   cd client
@@ -11,4 +11,7 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   ln -s dist/main.*.js "$SCRIPT_DIR"/server/static/dist
 )
 
-python "$SCRIPT_DIR"/server
+(
+  cd "$SCRIPT_DIR"/server
+  python .
+)

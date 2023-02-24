@@ -38,11 +38,12 @@ async def index():
 
 @app.route('/ccp')
 async def ccp():
-    globbed_file = glob.glob("./static/dist/main.*.js")
+    script_path = os.path.abspath(os.path.dirname(__file__))
+    globbed_file = glob.glob(f"{script_path}/static/dist/main.*.js")
     core_hash = get_sha384_hash(globbed_file[0])
 
     globbed_file = globbed_file[0].split(os.path.sep)
-    globbed_file = globbed_file[2:]
+    globbed_file = globbed_file[-2:]
     globbed_file = os.path.sep.join(globbed_file)
 
     return await render_template('ccp.html',
