@@ -81,3 +81,7 @@ export function checkStateDuration(agent, stateName, maxMinutes) {
     }
 
 }
+
+export function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}

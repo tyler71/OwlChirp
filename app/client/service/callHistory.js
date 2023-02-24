@@ -1,7 +1,7 @@
 // ######## User Local Call History ########################
 import {API} from "../const";
 import {generateBaseHeader} from "../authentication";
-import {sortPropertyList} from "../helper";
+import {sleep, sortPropertyList} from "../helper";
 
 export function CallHistory(agent) {
     this.agent = agent;
@@ -14,10 +14,16 @@ export function CallHistory(agent) {
 
     console.log("AAAAA - About to make query")
     this._refreshCalls = async () => {
-        let req = await fetch(API + '/calls/agent?' + this.searchParams, {
-            method: 'GET',
-            headers: await generateBaseHeader(),
-        })
+        let req_status = false
+        let req = undefined;
+        while (req_status !== true) {
+            await sleep(1000);
+            req = await fetch(API + '/calls/agent?' + this.searchParams, {
+                method: 'GET',
+                headers: await generateBaseHeader(),
+            })
+            req_status = req.ok
+        }
         let res = await req.json();
         let result = res === undefined ? [] : res
 
@@ -39,7 +45,9 @@ export function CallHistory(agent) {
             headers: await generateBaseHeader(),
             body: JSON.stringify(logItem),
         })
-        if(!req.ok) { console.error(req) }
+        if (!req.ok) {
+            console.error(req)
+        }
 
         while (this.log.length > 50) {
             this.log.pop()

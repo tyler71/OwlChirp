@@ -4,7 +4,6 @@ import {formatPhoneNumber, formatSecondsToTime, spinnerToggle} from "../helper";
 import {phoneLog} from "../hook/init";
 
 export async function updateAgentCallList() {
-    console.log("AAAAA - Updating Agent call list")
     let callListSection = document.querySelector('#recentCallList');
     let calls = await phoneLog.getLog();
     for (let call of calls) {
@@ -15,7 +14,6 @@ export async function updateAgentCallList() {
         }).format(new Date(call.timestamp))
         let c_username = call.agent.slice(0, (call.agent.indexOf('@')))
     }
-    // let newSection = createCollapseList(convertedCalls, true, 'dblclick', 'agentCallList');
     let newSection = createRecentCallList(calls, "Recent Calls", 'recentCallList', 'click');
     spinnerToggle(callListSection, false);
     callListSection.parentNode.replaceChild(newSection, callListSection);
