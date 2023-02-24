@@ -6,6 +6,9 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   cd client
   npm install
   npm run prod
+  mkdir -p "$SCRIPT_DIR"/server/static/dist
+  rm "$SCRIPT_DIR"/server/static/dist/main.*.js
+  ln -s dist/main.*.js "$SCRIPT_DIR"/server/static/dist
 )
 
 python "$SCRIPT_DIR"/server
