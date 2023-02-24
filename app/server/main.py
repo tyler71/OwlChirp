@@ -1,14 +1,14 @@
 import glob
+import logging
 import os
 
 from botocore.exceptions import ClientError
-from quart import Quart, request, render_template, make_response, abort, send_file
+from quart import Quart, request, render_template, make_response, abort
 
+from lib.Authentication import require_api_key
 from lib.Database import Db
 from lib.Events import ServerSentEvents, get_metric_data, cm
 from lib.Helper import sync_to_async, get_sha384_hash
-import logging
-from lib.Authentication import require_api_key
 
 events = ServerSentEvents(["queue_count",
                            "available_count",
@@ -38,8 +38,8 @@ async def index():
 
 @app.route('/ccp')
 async def ccp():
-    script_path = os.path.abspath(os.path.dirname(__file__))
-    globbed_file = glob.glob(f"{script_path}/static/dist/main.*.js")
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    globbed_file = glob.glob(f"{dir_path}/static/dist/main.*.js")
     core_hash = get_sha384_hash(globbed_file[0])
 
     globbed_file = globbed_file[0].split(os.path.sep)
@@ -52,19 +52,6 @@ async def ccp():
                                  LOADING_CLASS="alert-secondary",
                                  HELP_CURSOR_CLASS="helpCursor",
                                  )
-
-
-# We're not sending static as this file will often change.
-@app.route('/ccp.js')
-async def js_ccp():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    js_file = os.path.join(dir_path, "static/scripts/core.js")
-    content = await send_file(js_file,
-                              mimetype='application/javascript', as_attachment=False)
-    response = await make_response(content)
-    if 'Cache-Control' not in response.headers:
-        response.headers['Cache-Control'] = 'no-store'
-    return response
 
 
 @app.route('/api/metrics')
