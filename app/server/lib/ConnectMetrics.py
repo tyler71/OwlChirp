@@ -4,7 +4,7 @@ import logging
 import math
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Dict
+from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
@@ -109,7 +109,7 @@ class ConnectMetrics:
         # Hack to ensure on call is set as on call and not available
         for user in current_users['UserDataList']:
             if user['Status']['StatusName'] == 'Available' and len(user['Contacts']) > 0 and user['Contacts'][0][
-                'AgentContactState'].upper() == 'CONNECTED':
+                    'AgentContactState'].upper() == 'CONNECTED':
                 user['Status']['StatusName'] = 'On call'
 
         return current_users['UserDataList']

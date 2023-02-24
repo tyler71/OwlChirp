@@ -1,3 +1,4 @@
+import glob
 import os
 
 from botocore.exceptions import ClientError
@@ -37,7 +38,13 @@ async def index():
 
 @app.route('/ccp')
 async def ccp():
+    globbed_file = glob.glob("./static/dist/main.*.js")
+    globbed_file = globbed_file[0].split(os.path.sep)
+    globbed_file = globbed_file[2:]
+    globbed_file = os.path.sep.join(globbed_file)
+
     return await render_template('ccp.html',
+                                 core_file=globbed_file,
                                  LOADING_CLASS="alert-secondary",
                                  HELP_CURSOR_CLASS="helpCursor",
                                  )

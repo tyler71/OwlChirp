@@ -5,7 +5,7 @@ COPY ./requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
 FROM node:18.13.0 AS build_js_dist
-COPY ./assets /assets
+COPY ./app/client /assets
 WORKDIR /assets
 
 RUN npm install
@@ -46,7 +46,7 @@ RUN mkdir /app /data               \
       --gid 1000                   \
       --system
 
-COPY --from=build_js_dist         app/static/lib/main.js app/static/lib/main.js
+COPY --from=build_js_dist         /assets/dist/main.*.js app/server/static/
 COPY --from=build_reverse_proxy   /opt/reverse_proxy     /opt/reverse_proxy
 COPY --from=build_app_environment /usr/local             /usr/local
 

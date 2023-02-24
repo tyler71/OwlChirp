@@ -18,7 +18,8 @@ class AuthApiKey:
         self.valid_user_tokens = dict()
         self.cm = cm
 
-    def _generate_token(self, agent_id: str, agent_username: str) -> str:
+    @staticmethod
+    def _generate_token(agent_id: str, agent_username: str) -> str:
         sha256 = hashlib.sha256()
 
         # Set to javascript timestamp in UTC
@@ -29,8 +30,6 @@ class AuthApiKey:
         unencoded_str = str(timestamp) + agent_id + agent_username
 
         sha256.update(unencoded_str.encode('utf-8'))
-        logging.error(timestamp)
-        logging.error("Expecting " + sha256.hexdigest())
         return sha256.hexdigest()
 
     @cached(LRUCache(maxsize=32))

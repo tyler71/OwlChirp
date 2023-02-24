@@ -86,7 +86,8 @@ class ServerSentEvents:
 
     # Generators hold state (previous_result), so we use it to not return anything
     # if no new change has occurred.
-    def _key_change(self, data: dict, key: str) -> typing.Generator[dict, dict, None]:
+    @staticmethod
+    def _key_change(data: dict, key: str) -> typing.Generator[dict, dict, None]:
         """
         For a given key, returns a generator that will yield it back if that
         key has changed.
