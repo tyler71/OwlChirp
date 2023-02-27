@@ -26,7 +26,7 @@ class AuthApiKey:
         """
         Tokens only change once an hour. This will get remove all invalid ones
         """
-        current_hour = datetime.datetime.now(tz=self._utc_tz).hour
+        current_hour = datetime.datetime.utcnow().replace(tzinfo=self._utc_tz).hour
         if current_hour > self.hour:
             self.hour = current_hour
             self.accepted_tokens = set()

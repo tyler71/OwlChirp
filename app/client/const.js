@@ -1,8 +1,8 @@
 export const API = '/api';
 
-export const SPS_CONNECT_DOMAIN = new URL('https://sps-connect-poc.my.connect.aws');
-export const INSTANCE_URL = "https://sps-connect-poc.my.connect.aws/connect/ccp-v2";
-export const TIME_ZONE = 'America/Los_Angeles';
+export const CONNECT_DOMAIN = "_REPLACE_CONNECT_DOMAIN";
+export const CCP_URL = `${CONNECT_DOMAIN}/connect/ccp-v2`;
+export const TIME_ZONE = "_REPLACE_TIME_ZONE";
 
 export const TABLE_INFO_CLASS = 'table-info';
 export const TABLE_ALERT_CLASS = 'table-warning';

@@ -7,11 +7,11 @@
   },
   "dependencies": {
     "@microsoft/fetch-event-source": "^2.0.1",
-    "amazon-connect-streams": "^2.4.5",
-    "bootstrap": "^4.6.2"
+    "amazon-connect-streams": "^2.4.5"
   },
   "devDependencies": {
     "webpack": "^5.75.0",
-    "webpack-cli": "^5.0.1"
+    "webpack-cli": "^5.0.1",
+    "string-replace-loader": "^3.1.0"
   }
 }

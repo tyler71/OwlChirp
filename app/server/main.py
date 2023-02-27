@@ -5,7 +5,7 @@ import os
 from botocore.exceptions import ClientError
 from quart import Quart, request, render_template, make_response, abort
 
-from app.server.lib.Helper import HttpResponse
+from lib.Helper import HttpResponse
 from lib.Authentication import require_api_key
 from lib.Database import Db
 from lib.Events import ServerSentEvents, get_metric_data, cm

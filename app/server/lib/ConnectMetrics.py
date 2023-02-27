@@ -13,9 +13,6 @@ from cachetools import cached, TTLCache, LRUCache
 
 class ConnectMetrics:
     def __init__(self,
-                 accesskey=os.environ["AWS_ACCESS_KEY_ID"],
-                 secretkey=os.environ["AWS_SECRET_ACCESS_KEY"],
-                 region=os.environ["AWS_DEFAULT_REGION"],
                  connect_instance=os.getenv("CONNECT_INSTANCE", None),
                  ):
         self.connect_instance = connect_instance
@@ -93,7 +90,7 @@ class ConnectMetrics:
 
         return metric_hist_data['MetricResults'][0]['Collections']
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=10))
+    @cached(TTLCache(maxsize=1024 * 32, ttl=5))
     def _refresh_current_user_data(self) -> dict:
         queues = [q['Id'] for q in self._refresh_queues()]
 
@@ -145,7 +142,7 @@ class ConnectMetrics:
         try:
             user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
             if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
-                raise ValueError("_refresh_userlist#current_users network failure")
+                logging.error("_refresh_userlist#current_users network failure")
             return user_data['User']
         except ClientError as e:
             logging.error(e)

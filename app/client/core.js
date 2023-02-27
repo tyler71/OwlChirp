@@ -1,5 +1,5 @@
 import "amazon-connect-streams";
-import {INSTANCE_URL} from "./const";
+import {CCP_URL} from "./const";
 import {Notifier} from "./service/Notifier";
 import {hookIncomingCall} from "./hook/incomingCall";
 import {hookRefresh} from "./hook/refresh";
@@ -17,7 +17,7 @@ export let agentObj;
 // Starts the CCP instance.
 // The provided hooks are used for the rest of the program.
 connect.core.initCCP(containerDiv, {
-    ccpUrl: INSTANCE_URL,             // REQUIRED
+    ccpUrl: CCP_URL,             // REQUIRED
     loginPopup: true,                 // optional, defaults to `true`
     loginPopupAutoClose: true,        // optional, defaults to `false`
     loginOptions: {                   // optional, if provided opens login in new window
