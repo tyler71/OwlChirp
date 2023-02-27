@@ -5,6 +5,9 @@ COPY ./requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
 FROM node:18.14.2 AS build_js_dist
+ARG CONNECT_DOMAIN
+ARG TIME_ZONE=America/Los_Angeles
+
 COPY ./app/client /assets
 WORKDIR /assets
 

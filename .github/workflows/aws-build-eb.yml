@@ -48,6 +48,7 @@ jobs:
             ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:build_${{ github.run_number }}
           build-args: |
             SET_GIT_SHA=${{ github.sha }}
+            CONNECT_DOMAIN=${{ secrets.CONNECT_DOMAIN }}
           cache-from: type=gha
           cache-to:   type=gha,mode=max
 

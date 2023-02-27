@@ -1,0 +1,8 @@
+*.sqlite3
+__pycache__/
+node_modules/
+venv/
+
+.idea/dataSources.xml
+
+main.*.js
