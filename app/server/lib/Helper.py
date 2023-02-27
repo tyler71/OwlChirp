@@ -4,6 +4,11 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial, wraps
 
 
+class HttpResponse:
+    CREATED = 201
+    UNAUTHORIZED = 401
+
+
 def sync_to_async(func, *args, **kwargs):
     lock = asyncio.Lock()
 
@@ -16,6 +21,7 @@ def sync_to_async(func, *args, **kwargs):
                 return await loop.run_in_executor(executor, p_func)
 
     return inner
+
 
 def get_sha384_hash(file_path: str) -> str:
     with open(file_path, 'rb') as f:

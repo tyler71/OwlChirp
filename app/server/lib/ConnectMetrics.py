@@ -93,7 +93,7 @@ class ConnectMetrics:
 
         return metric_hist_data['MetricResults'][0]['Collections']
 
-    # @cached(TTLCache(maxsize=1024 * 32, ttl=10))
+    @cached(TTLCache(maxsize=1024 * 32, ttl=10))
     def _refresh_current_user_data(self) -> dict:
         queues = [q['Id'] for q in self._refresh_queues()]
 
@@ -145,7 +145,7 @@ class ConnectMetrics:
         try:
             user_data = self.client.describe_user(InstanceId=self.connect_instance, UserId=user_id)
             if user_data['ResponseMetadata']['HTTPStatusCode'] != 200:
-                logging.error("_refresh_userlist#current_users network failure")
+                raise ValueError("_refresh_userlist#current_users network failure")
             return user_data['User']
         except ClientError as e:
             logging.error(e)

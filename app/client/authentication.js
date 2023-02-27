@@ -10,7 +10,7 @@ async function checksum(string, algorithm = 'SHA-256') {
 
 async function hashRequest(agent) {
     let date = new Date();
-    date.setUTCHours(0, 0, 0, 0)
+    date.setUTCMinutes(0, 0, 0)
     let timestamp = Math.floor(date.getTime() / 1000);
 
 
