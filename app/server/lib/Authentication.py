@@ -38,6 +38,7 @@ class AuthApiKey:
 
         unencoded_str = f"{timestamp}{agent_id}{agent_username}"
 
+        logging.info(f"_generate_token: {unencoded_str}")
         sha256.update(unencoded_str.encode('utf-8'))
         return sha256.hexdigest()
 

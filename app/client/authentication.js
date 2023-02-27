@@ -17,6 +17,7 @@ async function hashRequest(agent) {
     let agentID = (await getAgentRegex(agent))[4]
     let agentUsername = agent.getConfiguration().username
 
+    console.debug(`X-Api-Key unencoded: ${timestamp}${agentID}${agentUsername}`)
     return await checksum(`${timestamp}${agentID}${agentUsername}`)
 }
 

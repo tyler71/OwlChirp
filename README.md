@@ -5,7 +5,8 @@
 - [GetCurrentMetricData Boto3](https://docs.aws.amazon.com/connect/latest/APIReference/API_GetCurrentMetricData.html)
 
 
-Needed environment variables
+Environment variables
+- LOG_LEVEL
 During build / deployment
 - CONNECT_DOMAIN
 - TIME_ZONE
