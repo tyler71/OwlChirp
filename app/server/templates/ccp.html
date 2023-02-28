@@ -9,10 +9,11 @@
             integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN"
             crossorigin="anonymous"></script>
     <link href="{{ url_for('static', filename='ccp.css') }}" rel="stylesheet" type="text/css"/>
-    <script defer src="{{ url_for('static', filename=core_file) }}"
-            {#            integrity="{{ core_hash }}"#}
-            {#            crossorigin="anonymous"#}
-    ></script>
+
+    {% for file in core_files -%}
+    <script defer src="{{ url_for('static', filename=file.file) }}"></script>
+    {% endfor %}
+
 {% endblock %}
 
 {% block body %}

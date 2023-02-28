@@ -9,6 +9,8 @@ export const TABLE_ALERT_CLASS = 'table-warning';
 export const TABLE_DANGER_CLASS = 'table-danger';
 export const CURSOR_HELP_CLASS = 'helpCursor';
 
+export const LOADING_CLASS = 'alert-secondary'
+
 export const STATUS_AFTERCALL = "aftercallwork";
 export const STATUS_AVAILABLE = "available";
 export const STATUS_BREAK = "quick break";
@@ -26,7 +28,8 @@ export const SIDELINE_STATUSES = {[STATUS_BREAK]: 1, [STATUS_PROJECT]: 1, [STATU
 export const EXCLUDED_STATUSES = {[STATUS_OFFLINE]: 1, [STATUS_ON_CONTACT]: 1, [STATUS_IN_MEETING]: 1, [STATUS_LUNCH]: 1};
 export const BREAK_STATUSES = {[STATUS_BREAK]: 10, [STATUS_AFTERCALL]: 10, [STATUS_LUNCH]: 65, [STATUS_MISSED_CALL]: 5}
 
+
+export let SIDELINE_NOTIFICATION_INTERVAL = 120;
+
 export const MAX_QUEUE_COUNT = 1;
 export const MIN_AGENT_STAFFED = 1;
-
-export const LOADING_CLASS = 'alert-secondary'

@@ -8,7 +8,21 @@ module.exports = (env, argv) => {
         ? path.resolve(__dirname, 'dist')
         : path.resolve(__dirname, '..', 'server', 'static', 'dist');
 
+
+
+
     return {
+        optimization: {
+            splitChunks: {
+                cacheGroups: {
+                    vendor: {
+                        test: /[\\/]node_modules[\\/]/,
+                        name: 'vendor',
+                        chunks: 'all'
+                    }
+                }
+            }
+        },
         module: {
             rules: [
                 {
@@ -34,7 +48,7 @@ module.exports = (env, argv) => {
         mode: argv.mode,
         entry: path.resolve(__dirname, 'core.js'),
         output: {
-            filename: 'main.[fullhash].js',
+            filename: '[name].[contenthash].js',
             path: pathLocation,
             clean: true
         },

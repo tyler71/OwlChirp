@@ -5,10 +5,10 @@ import os
 from botocore.exceptions import ClientError
 from quart import Quart, request, render_template, make_response, abort
 
-from lib.Helper import HttpResponse
 from lib.Authentication import require_api_key
 from lib.Database import Db
 from lib.Events import ServerSentEvents, get_metric_data, cm
+from lib.Helper import HttpResponse
 from lib.Helper import sync_to_async, get_sha384_hash
 
 events = ServerSentEvents(["queue_count",
@@ -35,17 +35,23 @@ async def index():
 
 @app.route('/ccp')
 async def ccp():
+    core_files = list()
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    globbed_file = glob.glob(f"{dir_path}/static/dist/main.*.js")
-    core_hash = get_sha384_hash(globbed_file[0])
+    globbed_files = glob.glob(f"{dir_path}/static/dist/*.*.js")
+    for file in globbed_files:
+        ghash = get_sha384_hash(file)
 
-    globbed_file = globbed_file[0].split(os.path.sep)
-    globbed_file = globbed_file[-2:]
-    globbed_file = os.path.sep.join(globbed_file)
+        gfile = file.split(os.path.sep)
+        gfile = gfile[-2:]
+        gfile = os.path.sep.join(gfile)
+
+        core_files.append({
+            "file": gfile,
+            "hash": f"sha384-{ghash}",
+        })
 
     return await render_template('ccp.html',
-                                 core_file=globbed_file,
-                                 core_hash=f"sha384-{core_hash}",
+                                 core_files=core_files,
                                  LOADING_CLASS="alert-secondary",
                                  HELP_CURSOR_CLASS="helpCursor",
                                  )

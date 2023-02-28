@@ -5,18 +5,18 @@ import {
     LOADING_CLASS,
     MAX_QUEUE_COUNT,
     MIN_AGENT_STAFFED,
-    SIDELINE_STATUSES, STATUS_ON_CONTACT,
+    SIDELINE_NOTIFICATION_INTERVAL,
+    SIDELINE_STATUSES,
+    STATUS_ON_CONTACT,
     TABLE_ALERT_CLASS
 } from "../const";
-import {fetchEventSource} from "@microsoft/fetch-event-source";
 import {generateBaseHeader} from "../authentication";
+import {fetchEventSource} from "@microsoft/fetch-event-source";
 import {agentSideline, sleep, spinnerToggle} from "../helper";
 import {Notifier} from "./Notifier";
 import {agentObj} from "../core";
 
 class FatalError extends Error { }
-
-let sidelineNotificationInterval = 300;
 
 export async function eventSub(endpoint) {
     let events = {
@@ -68,11 +68,11 @@ function _realtimeUpdateQueueCount(data) {
         let queueNotifier = new Notifier("queueCount");
         if (agentSideline()) {
             queueNotifier.show(`Queue Count is ${value}!\nCan you help?`,
-                "Callers Waiting", "queueCount", sidelineNotificationInterval)
+                "Callers Waiting", "queueCount", 1)
         }
         else if(agentObj.getState().name.toLowerCase() == STATUS_ON_CONTACT) {
             queueNotifier.show(`Queue Count is ${value}\nWe're asking for help!`,
-                "Support Requested", "supportRequest", sidelineNotificationInterval)
+                "Support Requested", "supportRequest", SIDELINE_NOTIFICATION_INTERVAL)
         }
     }
 }
@@ -110,7 +110,7 @@ function _realtimeUpdateAvailableCount(data) {
             let tag = "availableAgents"
             let notify = new Notifier(tag)
             notify.show(`There are currently ${activeAgentCount} available agents`,
-                "Available Agents", tag, sidelineNotificationInterval)
+                "Available Agents", tag, SIDELINE_NOTIFICATION_INTERVAL)
         }
     }
 }
