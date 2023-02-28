@@ -43,7 +43,7 @@ export function Notifier(namespace = "") {
 
     this._show = (message, title, tag, events) => {
         if (this.compatible()) {
-            this.list[tag] = new Notification(`${this.namespace} ${title}`, {
+            this.list[tag] = new Notification(`${title}`, {
                 body: message,
                 tag: tag,
                 lang: "en-US",
