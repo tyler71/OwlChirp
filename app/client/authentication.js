@@ -10,14 +10,13 @@ async function checksum(string, algorithm = 'SHA-256') {
 
 async function hashRequest(agent) {
     let date = new Date();
-    date.setUTCMinutes(0, 0, 0)
+    date.setUTCSeconds(0, 0)
     let timestamp = Math.floor(date.getTime() / 1000);
 
 
     let agentID = (await getAgentRegex(agent))[4]
     let agentUsername = agent.getConfiguration().username
 
-    console.debug(`X-Api-Key unencoded: ${timestamp}${agentID}${agentUsername}`)
     return await checksum(`${timestamp}${agentID}${agentUsername}`)
 }
 

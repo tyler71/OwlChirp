@@ -13,6 +13,8 @@ import {generateBaseHeader} from "../authentication";
 import {agentSideline, spinnerToggle} from "../helper";
 import {Notifier} from "./Notifier";
 
+class FatalError extends Error { }
+
 let sidelineNotificationInterval = 300;
 
 export async function eventSub(endpoint) {
@@ -37,10 +39,15 @@ export async function eventSub(endpoint) {
 async function asyncSubscribe(url, callback) {
     let res = await fetchEventSource(url, {
         headers: await generateBaseHeader(),
-        onmessage(ev) {
+        async onmessage(ev) {
             callback(ev)
+        },
+        async onerror(err) {
+            asyncSubscribe(url, callback)
+            throw new FatalError()
         }
     })
+
     return res
 }
 

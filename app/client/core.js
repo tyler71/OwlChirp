@@ -45,6 +45,7 @@ connect.core.initCCP(containerDiv, {
 connect.agent((agent) => {
     // We use the agent object and set it right at the start. We also have a hookInit for all extra code we are running
     agentObj = agent;
+    window.agentObj = agentObj;
     hookInit(agent).then(r => console.log(r));
     agent.onRefresh((agent) => {
         hookRefresh(agent);
