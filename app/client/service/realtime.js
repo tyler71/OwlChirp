@@ -10,7 +10,7 @@ import {
 } from "../const";
 import {fetchEventSource} from "@microsoft/fetch-event-source";
 import {generateBaseHeader} from "../authentication";
-import {agentSideline, spinnerToggle} from "../helper";
+import {agentSideline, sleep, spinnerToggle} from "../helper";
 import {Notifier} from "./Notifier";
 
 class FatalError extends Error { }
@@ -43,6 +43,7 @@ async function asyncSubscribe(url, callback) {
             callback(ev)
         },
         async onerror(err) {
+            await sleep(1000);
             asyncSubscribe(url, callback)
             throw new FatalError()
         }
