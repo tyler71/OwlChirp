@@ -11,11 +11,22 @@ export const CURSOR_HELP_CLASS = 'helpCursor';
 
 // Sideline statuses can receive notifications.
 // Excluded statuses are not notified
-export const SIDELINE_STATUSES = {"quick break": 1, "on a project": 1, "ticket break": 1, "missed": 1}
-export const EXCLUDED_STATUSES = {"offline": 1, "on contact": 1, "in a meeting": 1, "lunch": 1};
-export const BREAK_STATUSES = {"quick break": 10, "aftercallwork": 10, "lunch": 65, "missedcallagent": 5}
+const STATUS_AFTERCALL = "aftercallwork";
+const STATUS_BREAK = "quick break";
+const STATUS_IN_MEETING = "in a meeting";
+const STATUS_LUNCH = "lunch";
+const STATUS_MISSED_CALL = "missedcallagent";
+const STATUS_OFFLINE = "offline";
+const STATUS_ON_CONTACT = "on contact";
+const STATUS_PROJECT = "on a project";
+const STATUS_TICKET_BREAK = "ticket break";
 
-export const MAX_QUEUE_COUNT = 1;
+export const SIDELINE_STATUSES = {[STATUS_BREAK]: 1, [STATUS_PROJECT]: 1, [STATUS_TICKET_BREAK]: 1}
+export const EXCLUDED_STATUSES = {[STATUS_OFFLINE]: 1, [STATUS_ON_CONTACT]: 1, [STATUS_IN_MEETING]: 1, [STATUS_LUNCH]: 1};
+export const BREAK_STATUSES = {[STATUS_BREAK]: 10, [STATUS_AFTERCALL]: 10, [STATUS_LUNCH]: 65, [STATUS_MISSED_CALL]: 5}
+
+console.debug(SIDELINE_STATUSES)
+export const MAX_QUEUE_COUNT = -1;
 export const MIN_AGENT_STAFFED = 1;
 
 export const LOADING_CLASS = 'alert-secondary'
