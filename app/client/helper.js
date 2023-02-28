@@ -1,4 +1,4 @@
-import {EXCLUDED_STATUSES, LOADING_CLASS} from "./const";
+import {EXCLUDED_STATUSES, LOADING_CLASS, STATUS_AFTERCALL} from "./const";
 import {agentObj, notify} from "./core";
 import {lastTagNotification} from "./service/Notifier";
 
@@ -59,9 +59,13 @@ export function setToState(agent, state) {
 
 // If an agent is on the "SideLine" it means they are not routable, but can be.
 export function agentSideline() {
-    let not_routable = agentObj.getState().type === connect.AgentStateType.NOT_ROUTABLE;
-    return not_routable && !agentObj.getState().name.toLowerCase() in EXCLUDED_STATUSES
+    let state_type = agentObj.getState().type;
+    let state_name = agentObj.getState().name.toLowerCase();
 
+    let not_routable =
+        state_type === connect.AgentStateType.NOT_ROUTABLE
+        || state_name === STATUS_AFTERCALL;
+    return not_routable && ! (state_name in EXCLUDED_STATUSES)
 }
 
 // Will send notifications if this maxMinutes is reached
