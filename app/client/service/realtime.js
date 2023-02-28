@@ -5,13 +5,14 @@ import {
     LOADING_CLASS,
     MAX_QUEUE_COUNT,
     MIN_AGENT_STAFFED,
-    SIDELINE_STATUSES,
+    SIDELINE_STATUSES, STATUS_ON_CONTACT,
     TABLE_ALERT_CLASS
 } from "../const";
 import {fetchEventSource} from "@microsoft/fetch-event-source";
 import {generateBaseHeader} from "../authentication";
 import {agentSideline, sleep, spinnerToggle} from "../helper";
 import {Notifier} from "./Notifier";
+import {agentObj} from "../core";
 
 class FatalError extends Error { }
 
@@ -64,10 +65,14 @@ function _realtimeUpdateQueueCount(data) {
         : queueCountSection.classList.remove(TABLE_ALERT_CLASS)
 
     if (value > MAX_QUEUE_COUNT) {
+        let queueNotifier = new Notifier("queueCount");
         if (agentSideline()) {
-            let queueNotifier = new Notifier("queueCount");
             queueNotifier.show(`Queue Count is ${value}!\nCan you help?`,
                 "Callers Waiting", "queueCount", sidelineNotificationInterval)
+        }
+        else if(agentObj.getState().name.toLowerCase() == STATUS_ON_CONTACT) {
+            queueNotifier.show(`Queue Count is ${value}\nWe're asking for help!`,
+                "Support Requested", "supportRequest", sidelineNotificationInterval)
         }
     }
 }
