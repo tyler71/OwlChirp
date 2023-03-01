@@ -1,11 +1,11 @@
 {% extends "skel.html" %}
 {% block head %}
     {% for file in core_css_files -%}
-    <link rel="stylesheet" href="{{ url_for('static', filename=file.file) }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename=file.file) }}" crossorigin="anonymous" integrity="{{ file.hash }}">
     {% endfor %}
 
     {% for file in core_js_files -%}
-    <script defer src="{{ url_for('static', filename=file.file) }}"></script>
+    <script defer src="{{ url_for('static', filename=file.file) }}" crossorigin="anonymous" integrity="{{ file.hash }}"></script>
     {% endfor %}
 
 {% endblock %}

@@ -50,12 +50,12 @@ async def ccp():
         if os.path.splitext(gfile)[-1] == '.js':
             core_js_files.append({
                 "file": gfile,
-                "hash": f"sha384-{ghash}",
+                "hash": ghash,
             })
         elif os.path.splitext(gfile)[-1] == '.css':
             core_css_files.append({
                 "file": gfile,
-                "hash": f"sha384-{ghash}",
+                "hash": ghash,
             })
 
     core_js_files = sorted(core_js_files, key=lambda x: 1 if re.match("dist/main", x["file"]) else 0)
