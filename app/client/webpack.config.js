@@ -1,5 +1,7 @@
 const path = require('path');
 const webpack = require('webpack');
+const css = require('css-loader');
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 
 module.exports = (env, argv) => {
     const isProduction = argv.mode === 'production';
@@ -9,9 +11,13 @@ module.exports = (env, argv) => {
         : path.resolve(__dirname, '..', 'server', 'static', 'dist');
 
 
-
-
     return {
+        plugins: [
+            new MiniCssExtractPlugin({
+                filename: "[name].css",
+                chunkFilename: "[id].css"
+            })
+        ],
         optimization: {
             splitChunks: {
                 cacheGroups: {
@@ -42,7 +48,11 @@ module.exports = (env, argv) => {
                             },
                         ]
                     },
-                }
+                },
+                {
+                    test: /\.css$/,
+                    use: [MiniCssExtractPlugin.loader, 'css-loader']
+                },
             ]
         },
         mode: argv.mode,

@@ -1,6 +1,7 @@
 import glob
 import logging
 import os
+import re
 
 from botocore.exceptions import ClientError
 from quart import Quart, request, render_template, make_response, abort
@@ -35,23 +36,34 @@ async def index():
 
 @app.route('/ccp')
 async def ccp():
-    core_files = list()
+    core_js_files = list()
+    core_css_files = list()
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    globbed_files = glob.glob(f"{dir_path}/static/dist/*.*.js")
-    for file in globbed_files:
+    glob_files = glob.glob(f"{dir_path}/static/dist/*")
+    for file in glob_files:
         ghash = get_sha384_hash(file)
 
         gfile = file.split(os.path.sep)
         gfile = gfile[-2:]
         gfile = os.path.sep.join(gfile)
 
-        core_files.append({
-            "file": gfile,
-            "hash": f"sha384-{ghash}",
-        })
+        if os.path.splitext(gfile)[-1] == '.js':
+            core_js_files.append({
+                "file": gfile,
+                "hash": f"sha384-{ghash}",
+            })
+        elif os.path.splitext(gfile)[-1] == '.css':
+            core_css_files.append({
+                "file": gfile,
+                "hash": f"sha384-{ghash}",
+            })
+
+    core_js_files = sorted(core_js_files, key=lambda x: 1 if re.match("dist/main", x["file"]) else 0)
+    core_css_files = sorted(core_css_files, key=lambda x: 1 if re.match("dist/main", x["file"]) else 0)
 
     return await render_template('ccp.html',
-                                 core_files=core_files,
+                                 core_js_files=core_js_files,
+                                 core_css_files=core_css_files,
                                  LOADING_CLASS="alert-secondary",
                                  HELP_CURSOR_CLASS="helpCursor",
                                  )

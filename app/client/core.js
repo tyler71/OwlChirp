@@ -1,9 +1,17 @@
 import "amazon-connect-streams";
-import {CCP_URL} from "./const";
+import {CCP_URL, CONNECT_DOMAIN} from "./const";
 import {Notifier} from "./service/Notifier";
 import {hookIncomingCall} from "./hook/incomingCall";
 import {hookRefresh} from "./hook/refresh";
 import {hookInit} from "./hook/init";
+
+import 'bootstrap/dist/css/bootstrap.css';
+import "./css/ccp.css";
+
+import Popper from 'popper.js';
+import jquery from 'jquery';
+window.Popper = Popper;
+window.jquery = jquery;
 
 export let notify = new Notifier();
 notify.authorize();
@@ -13,6 +21,9 @@ let statusDiv = document.querySelector('#statusDiv');
 let [statusDivA, statusDivB] = statusDiv.children;
 
 export let agentObj;
+
+document.querySelector('#visualAgentList').innerHTML = `Thanks for using my program! -Tyler<br><a href='${CONNECT_DOMAIN}/login' target="_blank">AWS Login</a>`
+
 
 // Starts the CCP instance.
 // The provided hooks are used for the rest of the program.
