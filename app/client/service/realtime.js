@@ -8,6 +8,8 @@ import {
     MIN_AGENT_STAFFED,
     SIDELINE_NOTIFICATION_INTERVAL,
     SIDELINE_STATUSES,
+    STATUS_ERROR,
+    STATUS_MISSED_CALL,
     STATUS_ON_CONTACT,
     TABLE_ALERT_CLASS
 } from "../const";
@@ -155,7 +157,7 @@ async function _realtimeUpdateVisualAgentList(data) {
 
         let sn = user.status.name.toLowerCase()
 
-        if (sn === "error") {
+        if (sn === STATUS_ERROR || sn === STATUS_MISSED_CALL) {
             span.classList.add('visual_list_error')
         } else if (sn === "on call") {
             span.classList.add('visual_list_on_call')
