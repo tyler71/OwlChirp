@@ -2,6 +2,7 @@ import {
     API,
     CURSOR_HELP_CLASS,
     EXCLUDED_STATUSES,
+    HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL,
     LOADING_CLASS,
     MAX_QUEUE_COUNT,
     MIN_AGENT_STAFFED,
@@ -16,7 +17,8 @@ import {agentSideline, sleep, spinnerToggle} from "../helper";
 import {Notifier} from "./Notifier";
 import {agentObj} from "../core";
 
-class FatalError extends Error { }
+class FatalError extends Error {
+}
 
 export async function eventSub(endpoint) {
     let events = {
@@ -69,14 +71,14 @@ function _realtimeUpdateQueueCount(data) {
         let queueNotifier = new Notifier("queueCount");
         if (agentSideline()) {
             queueNotifier.show(`Queue Count is ${value}!\nCan you help?`,
-                "Callers Waiting", "queueCount", 1)
-        }
-        else if(agentObj.getState().name.toLowerCase() == STATUS_ON_CONTACT) {
+                "Callers Waiting", "queueCount", HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL)
+        } else if (agentObj.getState().name.toLowerCase() == STATUS_ON_CONTACT) {
             queueNotifier.show(`Queue Count is ${value}\nWe're asking for help!`,
-                "Support Requested", "supportRequest", SIDELINE_NOTIFICATION_INTERVAL)
+                "Support Requested", "supportRequest", HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL)
         }
     }
 }
+
 // ######## Realtime Available Agent Count ########################
 
 function _realtimeUpdateAvailableCount(data) {
@@ -153,12 +155,14 @@ async function _realtimeUpdateVisualAgentList(data) {
 
         let sn = user.status.name.toLowerCase()
 
-        if (sn in SIDELINE_STATUSES) {
+        if (sn === "error") {
+            span.classList.add('visual_list_error')
+        } else if (sn === "on call") {
+            span.classList.add('visual_list_on_call')
+        } else if (sn in SIDELINE_STATUSES) {
             span.classList.add('visual_list_sideline_status')
         } else if (sn in EXCLUDED_STATUSES) {
             span.classList.add('visual_list_excluded_status')
-        } else if (sn === "on call") {
-            span.classList.add('visual_list_on_call')
         }
 
         span.innerHTML = firstLetter

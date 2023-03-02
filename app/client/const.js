@@ -21,15 +21,18 @@ export const STATUS_OFFLINE = "offline";
 export const STATUS_ON_CONTACT = "on contact";
 export const STATUS_PROJECT = "on a project";
 export const STATUS_TICKET_BREAK = "ticket break";
+export const STATUS_ERROR = "error";
 
 // Sideline statuses can receive notifications.
 // Excluded statuses are not notified
-export const SIDELINE_STATUSES = {[STATUS_BREAK]: 1, [STATUS_PROJECT]: 1, [STATUS_TICKET_BREAK]: 1}
+export const SIDELINE_STATUSES = {[STATUS_BREAK]: 1, [STATUS_PROJECT]: 1, [STATUS_TICKET_BREAK]: 1, [STATUS_ERROR]: 1};
 export const EXCLUDED_STATUSES = {[STATUS_OFFLINE]: 1, [STATUS_ON_CONTACT]: 1, [STATUS_IN_MEETING]: 1, [STATUS_LUNCH]: 1};
-export const BREAK_STATUSES = {[STATUS_BREAK]: 10, [STATUS_AFTERCALL]: 10, [STATUS_LUNCH]: 65, [STATUS_MISSED_CALL]: 5}
+export const BREAK_STATUSES = {[STATUS_BREAK]: 10, [STATUS_AFTERCALL]: 10, [STATUS_LUNCH]: 65, [STATUS_MISSED_CALL]: 3, [STATUS_ERROR]: 3};
 
 
-export let SIDELINE_NOTIFICATION_INTERVAL = 120;
+export const SIDELINE_NOTIFICATION_INTERVAL = 120;
+export const HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL = 10;
+
 
 export const MAX_QUEUE_COUNT = 1;
 export const MIN_AGENT_STAFFED = 1;

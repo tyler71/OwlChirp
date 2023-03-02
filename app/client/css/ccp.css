@@ -50,6 +50,9 @@ html, body {
 #visualAgentList > span.visual_list_excluded_status {
     color: rgba(80,80,80, 0.4)
 }
+#visualAgentList > span.visual_list_error {
+    color: #b90000;
+}
 #visualAgentList > span.visual_list_on_call:before {
     content: "*";
 }
