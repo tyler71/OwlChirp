@@ -20,6 +20,7 @@ module.exports = (env, argv) => {
         ],
         optimization: {
             splitChunks: {
+                maxSize: 100000,
                 cacheGroups: {
                     vendor: {
                         test: /[\\/]node_modules[\\/]/,
