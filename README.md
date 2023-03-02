@@ -5,6 +5,7 @@
 - [GetCurrentMetricData Boto3](https://docs.aws.amazon.com/connect/latest/APIReference/API_GetCurrentMetricData.html)
 
 
+## Setup
 Environment variables
 - LOG_LEVEL
 During build / deployment
@@ -17,3 +18,20 @@ During hosting
 - CONNECT_INSTANCE
 - DB_STRING
 - APP_PORT
+
+## Compile
+Manually compiling the front end
+In app/client:
+```bash
+npm run prod
+```
+This will create a folder call `dist/`
+Copy this to app/server/static.
+You can also run `compile.sh`
+
+## Development
+Run these two commands:
+```bash
+npm run watch
+python app/server
+```

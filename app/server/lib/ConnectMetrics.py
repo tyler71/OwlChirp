@@ -30,7 +30,7 @@ class ConnectMetrics:
             logging.error("_refresh_queue network failure")
         return queues['QueueSummaryList']
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=2))
+    @cached(TTLCache(maxsize=1024 * 32, ttl=4))
     def _refresh_metric(self) -> dict:
         """ Current metrics. No summation of data. Includes things like how many agents are available
         """
@@ -90,7 +90,7 @@ class ConnectMetrics:
 
         return metric_hist_data['MetricResults'][0]['Collections']
 
-    @cached(TTLCache(maxsize=1024 * 32, ttl=2))
+    @cached(TTLCache(maxsize=1024 * 32, ttl=4))
     def _refresh_current_user_data(self) -> dict:
         queues = [q['Id'] for q in self._refresh_queues()]
 
