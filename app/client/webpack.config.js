@@ -15,7 +15,8 @@ module.exports = (env, argv) => {
         plugins: [
             new MiniCssExtractPlugin({
                 filename: "[name].[contenthash].css",
-                chunkFilename: "[id].[contenthash].css" })
+                chunkFilename: "[id].[contenthash].css"
+            })
         ],
         optimization: {
             splitChunks: {
