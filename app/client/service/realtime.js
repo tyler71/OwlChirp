@@ -40,6 +40,7 @@ export async function eventSub(endpoint) {
 async function asyncSubscribe(url, callback) {
     let res = await fetchEventSource(url, {
         headers: await generateBaseHeader(),
+        openWhenHidden: true,
         async onmessage(ev) {
             callback(ev)
         },
