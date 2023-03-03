@@ -5,8 +5,7 @@
     {% endfor %}
     {% for file in core_js_files -%}
     <script defer src="{{ url_for('static', filename=file.file) }}" crossorigin="anonymous" integrity="{{ file.hash }}"></script>
-    {% endfor %}
-
+    {% endfor -%}
 {% endblock %}
 
 {% block body %}

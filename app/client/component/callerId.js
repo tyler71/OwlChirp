@@ -47,7 +47,7 @@ export async function incomingCallCallerId(phoneNumber) {
     if (res.ok) {
         let data = await res.json();
         callerId.innerHTML = data.name;
-        this.callerId.setAttribute("title", formatPhoneNumber(phoneNumber))
+        callerId.setAttribute("title", formatPhoneNumber(phoneNumber))
     } else {
         callerId.innerHTML = formatPhoneNumber(phoneNumber)
     }
