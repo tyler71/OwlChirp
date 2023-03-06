@@ -12,11 +12,18 @@ from cachetools import cached, TTLCache, LRUCache
 
 
 class ConnectMetrics:
+    __instance = None
+
     def __init__(self,
                  connect_instance=os.getenv("CONNECT_INSTANCE", None),
                  ):
         self.connect_instance = connect_instance
         self.client = boto3.client('connect')
+        ConnectMetrics.__instance = self
+
+    @staticmethod
+    def get_instance():
+        return ConnectMetrics.__instance
 
     @cached(TTLCache(maxsize=1024 * 8, ttl=3600 * 6))  # 6 hours
     def _refresh_queues(self) -> dict:
@@ -106,7 +113,7 @@ class ConnectMetrics:
         # Hack to ensure on call is set as on call and not available
         for user in current_users['UserDataList']:
             if user['Status']['StatusName'] == 'Available' and len(user['Contacts']) > 0 and user['Contacts'][0][
-                    'AgentContactState'].upper() == 'CONNECTED':
+                'AgentContactState'].upper() == 'CONNECTED':
                 user['Status']['StatusName'] = 'On call'
 
         return current_users['UserDataList']
@@ -217,6 +224,3 @@ class ConnectMetrics:
     @property
     def userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         return self._refresh_userlist()
-
-
-cm = ConnectMetrics()

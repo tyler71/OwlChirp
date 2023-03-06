@@ -11,7 +11,7 @@ from typing import Any, AsyncGenerator
 
 from cachetools import cached, TTLCache
 
-from .ConnectMetrics import cm
+from .ConnectMetrics import ConnectMetrics
 from .Helper import sync_to_async
 
 cache_length = int(os.getenv('AWS_CONNECT_CACHE_LENGTH', 10))
@@ -125,6 +125,7 @@ class ServerSentEvent:
 
 @cached(TTLCache(maxsize=1024 * 32, ttl=cache_length))
 def get_metric_data() -> dict:
+    cm = ConnectMetrics.get_instance()
     r = {
         'queue_count': cm.queue_count,
         'available_count': cm.available_agents,

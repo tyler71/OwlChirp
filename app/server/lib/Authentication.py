@@ -8,7 +8,7 @@ import pytz
 from cachetools import cached, LRUCache, TTLCache
 from quart import request, abort
 
-from .ConnectMetrics import cm, ConnectMetrics
+from .ConnectMetrics import ConnectMetrics
 from .Helper import HttpResponse
 
 
@@ -68,7 +68,7 @@ class AuthApiKey:
             return e
 
 
-auth_api_key = AuthApiKey(cm=cm)
+auth_api_key = AuthApiKey(cm=ConnectMetrics.get_instance())
 
 
 def require_api_key(func):
