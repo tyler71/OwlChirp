@@ -23,6 +23,8 @@ class ConnectMetrics:
 
     @staticmethod
     def get_instance():
+        if ConnectMetrics.__instance is None:
+            ConnectMetrics()
         return ConnectMetrics.__instance
 
     @cached(TTLCache(maxsize=1024 * 8, ttl=3600 * 6))  # 6 hours
@@ -36,6 +38,15 @@ class ConnectMetrics:
         if queues['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_queue network failure")
         return queues['QueueSummaryList']
+
+    @cached(TTLCache(maxsize=1024 * 8, ttl=600))  # 10 minutes
+    def _refresh_registered_users(self) -> dict:
+        """ List all registered users
+        """
+        registered_users = self.client.list_users(InstanceId=os.getenv('CONNECT_INSTANCE', None))
+        if registered_users['ResponseMetadata']['HTTPStatusCode'] != 200:
+            logging.error("_refresh_registered_users failure")
+        return registered_users['UserSummaryList']
 
     @cached(TTLCache(maxsize=1024 * 32, ttl=4))
     def _refresh_metric(self) -> dict:
@@ -183,7 +194,7 @@ class ConnectMetrics:
             'available_agents': self.available_agents,
             'active_agents': self.active_agents,
             'queue_count': self.queue_count,
-            'user_list': self.userlist,
+            'user_list': self.active_user_list,
         }
         return r
 
@@ -222,5 +233,9 @@ class ConnectMetrics:
         return 0
 
     @property
-    def userlist(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
+    def active_user_list(self) -> list[dict[str, dict[str, Any] | dict[str, Any] | Any]]:
         return self._refresh_userlist()
+
+    @property
+    def registered_user_list(self):
+        return self._refresh_registered_users()

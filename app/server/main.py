@@ -6,9 +6,10 @@ import re
 from botocore.exceptions import ClientError
 from quart import Quart, request, render_template, make_response, abort
 
+from app.server.lib.ConnectMetrics import ConnectMetrics
 from lib.Authentication import require_api_key
 from lib.Database import Db
-from lib.Events import ServerSentEvents, get_metric_data, cm
+from lib.Events import ServerSentEvents, get_metric_data
 from lib.Helper import HttpResponse
 from lib.Helper import sync_to_async, get_sha384_hash
 
@@ -151,6 +152,7 @@ async def number_call_log():
 @app.route('/api/calls/detail')
 @require_api_key
 async def contact_detailed_info():
+    cm = ConnectMetrics.get_instance()
     contact_id = request.args.get("contact_id", None)
     try:
         user_data = await sync_to_async(cm.describe_contact, contact_id)()

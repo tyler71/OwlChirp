@@ -130,7 +130,7 @@ def get_metric_data() -> dict:
         'queue_count': cm.queue_count,
         'available_count': cm.available_agents,
         'active_agent_count': cm.active_agents,
-        'user_list': cm.userlist,
+        'user_list': cm.active_user_list,
         'handled_incoming': cm.handled_incoming(),
     }
     return r

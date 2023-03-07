@@ -47,7 +47,7 @@ class AuthApiKey:
         if provided_token in self.accepted_tokens:
             return True
 
-        users = self.cm.userlist
+        users = self.cm.registered_user_list
 
         # UTC Timestamp
         now = datetime.datetime.utcnow().replace(minute=0, second=0, microsecond=0, tzinfo=self._utc_tz)
@@ -57,10 +57,10 @@ class AuthApiKey:
             for user in users:
                 generated_token = self._generate_token(
                     timestamp=timestamp,
-                    agent_id=user["user_id"],
-                    agent_username=user["user"]["username"])
+                    agent_id=user["Id"],
+                    agent_username=user["Username"])
+                self.accepted_tokens.add(generated_token)
                 if generated_token == provided_token:
-                    self.accepted_tokens.add(provided_token)
                     return True
             return False
         except Exception as e:
