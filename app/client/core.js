@@ -14,6 +14,7 @@ window.Popper = Popper;
 window.jquery = jquery;
 
 export let notify = new Notifier();
+window.notify = notify;
 notify.authorize();
 
 let containerDiv = document.querySelector('#ccp');
