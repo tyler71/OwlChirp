@@ -12,7 +12,6 @@ export function CallHistory(agent) {
     });
     this.log = undefined;
 
-    console.log("AAAAA - About to make query")
     this._refreshCalls = async () => {
         let req_status = false
         let req = undefined;

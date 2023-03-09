@@ -19,8 +19,6 @@ import {agentSideline, sleep, spinnerToggle} from "../helper";
 import {Notifier} from "./Notifier";
 import {agentObj} from "../core";
 
-class FatalError extends Error {
-}
 
 export async function eventSub(endpoint) {
     let events = {
@@ -42,6 +40,8 @@ export async function eventSub(endpoint) {
 }
 
 async function asyncSubscribe(url, callback) {
+    class RetriableError extends Error { }
+    class FatalError extends Error { }
     let res = await fetchEventSource(url, {
         headers: await generateBaseHeader(),
         openWhenHidden: true,
@@ -49,9 +49,15 @@ async function asyncSubscribe(url, callback) {
             callback(ev)
         },
         async onerror(err) {
+            console.error(`Connection errored. Reopening connection to ${url}`)
             await sleep(1000);
             asyncSubscribe(url, callback)
-            throw new FatalError()
+            throw new FatalError();
+        },
+        async onclose() {
+            console.error(`Connection closed. Reopening connection to ${url}`)
+            await sleep(1000);
+            throw new RetriableError();
         }
     })
 
