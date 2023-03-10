@@ -14,7 +14,7 @@ import {
     TABLE_ALERT_CLASS
 } from "../const";
 import {generateBaseHeader} from "../authentication";
-import {fetchEventSource} from "@microsoft/fetch-event-source";
+import {EventStreamContentType, fetchEventSource} from "@microsoft/fetch-event-source";
 import {agentSideline, sleep, spinnerToggle} from "../helper";
 import {Notifier} from "./Notifier";
 import {agentObj} from "../core";
@@ -42,22 +42,34 @@ export async function eventSub(endpoint) {
 async function asyncSubscribe(url, callback) {
     class RetriableError extends Error { }
     class FatalError extends Error { }
+
+    let alertSection = document.querySelector('#alertSection');
+
+    let lastAttemptRetry = new Date;
     let res = await fetchEventSource(url, {
         headers: await generateBaseHeader(),
         openWhenHidden: true,
-        async onmessage(ev) {
+        onmessage(ev) {
             callback(ev)
         },
-        async onerror(err) {
-            console.error(`Connection errored. Reopening connection to ${url}`)
-            await sleep(1000);
-            asyncSubscribe(url, callback)
-            throw new FatalError();
+        onopen(response) {
+            if (response.ok && response.headers.get('content-type') === EventStreamContentType) {
+                alertSection.textContent = '';
+            }
         },
-        async onclose() {
-            console.error(`Connection closed. Reopening connection to ${url}`)
-            await sleep(1000);
-            throw new RetriableError();
+        onerror(err) {
+            if ((new Date) - lastAttemptRetry > 1000) {
+                console.error(`Connection errored. Reopening connection to ${url}`)
+                alertSection.textContent = "Connection lost, attempting to reconnect"
+                asyncSubscribe(url, callback)
+                throw new FatalError();
+            }
+        },
+        onclose() {
+            if ((new Date) - lastAttemptRetry > 1000) {
+                console.error(`Connection closed. Reopening connection to ${url}`)
+                throw new RetriableError();
+            }
         }
     })
 

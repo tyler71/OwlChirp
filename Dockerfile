@@ -1,3 +1,16 @@
+FROM python:3.10-slim AS init
+
+RUN mkdir /app /data               \
+ && groupadd application           \
+      --gid 1000                   \
+ && useradd application            \
+      --base-dir /app              \
+      --home-dir /home/application \
+      --create-home                \
+      --uid 1000                   \
+      --gid 1000                   \
+      --system
+
 # This stage installs all the requirements for the main app.
 # This will be copied later to the production stage
 FROM python:3.10-slim AS build_app_environment
@@ -30,22 +43,12 @@ RUN mkdir -p /opt/reverse_proxy  \
 # We also copy in config files
 # A application user is created. While the image doesn't force non-root
 # Supervisor later on drops root for all apps it handles
-FROM python:3.10-slim AS production
+FROM init AS production
 
 ARG SET_GIT_SHA=dev
 ENV GIT_SHA=$SET_GIT_SHA
 ENV TZ="America/Los_Angeles"
 
-RUN mkdir /app /data               \
- && groupadd application           \
-      --gid 1000                   \
- && useradd application            \
-      --base-dir /app              \
-      --home-dir /home/application \
-      --create-home                \
-      --uid 1000                   \
-      --gid 1000                   \
-      --system
 
 COPY --from=build_reverse_proxy   /opt/reverse_proxy     /opt/reverse_proxy
 COPY --from=build_app_environment /usr/local             /usr/local
