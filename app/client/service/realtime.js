@@ -44,6 +44,7 @@ async function asyncSubscribe(url, callback) {
     class FatalError extends Error { }
 
     let alertSection = document.querySelector('#alertSection');
+    const FAIL_MESSAGE = "Connection lost, attempting to reconnect";
 
     let lastAttemptRetry = new Date;
     let res = await fetchEventSource(url, {
@@ -54,13 +55,17 @@ async function asyncSubscribe(url, callback) {
         },
         onopen(response) {
             if (response.ok && response.headers.get('content-type') === EventStreamContentType) {
-                alertSection.textContent = '';
+                if(alertSection.textContent === FAIL_MESSAGE) {
+                    alertSection.textContent = '';
+                    alertSection.classList.remove("bg-danger");
+                }
             }
         },
         onerror(err) {
             if ((new Date) - lastAttemptRetry > 1000) {
                 console.error(`Connection errored. Reopening connection to ${url}`)
-                alertSection.textContent = "Connection lost, attempting to reconnect"
+                alertSection.textContent = FAIL_MESSAGE
+                alertSection.classList.add("bg-danger");
                 asyncSubscribe(url, callback)
                 throw new FatalError();
             }
