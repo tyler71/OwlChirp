@@ -6,7 +6,7 @@ import re
 from botocore.exceptions import ClientError
 from quart import Quart, request, render_template, make_response, abort
 
-from app.server.lib.ConnectMetrics import ConnectMetrics
+from lib.ConnectMetrics import ConnectMetrics
 from lib.Authentication import require_api_key
 from lib.Database import Db
 from lib.Events import ServerSentEvents, get_metric_data
