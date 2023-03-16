@@ -76,5 +76,5 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
-          docker swarm deploy -c deploy/docker-compose.yml ${{ steps.v.outputs.reponame }}
+          docker stack deploy -c deploy/docker-compose.yml ${{ steps.v.outputs.reponame }}
           
