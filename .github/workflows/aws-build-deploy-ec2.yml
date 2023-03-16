@@ -1,4 +1,4 @@
-name: Build / Push AWS ECR; Deploy to AWS Beanstalk
+name: Build / Push AWS ECR; Deploy to EC2
 
 on:
   push:
@@ -56,17 +56,25 @@ jobs:
       # Configure deployment package to use AWS repo with image of today's date.
       - name: Update stack to repo
         env:
+          AWS_DEFAULT_REGION:  ${{ var.AWS_DEFAULT_REGION }}
+          CONNECT_INSTANCE: ${{ var.CONNECT_INSTANCE }}
+          DB_STRING: ${{ var.DB_STRING }}
           ECR_REGISTRY:   ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
+          HOST: ${{ var.HOST }}
         run: |
           sed -i "s;image:.*;image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }};" deploy/docker-compose.yml
+          sed -i "s;caddy:.*;caddy: ${{ env.HOST }};" deploy/docker-compose.yml
+          sed -i "s;AWS_DEFAULT_REGION:.*;AWS_DEFAULT_REGION: ${{ env.AWS_DEFAULT_REGION }};" deploy/docker-compose.yml
+          sed -i "s;DB_STRING:.*;DB_STRING: ${{ env.DB_STRING }};" deploy/docker-compose.yml
+          sed -i "s;CONNECT_INSTANCE:.*;CONNECT_INSTANCE: ${{ env.CONNECT_INSTANCE }};" deploy/docker-compose.yml
 
       - name: Deploy
-        uses: kitconcept/docker-stack-deploy@v1.0.1
-        with:
-          remote_host: ${{ secrets.REMOTE_SERVER_HOSTNAME }}
-          remote_user: ${{ secrets.REMOTE_SERVER_USERNAME }}
-          remote_private_key: ${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}
-          stack_file: "deploy/docker-compose.yml"
-          stack_name: ${{ steps.v.outputs.reponame }}
-          stack_param: "HOST=${{ secrets.REMOTE_SERVER_HOSTNAME }}"
+        env:
+          DOCKER_HOST: ssh://${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
+          docker swarm deploy -c deploy/docker-compose.yml ${{ steps.v.outputs.reponame }}
+          

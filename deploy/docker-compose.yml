@@ -7,6 +7,10 @@ services:
       - owlchirp:/data
     networks:
       - public
+    environment:
+      AWS_DEFAULT_REGION: emptyvalue
+      CONNECT_INSTANCE: emptyvalue
+      DB_STRING: emptyvalue
     deploy:
       replicas: 1
       placement:
