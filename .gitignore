@@ -6,3 +6,5 @@ venv/
 .idea/dataSources.xml
 
 main.*.js
+
+.idea/
