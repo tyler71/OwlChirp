@@ -21,6 +21,9 @@ services:
         caddy.reverse_proxy: "{{ upstreams 8080 }}"
         variables:
 
+volumes:
+  owlchirp:
+
 networks:
   public:
     external: true
