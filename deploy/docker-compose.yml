@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  owlchirp:
+    image: override_this
+    volumes:
+      - owlchirp:/data
+    networks:
+      - public
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.platform.os == linux
+      labels:
+        caddy: ${ HOST }
+        caddy.reverse_proxy: "{{ upstreams 8080 }}"
+        variables:
+
+networks:
+  public:
+    external: true

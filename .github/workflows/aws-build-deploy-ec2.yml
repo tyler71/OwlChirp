@@ -3,7 +3,7 @@ name: Build / Push AWS ECR; Deploy to AWS Beanstalk
 on:
   push:
     branches:
-    - none
+    - production
 
 jobs:
   deploy:
@@ -26,6 +26,7 @@ jobs:
         run: |
           echo "::set-output name=date::$(date '+%m_%d_%Y')"
           echo "::set-output name=reponame::$(echo ${{ github.event.repository.name }} | tr '[:upper:]' '[:lower:]')"
+
       - name: Login to Amazon ECR
         id:   login-ecr
         uses: aws-actions/amazon-ecr-login@v1
@@ -53,32 +54,19 @@ jobs:
           cache-to:   type=gha,mode=max
 
       # Configure deployment package to use AWS repo with image of today's date.
-      - name: Generate deployment package
+      - name: Update stack to repo
         env:
           ECR_REGISTRY:   ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
         run: |
-          cd beanstalk
-          sed -i "s;image:.*;image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }};" docker-compose.yml
-          zip -r ../deploy.zip .
-      - name: Upload deploy artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name:           beanstalk-deploy.zip
-          path:           ./deploy.zip
-          retention-days: 14
+          sed -i "s;image:.*;image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }};" deploy/docker-compose.yml
 
-      - name: Deploy to EB
-        uses: einaregilsson/beanstalk-deploy@v20
+      - name: Deploy
+        uses: kitconcept/docker-stack-deploy@v1.0.1
         with:
-          aws_session_token:                 ${{ github.event.inputs.session_token }}
-          aws_access_key:                    ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_key:                    ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          application_name:                  ${{ secrets.EB_APP_NAME }}
-          environment_name:                  ${{ secrets.EB_ENV_NAME }}
-          version_label:                     tl-analytics-source-${{ github.run_number }}
-          use_existing_version_if_available: true
-          region:                            ${{ secrets.AWS_REGION }}
-          existing_bucket_name:              ${{ secrets.EB_BUCKET }}
-          wait_for_deployment:               false
-          deployment_package:                deploy.zip
+          remote_host: ${{ secrets.REMOTE_SERVER_HOSTNAME }}
+          remote_user: ${{ secrets.REMOTE_SERVER_USERNAME }}
+          remote_private_key: ${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}
+          stack_file: "deploy/docker-compose.yml"
+          stack_name: ${{ steps.v.outputs.reponame }}
+          stack_param: "HOST=${{ secrets.REMOTE_SERVER_HOSTNAME }}"
