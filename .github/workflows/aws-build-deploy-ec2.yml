@@ -56,12 +56,12 @@ jobs:
       # Configure deployment package to use AWS repo with image of today's date.
       - name: Update stack to repo
         env:
-          AWS_DEFAULT_REGION:  ${{ var.AWS_DEFAULT_REGION }}
-          CONNECT_INSTANCE: ${{ var.CONNECT_INSTANCE }}
-          DB_STRING: ${{ var.DB_STRING }}
+          AWS_DEFAULT_REGION:  ${{ vars.AWS_DEFAULT_REGION }}
+          CONNECT_INSTANCE: ${{ vars.CONNECT_INSTANCE }}
+          DB_STRING: ${{ vars.DB_STRING }}
           ECR_REGISTRY:   ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
-          HOST: ${{ var.HOST }}
+          HOST: ${{ vars.HOST }}
         run: |
           sed -i "s;image:.*;image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }};" deploy/docker-compose.yml
           sed -i "s;caddy:.*;caddy: ${{ env.HOST }};" deploy/docker-compose.yml
