@@ -1,5 +1,5 @@
 import "amazon-connect-streams";
-import {CCP_URL, CONNECT_INSTANCE} from "./const";
+import {CCP_URL, CONNECT_DOMAIN, CONNECT_INSTANCE} from "./const";
 import {Notifier} from "./service/Notifier";
 import {hookIncomingCall} from "./hook/incomingCall";
 import {hookRefresh} from "./hook/refresh";
@@ -23,13 +23,13 @@ let [statusDivA, statusDivB] = statusDiv.children;
 
 export let agentObj;
 
-document.querySelector('#visualAgentList').innerHTML = `Thanks for using my program! -Tyler<br><a href='${CONNECT_INSTANCE}/login' target="_blank">AWS Login</a>`
+document.querySelector('#visualAgentList').innerHTML = `Thanks for using my program! -Tyler<br><a href='${CONNECT_DOMAIN}/login' target="_blank">AWS Login</a>`
 
 
 // Starts the CCP instance.
 // The provided hooks are used for the rest of the program.
 connect.core.initCCP(containerDiv, {
-    ccpUrl: CCP_URL,             // REQUIRED
+    ccpUrl: `${CONNECT_DOMAIN}/connect/ccp-v2`, // REQUIRED
     loginPopup: true,                 // optional, defaults to `true`
     loginPopupAutoClose: true,        // optional, defaults to `false`
     loginOptions: {                   // optional, if provided opens login in new window
