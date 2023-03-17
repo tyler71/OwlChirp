@@ -13,9 +13,21 @@ RUN mkdir /app /data               \
 
 # This stage installs all the requirements for the main app.
 # This will be copied later to the production stage
-FROM init AS build_app_environment
+FROM init AS build_server_environment
 COPY ./requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt
+
+FROM node:lts AS build_client_environment
+# When run in prod, the webpack configuration puts built assets in ./dist
+# So this should be in /build/dist/
+# build args CONNECT_INSTANCE and TIME_ZONE are required
+WORKDIR /build
+
+COPY ./app/client/* /build
+
+RUN npm install
+
+RUN npm run prod
 
 # caddy handles http/s termination. It is built from scratch
 # This allows for additional modules later if we need it.
@@ -46,8 +58,9 @@ ENV TZ="America/Los_Angeles"
 
 ENV DATA_DIR /data
 
-COPY --from=build_app_environment /usr/local         /usr/local
-COPY --from=build_reverse_proxy   /opt/reverse_proxy /opt/reverse_proxy
+COPY --from=build_server_environment /usr/local         /usr/local
+COPY --from=build_client_environment /build/dist       /app/server/static/dist
+COPY --from=build_reverse_proxy      /opt/reverse_proxy /opt/reverse_proxy
 
 RUN python -m pip install --no-cache-dir install supervisor
 

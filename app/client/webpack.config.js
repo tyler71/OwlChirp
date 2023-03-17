@@ -38,8 +38,8 @@ module.exports = (env, argv) => {
                     options: {
                         multiple: [
                             {
-                                search: '_REPLACE_CONNECT_DOMAIN',
-                                replace: process.env.CONNECT_DOMAIN,
+                                search: '_REPLACE_CONNECT_INSTANCE',
+                                replace: process.env.CONNECT_INSTANCE,
                                 strict: true
                             },
                             {

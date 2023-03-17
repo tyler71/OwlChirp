@@ -1,4 +1,4 @@
-import {API, CURSOR_HELP_CLASS, CONNECT_DOMAIN, TIME_ZONE, LOADING_CLASS} from "../const";
+import {API, CURSOR_HELP_CLASS, CONNECT_INSTANCE, TIME_ZONE, LOADING_CLASS} from "../const";
 import {generateBaseHeader} from "../authentication";
 import {formatPhoneNumber, formatSecondsToTime, spinnerToggle} from "../helper";
 import {phoneLog} from "../hook/init";
@@ -102,7 +102,7 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
 
                     // Generate the structure for the contact id url
                     let contactIdLink = document.createElement('a')
-                    contactIdLink.href = `${CONNECT_DOMAIN}/contact-trace-records/details/${subTableJson["id"]}?tx=${TIME_ZONE}`;
+                    contactIdLink.href = `${CONNECT_INSTANCE}/contact-trace-records/details/${subTableJson["id"]}?tx=${TIME_ZONE}`;
                     contactIdLink.target = "_blank"
                     contactIdLink.textContent = subTableJson["id"].split("-")[0]
 
