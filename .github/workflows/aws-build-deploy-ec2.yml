@@ -71,11 +71,16 @@ jobs:
 
       - name: Deploy
         env:
-          DOCKER_HOST: ssh://${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
+          SSH_STRING: ${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
+          DOCKER_HOST: ssh://${{ env.SSH_STRING }}
+          REGION: ${{ vars.AWS_DEFAULT_REGION }}
+          ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 400 ~/.ssh/id_rsa
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
+          
+          ssh ${{ env.SSH_STRING }} "aws ecr get-login-password --region ${{ env.REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REPOSITORY }}"
           docker stack deploy -c deploy/docker-compose.yml ${{ steps.v.outputs.reponame }}
           
