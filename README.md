@@ -9,7 +9,7 @@
 Environment variables
 - LOG_LEVEL
 During build / deployment
-- CONNECT_DOMAIN
+- CONNECT_INSTANCE
 - TIME_ZONE
 During hosting
 - AWS_ACCESS_KEY_ID

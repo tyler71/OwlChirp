@@ -48,7 +48,7 @@ jobs:
           build-args: |
             SET_GIT_SHA=${{ github.sha }}
             SET_BUILD_NUMBER=${{ github.run_number }}
-            CONNECT_DOMAIN=${{ secrets.CONNECT_DOMAIN }}
+            CONNECT_INSTANCE=${{ secrets.CONNECT_INSTANCE }}
           cache-from: type=gha
           cache-to:   type=gha,mode=max
 
