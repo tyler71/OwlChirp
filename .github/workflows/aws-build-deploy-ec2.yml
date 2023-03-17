@@ -59,27 +59,28 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Configure deployment package to use AWS repo with image of today's date.
-      - name: Update stack to repo
-        env:
-          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
-          CONNECT_INSTANCE: ${{ vars.CONNECT_INSTANCE }}
-          DB_STRING: ${{ vars.DB_STRING }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
-          HOST: ${{ vars.HOST }}
-        run: |
-          sed -i "s;image:.*;image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }};" deploy/docker-compose.yml
-          sed -i "s;caddy:.*;caddy: ${{ env.HOST }};" deploy/docker-compose.yml
-          sed -i "s;AWS_DEFAULT_REGION:.*;AWS_DEFAULT_REGION: ${{ env.AWS_DEFAULT_REGION }};" deploy/docker-compose.yml
-          sed -i "s;DB_STRING:.*;DB_STRING: ${{ env.DB_STRING }};" deploy/docker-compose.yml
-          sed -i "s;CONNECT_INSTANCE:.*;CONNECT_INSTANCE: ${{ env.CONNECT_INSTANCE }};" deploy/docker-compose.yml
+#      - name: Update stack to repo
+#        env:
+#          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+#          ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
+#          HOST: ${{ vars.HOST }}
+#        run: |
+#          sed -i "s;image:.*;image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }};" deploy/docker-compose.yml
+#          sed -i "s;caddy:.*;caddy: ${{ env.HOST }};" deploy/docker-compose.yml
+#          sed -i "s;DB_STRING:.*;DB_STRING: ${{ env.DB_STRING }};" deploy/docker-compose.yml
+#          sed -i "s;CONNECT_INSTANCE:.*;CONNECT_INSTANCE: ${{ env.CONNECT_INSTANCE }};" deploy/docker-compose.yml
 
       - name: Deploy
         env:
-          SSH_STRING: ${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+          CONNECT_INSTANCE: ${{ secrets.CONNECT_INSTANCE }}
+          DB_STRING: ${{ vars.DB_STRING }}
           DOCKER_HOST: ssh://${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
-          REGION: ${{ vars.AWS_DEFAULT_REGION }}
           ECR_REPOSITORY: ${{ steps.login-ecr.outputs.registry }}
+          HOST: ${{ vars.HOST }}
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ steps.v.outputs.reponame }}:${{ steps.v.outputs.date }}
+          REGION: ${{ vars.AWS_DEFAULT_REGION }}
+          SSH_STRING: ${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa

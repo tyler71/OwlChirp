@@ -14,9 +14,7 @@ from cachetools import cached, TTLCache, LRUCache
 class ConnectMetrics:
     __instance = None
 
-    def __init__(self,
-                 connect_instance=os.getenv("CONNECT_INSTANCE", None),
-                 ):
+    def __init__(self, connect_instance=os.environ["CONNECT_INSTANCE"]):
         self.connect_instance = connect_instance
         self.client = boto3.client('connect')
         ConnectMetrics.__instance = self
@@ -29,10 +27,10 @@ class ConnectMetrics:
 
     @cached(TTLCache(maxsize=1024 * 8, ttl=3600 * 6))  # 6 hours
     def _refresh_queues(self) -> dict:
-        """ Get queue list. This changes infrequently so we cache it for a long time
+        """ Get queue list. This changes infrequently, so we cache it for a long time
         """
         queues = self.client.list_queues(
-            InstanceId=os.getenv('CONNECT_INSTANCE', None),
+            InstanceId=self.connect_instance,
             QueueTypes=['STANDARD']
         )
         if queues['ResponseMetadata']['HTTPStatusCode'] != 200:
@@ -43,7 +41,7 @@ class ConnectMetrics:
     def _refresh_registered_users(self) -> dict:
         """ List all registered users
         """
-        registered_users = self.client.list_users(InstanceId=os.getenv('CONNECT_INSTANCE', None))
+        registered_users = self.client.list_users(InstanceId=self.connect_instance)
         if registered_users['ResponseMetadata']['HTTPStatusCode'] != 200:
             logging.error("_refresh_registered_users failure")
         return registered_users['UserSummaryList']

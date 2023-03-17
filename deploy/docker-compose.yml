@@ -2,11 +2,11 @@ version: "3.9"
 
 services:
   owlchirp:
-    image: override_this
+    image: ${IMAGE}
     environment:
-      AWS_DEFAULT_REGION: replaced_value
-      CONNECT_INSTANCE: replaced_value
-      DB_STRING: replaced_value
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      CONNECT_INSTANCE: ${CONNECT_INSTANCE}
+      DB_STRING: ${DB_STRING}
     volumes:
       - owlchirp:/data
     networks:
@@ -17,7 +17,7 @@ services:
         constraints:
           - node.platform.os == linux
       labels:
-        caddy: replaced_value
+        caddy: ${HOST}
         caddy.reverse_proxy: "{{ upstreams 8080 }}"
 
 volumes:

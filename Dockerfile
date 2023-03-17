@@ -60,9 +60,9 @@ ENV TZ="America/Los_Angeles"
 
 ENV DATA_DIR /data
 
-COPY --from=build_server_environment /usr/local         /usr/local
-COPY --from=build_client_environment /build/dist       /app/server/static/dist
 COPY --from=build_reverse_proxy      /opt/reverse_proxy /opt/reverse_proxy
+COPY --from=build_server_environment /usr/local         /usr/local
+COPY --from=build_client_environment /build/dist        /app/server/static/dist
 
 RUN python -m pip install --no-cache-dir install supervisor
 
