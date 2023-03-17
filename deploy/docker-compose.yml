@@ -8,18 +8,17 @@ services:
     networks:
       - public
     environment:
-      AWS_DEFAULT_REGION: emptyvalue
-      CONNECT_INSTANCE: emptyvalue
-      DB_STRING: emptyvalue
+      AWS_DEFAULT_REGION: replaced_value
+      CONNECT_INSTANCE: replaced_value
+      DB_STRING: replaced_value
     deploy:
       replicas: 1
       placement:
         constraints:
           - node.platform.os == linux
       labels:
-        caddy: ${ HOST }
+        caddy: replaced_value
         caddy.reverse_proxy: "{{ upstreams 8080 }}"
-        variables:
 
 volumes:
   owlchirp:
