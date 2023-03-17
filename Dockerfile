@@ -22,8 +22,11 @@ FROM node:lts AS build_client_environment
 # So this should be in /build/dist/
 # build args CONNECT_INSTANCE and TIME_ZONE are required
 WORKDIR /build
+RUN apt-get update && apt-get install -y tree \
+    && tree -L 2 /build
 
 COPY ./app/client/* /build
+RUN ls /build
 
 RUN npm install
 

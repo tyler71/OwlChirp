@@ -39,6 +39,7 @@ jobs:
         env:
           ECR_REGISTRY:   ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
+          CONNECT_INSTANCE: ${{ vars.CONNECT_INSTANCE }}
           TIME_ZONE: ${{ vars.TIME_ZONE }}
         with:
           context: .
@@ -50,7 +51,7 @@ jobs:
           build-args: |
             SET_GIT_SHA=${{ github.sha }}
             SET_BUILD_NUMBER=${{ github.run_number }}
-            CONNECT_INSTANCE=${{ secrets.CONNECT_INSTANCE }}
+            CONNECT_INSTANCE=${{ env.CONNECT_INSTANCE }}
             TIME_ZONE=${{ env.TIME_ZONE }}
           cache-from: type=gha
           cache-to:   type=gha,mode=max
