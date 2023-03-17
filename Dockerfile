@@ -21,15 +21,13 @@ FROM node:lts AS build_client_environment
 # When run in prod, the webpack configuration puts built assets in ./dist
 # So this should be in /build/dist/
 # build args CONNECT_INSTANCE and TIME_ZONE are required
+ARG CONNECT_INSTANCE
+ARG TIME_ZONE
 WORKDIR /build
-RUN apt-get update && apt-get install -y tree \
-    && tree -L 2 /build
 
-COPY ./app/client/* /build
-RUN ls /build
+COPY ./app/client /build
 
 RUN npm install
-
 RUN npm run prod
 
 # caddy handles http/s termination. It is built from scratch
