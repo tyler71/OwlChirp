@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-python3 /app
+python3 /app/server
