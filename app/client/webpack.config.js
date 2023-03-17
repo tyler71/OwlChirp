@@ -43,6 +43,11 @@ module.exports = (env, argv) => {
                                 strict: true
                             },
                             {
+                                search: '_REPLACE_CONNECT_DOMAIN',
+                                replace: process.env.CONNECT_DOMAIN,
+                                strict: true
+                            },
+                            {
                                 search: '_REPLACE_TIME_ZONE',
                                 replace: process.env.TIME_ZONE,
                                 strict: true

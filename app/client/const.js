@@ -1,7 +1,8 @@
 export const API = '/api';
 
 export const CONNECT_INSTANCE = "_REPLACE_CONNECT_INSTANCE";
-export const CCP_URL = `${CONNECT_INSTANCE}/connect/ccp-v2`;
+export const CONNECT_DOMAIN = "_REPLACE_CONNECT_DOMAIN";
+export const CCP_URL = `${CONNECT_DOMAIN}/connect/ccp-v2`;
 export const TIME_ZONE = "_REPLACE_TIME_ZONE";
 
 export const TABLE_INFO_CLASS = 'table-info';

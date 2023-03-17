@@ -21,6 +21,7 @@ FROM node:lts AS build_client_environment
 # When run in prod, the webpack configuration puts built assets in ./dist
 # So this should be in /build/dist/
 # build args CONNECT_INSTANCE and TIME_ZONE are required
+ARG CONNECT_DOMAIN
 ARG CONNECT_INSTANCE
 ARG TIME_ZONE
 WORKDIR /build
