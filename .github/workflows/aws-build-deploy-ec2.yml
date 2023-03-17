@@ -82,5 +82,5 @@ jobs:
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
           
           ssh ${{ env.SSH_STRING }} "aws ecr get-login-password --region ${{ env.REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REPOSITORY }}"
-          docker stack deploy -c deploy/docker-compose.yml ${{ steps.v.outputs.reponame }}
+          docker stack deploy --with-registry-auth -c deploy/docker-compose.yml ${{ steps.v.outputs.reponame }}
           
