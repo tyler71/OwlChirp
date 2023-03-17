@@ -74,7 +74,7 @@ jobs:
           SSH_STRING: ${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
           DOCKER_HOST: ssh://${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
           REGION: ${{ vars.AWS_DEFAULT_REGION }}
-          ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
+          ECR_REPOSITORY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa
