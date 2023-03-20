@@ -58,18 +58,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Configure deployment package to use AWS repo with image of today's date.
-#      - name: Update stack to repo
-#        env:
-#          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-#          ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
-#          HOST: ${{ vars.HOST }}
-#        run: |
-#          sed -i "s;image:.*;image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }};" deploy/docker-compose.yml
-#          sed -i "s;caddy:.*;caddy: ${{ env.HOST }};" deploy/docker-compose.yml
-#          sed -i "s;DB_STRING:.*;DB_STRING: ${{ env.DB_STRING }};" deploy/docker-compose.yml
-#          sed -i "s;CONNECT_INSTANCE:.*;CONNECT_INSTANCE: ${{ env.CONNECT_INSTANCE }};" deploy/docker-compose.yml
-
       - name: Deploy
         env:
           AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
