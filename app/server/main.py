@@ -35,6 +35,11 @@ async def index():
     return await render_template('index.html')
 
 
+@app.route('/ping')
+async def ping():
+    return {"response": "pong"}, 200
+
+
 @app.route('/ccp')
 async def ccp():
     core_js_files = list()

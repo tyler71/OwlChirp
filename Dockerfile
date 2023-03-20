@@ -1,5 +1,13 @@
 FROM python:3.10-slim AS init
 
+HEALTHCHECK --interval=5m --timeout=3s \
+  CMD curl -I 127.0.0.1:8080/ping || exit 1
+
+RUN apt-get update && apt-get install -y \
+    curl \
+ && rm -r /var/lib/apt/lists/* \
+ && apt-get clean
+
 RUN mkdir /app /data               \
  && groupadd application           \
       --gid 1000                   \
