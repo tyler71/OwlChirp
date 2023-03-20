@@ -1,7 +1,7 @@
 FROM python:3.10-slim AS init
 
-HEALTHCHECK --interval=5m --timeout=3s \
-  CMD curl -I 127.0.0.1:8080/ping || exit 1
+HEALTHCHECK --interval=15m --timeout=3s \
+  CMD curl --fail 127.0.0.1:8080/ping || exit 1
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -19,7 +19,7 @@ RUN mkdir /app /data               \
       --gid 1000                   \
       --system
 
-# This stage installs all the requirements for the main app.
+# This stage installs all the requirements for the main app to /usr/local.
 # This will be copied later to the production stage
 FROM init AS build_server_environment
 COPY ./requirements.txt .
@@ -40,7 +40,8 @@ RUN npm install
 RUN npm run prod
 
 # caddy handles http/s termination. It is built from scratch
-# This allows for additional modules later if we need it.
+# We are using it as a standardized reverse proxy to the app.
+# This also allows for additional modules later if we need it.
 FROM caddy:2.6.2-builder AS build_reverse_proxy
 ENV XCADDY_SKIP_CLEANUP=1
 ENV BUILD_VERSION=v2.6.2
@@ -52,8 +53,8 @@ RUN mkdir -p /opt/reverse_proxy  \
 
 # Copy files from previous stages
 # We also copy in config files
-# A application user is created. While the image doesn't force non-root
-# Supervisor later on drops root for all apps it handles
+# While the image doesn't force non-root, Supervisor drops root for all apps it handles
+# We also label the sha and build number. This causes Docker Swarm to notice it is a different image.
 FROM init AS production
 
 ARG SET_GIT_SHA=dev
@@ -64,7 +65,7 @@ ENV GIT_SHA=$SET_GIT_SHA
 LABEL GIT_SHA=$SET_GIT_SHA
 LABEL BUILD_NUMBER=$SET_BUILD_NUMBER
 
-ENV TZ="America/Los_Angeles"
+ENV TZ=$TIME_ZONE
 
 ENV DATA_DIR /data
 
