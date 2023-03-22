@@ -44,7 +44,7 @@ async function asyncSubscribe(url, callback) {
     class FatalError extends Error { }
 
     const alertSection = document.querySelector('#alertSection');
-    const FAIL_MESSAGE = "Connection lost, attempting to reconnect";
+    const FAIL_MESSAGE = "Realtime metrics paused; attempting to restore";
     let retryTimeSeconds = 2;
 
     let lastAttemptRetry = new Date;
@@ -58,7 +58,7 @@ async function asyncSubscribe(url, callback) {
             if (response.ok && response.headers.get('content-type') === EventStreamContentType) {
                 if(alertSection.textContent === FAIL_MESSAGE) {
                     alertSection.textContent = '';
-                    alertSection.classList.remove("bg-danger");
+                    alertSection.classList.remove("bg-warning");
                 }
             }
         },
