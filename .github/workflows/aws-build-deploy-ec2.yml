@@ -67,7 +67,6 @@ jobs:
           HOST: ${{ vars.HOST }}
           IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ steps.v.outputs.reponame }}:${{ steps.v.outputs.date }}
           REGION: ${{ vars.AWS_DEFAULT_REGION }}
-          SSH_STRING: ${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa

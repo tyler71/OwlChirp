@@ -44,7 +44,7 @@ async function asyncSubscribe(url, callback) {
     class FatalError extends Error { }
 
     const alertSection = document.querySelector('#alertSection');
-    const FAIL_MESSAGE = "Realtime metrics paused; attempting to restore";
+    const FAIL_MESSAGE = "Realtime metrics paused; restoring...";
     let retryTimeSeconds = 2;
 
     let lastAttemptRetry = new Date;
@@ -66,7 +66,7 @@ async function asyncSubscribe(url, callback) {
             if ((new Date) - lastAttemptRetry > retryTimeSeconds * 1000) {
                 console.error(`Connection errored. Reopening connection to ${url}. Waiting ${retryTimeSeconds} seconds`)
                 alertSection.textContent = FAIL_MESSAGE
-                alertSection.classList.add("bg-danger");
+                alertSection.classList.add("bg-warning");
                 asyncSubscribe(url, callback)
                 throw new FatalError();
             }
