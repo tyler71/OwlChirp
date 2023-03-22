@@ -63,19 +63,16 @@ async function asyncSubscribe(url, callback) {
             }
         },
         onerror(err) {
-            if ((new Date) - lastAttemptRetry > retryTimeSeconds * 1000) {
-                console.error(`Connection errored. Reopening connection to ${url}. Waiting ${retryTimeSeconds} seconds`)
-                alertSection.textContent = FAIL_MESSAGE
-                alertSection.classList.add("bg-warning");
-                asyncSubscribe(url, callback)
-                throw new FatalError();
-            }
+            console.error(`Connection errored. Reopening connection to ${url}. Waiting ${retryTimeSeconds} seconds`)
+            alertSection.textContent = FAIL_MESSAGE
+            alertSection.classList.add("bg-warning");
+            asyncSubscribe(url, callback)
+            throw new FatalError();
         },
         onclose() {
-            if ((new Date) - lastAttemptRetry > retryTimeSeconds * 1000) {
-                console.error(`Connection closed. Reopening connection to ${url}`)
-                throw new FatalError();
-            }
+            console.error(`Connection closed. Reopening connection to ${url}`)
+            asyncSubscribe(url, callback)
+            throw new FatalError();
         }
     })
 
