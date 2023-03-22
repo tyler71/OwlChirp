@@ -25,7 +25,7 @@ FROM init AS build_server_environment
 COPY ./requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
-FROM node:lts AS build_client_environment
+FROM node:18.14-slim AS build_client_environment
 # When run in prod, the webpack configuration puts built assets in ./dist
 # So this should be in /build/dist/
 # build args CONNECT_INSTANCE and TIME_ZONE are required
@@ -69,10 +69,6 @@ ENV TZ=$TIME_ZONE
 
 ENV DATA_DIR /data
 
-COPY --from=build_reverse_proxy      /opt/reverse_proxy /opt/reverse_proxy
-COPY --from=build_server_environment /usr/local         /usr/local
-COPY --from=build_client_environment /build/dist        /app/server/static/dist
-
 RUN python -m pip install --no-cache-dir install supervisor
 
 COPY ./config/init/supervisord.conf   /etc/supervisord.conf
@@ -80,6 +76,10 @@ COPY ./config/init.sh                 /init.sh
 COPY ./config/reverse_proxy/Caddyfile /etc/Caddyfile
 
 EXPOSE 8080
+
+COPY --from=build_reverse_proxy      /opt/reverse_proxy /opt/reverse_proxy
+COPY --from=build_server_environment /usr/local         /usr/local
+COPY --from=build_client_environment /build/dist        /app/server/static/dist
 
 COPY --chown=application:application ./app /app
 

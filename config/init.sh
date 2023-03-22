@@ -12,6 +12,7 @@ do
   chown application: "$pid"
 done
 
+mkdir -p /data
 chown -R application: /data
 
 /usr/local/bin/supervisord -c /etc/supervisord.conf

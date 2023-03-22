@@ -5,4 +5,7 @@ venv/
 
 .idea/dataSources.xml
 
+dist/*
 main.*.js
+
+ccp.sqlite3
