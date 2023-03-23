@@ -40,17 +40,14 @@ export async function eventSub(endpoint) {
 }
 
 async function asyncSubscribe(url, callback, retry = false) {
-    class RetriableError extends Error {
-    }
+    class RetriableError extends Error { }
 
-    class FatalError extends Error {
-    }
+    class FatalError extends Error { }
 
     const alertSection = document.querySelector('#alertSection');
     const FAIL_MESSAGE = "Realtime metrics paused; restoring...";
     let retryTimeSeconds = 2;
     let maxRetryTimeSeconds = 30;
-    let lastAttemptRetry = new Date;
 
     async function createConnection() {
         let res = await fetchEventSource(url, {
@@ -74,7 +71,6 @@ async function asyncSubscribe(url, callback, retry = false) {
                 throw new FatalError();
             },
             onclose() {
-                console.error("On close called")
                 throw new FatalError();
             }
         })
