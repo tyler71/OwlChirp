@@ -1,8 +1,5 @@
 FROM python:3.10-slim AS init
 
-HEALTHCHECK --interval=15m --timeout=3s \
- CMD curl --fail 127.0.0.1:8080/ping || exit 1
-
 RUN apt-get update && apt-get install -y \
     curl \
  && rm -r /var/lib/apt/lists/* \
@@ -78,8 +75,8 @@ COPY ./config/reverse_proxy/Caddyfile /etc/Caddyfile
 EXPOSE 8080
 
 COPY --from=build_reverse_proxy      /opt/reverse_proxy /opt/reverse_proxy
-COPY --from=build_server_environment /usr/local         /usr/local
 COPY --from=build_client_environment /build/dist        /app/server/static/dist
+COPY --from=build_server_environment /usr/local         /usr/local
 
 COPY --chown=application:application ./app /app
 
