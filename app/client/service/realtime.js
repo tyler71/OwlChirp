@@ -49,6 +49,7 @@ async function asyncSubscribe(url, callback, retry = false) {
     const alertSection = document.querySelector('#alertSection');
     const FAIL_MESSAGE = "Realtime metrics paused; restoring...";
     let retryTimeSeconds = 2;
+    let maxRetryTimeSeconds = 30;
     let lastAttemptRetry = new Date;
 
     async function createConnection() {
@@ -63,12 +64,11 @@ async function asyncSubscribe(url, callback, retry = false) {
                     if (alertSection.textContent === FAIL_MESSAGE) {
                         alertSection.textContent = '';
                         alertSection.classList.remove("bg-warning");
+                        retryTimeSeconds = 2;
                     }
                 }
             },
             onerror(err) {
-                console.error("On error called")
-                console.error(`Connection errored. Reopening connection to ${url}. Waiting ${retryTimeSeconds} seconds`)
                 alertSection.textContent = FAIL_MESSAGE
                 alertSection.classList.add("bg-warning");
                 throw new FatalError();
@@ -87,6 +87,10 @@ async function asyncSubscribe(url, callback, retry = false) {
             await createConnection()
         } catch (error) {
             await sleep(retryTimeSeconds * 1000)
+            retryTimeSeconds *= 1.2
+            if(retryTimeSeconds > maxRetryTimeSeconds) {
+                retryTimeSeconds = maxRetryTimeSeconds
+            }
         }
     }
 }
