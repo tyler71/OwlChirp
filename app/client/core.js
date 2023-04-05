@@ -23,22 +23,22 @@ let [statusDivA, statusDivB] = statusDiv.children;
 
 export let agentObj;
 
-document.querySelector('#visualAgentList').innerHTML = `Thanks for using my program! -Tyler<br><a href='${CONNECT_DOMAIN}/login' target="_blank">AWS Login</a>`
+document.querySelector('#alertSection').innerHTML = `Thanks for using my program! -Tyler<br><small>If OwlChirp isn't loading, try logging in<small></small><br><a href='${CONNECT_DOMAIN}/login' target="_blank"><button type="button" class="btn btn-primary m-4">Login</button>`
 
 
 // Starts the CCP instance.
 // The provided hooks are used for the rest of the program.
 connect.core.initCCP(containerDiv, {
     ccpUrl: `${CONNECT_DOMAIN}/connect/ccp-v2`, // REQUIRED
-    loginPopup: true,                 // optional, defaults to `true`
-    loginPopupAutoClose: true,        // optional, defaults to `false`
-    loginOptions: {                   // optional, if provided opens login in new window
-        autoClose: true,              // optional, defaults to `false`
-        height: 578,                  // optional, defaults to 578
-        width: 400,                   // optional, defaults to 433
-        top: 0,                       // optional, defaults to 0
-        left: 0                       // optional, defaults to 0
-    },
+    loginPopup: false,                 // optional, defaults to `true`
+    loginPopupAutoClose: false,        // optional, defaults to `false`
+    // loginOptions: {                   // optional, if provided opens login in new window
+    //     autoClose: true,              // optional, defaults to `false`
+    //     height: 578,                  // optional, defaults to 578
+    //     width: 400,                   // optional, defaults to 433
+    //     top: 0,                       // optional, defaults to 0
+    //     left: 0                       // optional, defaults to 0
+    // },
     softphone: {                      // optional, defaults below apply if not provided
         allowFramedSoftphone: true,   // optional, defaults to false
         disableRingtone: false,       // optional, defaults to false
