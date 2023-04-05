@@ -3,6 +3,7 @@ export const API = '/api';
 export const CONNECT_INSTANCE = "_REPLACE_CONNECT_INSTANCE";
 export const CONNECT_DOMAIN = "_REPLACE_CONNECT_DOMAIN";
 export const TIME_ZONE = "_REPLACE_TIME_ZONE";
+export const TELEMETRY_URL = "_REPLACE_TELEMETRY_URL";
 
 export const TABLE_INFO_CLASS = 'table-info';
 export const TABLE_ALERT_CLASS = 'table-warning';

@@ -1,8 +1,8 @@
 // Actions to take when there is an action
 import {incomingCallCallerId} from "../component/callerId";
-import {formatPhoneNumber} from "../helper";
+import {formatPhoneNumber, telemetry} from "../helper";
 import {updateAgentCallList} from "../component/recentCallList";
-import {notify} from "../core";
+import {agentObj, notify} from "../core";
 import {phoneLog} from "./init";
 
 export async function hookIncomingCall(contact) {
@@ -28,4 +28,6 @@ export async function hookIncomingCall(contact) {
 
     // Agent's recent calls
     await updateAgentCallList();
+
+    telemetry(agentObj);
 }

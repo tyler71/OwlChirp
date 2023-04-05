@@ -29,6 +29,8 @@ FROM node:18.14-slim AS build_client_environment
 ARG CONNECT_DOMAIN
 ARG CONNECT_INSTANCE
 ARG TIME_ZONE
+ARG TELEMETRY_URL
+
 WORKDIR /build
 
 COPY ./app/client /build

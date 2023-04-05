@@ -60,6 +60,7 @@ jobs:
             SET_BUILD_NUMBER=${{ github.run_number }}
             CONNECT_INSTANCE=${{ env.CONNECT_INSTANCE }}
             CONNECT_DOMAIN=${{ env.CONNECT_DOMAIN }}
+            TELEMETRY_URL=${{ env.TELEMETRY_URL }}
             TIME_ZONE=${{ env.TIME_ZONE }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

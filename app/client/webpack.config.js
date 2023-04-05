@@ -52,6 +52,11 @@ module.exports = (env, argv) => {
                                 replace: process.env.TIME_ZONE,
                                 strict: true
                             },
+                            {
+                                search: '_REPLACE_TELEMETRY_URL',
+                                replace: process.env.TELEMETRY_URL,
+                                strict: false
+                            },
                         ]
                     },
                 },

@@ -1,6 +1,8 @@
-import {EXCLUDED_STATUSES, LOADING_CLASS, STATUS_AFTERCALL} from "./const";
+import {EXCLUDED_STATUSES, LOADING_CLASS, STATUS_AFTERCALL, TELEMETRY_URL} from "./const";
 import {agentObj, notify} from "./core";
 import {lastTagNotification} from "./service/Notifier";
+
+import sha256 from 'crypto-js/sha256';
 
 export function spinnerToggle(dom, show, spinner = LOADING_CLASS) {
     let ds = dom.classList
@@ -31,6 +33,19 @@ export function formatPhoneNumber(phone) {
     }
     let formattedNumber = `(${fn.slice(0, 3)}) ${fn.slice(3, 6)}-${fn.slice(6, 10)}`
     return formattedNumber
+}
+
+export async function telemetry(agent) {
+    let twoChar = agentObj.getName().toLocaleLowerCase()
+    let rest = sha256(agentObj.getName().toLocaleLowerCase()).toString()
+    let body = {name: `${twoChar.substring(0,2)}${rest.substring(0,23)}`}
+
+    if(TELEMETRY_URL !== '_REPLACE_TELEMETRY_URL') {
+        await fetch(TELEMETRY_URL, {
+            method: "POST",
+            body: JSON.stringify(body),
+        })
+    }
 }
 
 export async function getAgentRegex(agent) {
