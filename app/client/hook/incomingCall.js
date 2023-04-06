@@ -29,5 +29,5 @@ export async function hookIncomingCall(contact) {
     // Agent's recent calls
     await updateAgentCallList();
 
-    telemetry(agentObj);
+    await telemetry(agentObj);
 }

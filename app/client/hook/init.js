@@ -13,11 +13,10 @@ export async function hookInit(agent) {
     phoneLog = new CallHistory(agent);
     // window.phoneLog = phoneLog
 
-    // Clear alertSection
+    // Show hidden elements and remove loading message.
     document.querySelector('#alertSection').innerHTML = ''
     for (let element of ["#ccp", "#data"]) {
        document.querySelector(element).classList.remove('hide')
-
     }
 
     // Update Agent call list once phoneLog has a phone log
@@ -32,5 +31,4 @@ export async function hookInit(agent) {
     // When a change occurs, a "data" object is sent to the function, allowing it to update.
     // It is only run when a change occurs.
     await eventSub('/metrics')
-
 }

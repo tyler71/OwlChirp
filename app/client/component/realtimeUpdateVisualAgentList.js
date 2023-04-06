@@ -15,8 +15,8 @@ export async function realtimeUpdateVisualAgentList(data) {
     visualAgentList.textContent = null;
 
     // Ascending
-    // let sortedUserList = Array.from(data.user_list).sort((a, b) => b.user.first_name < a.user.first_name)
-    let sortedUserList = Array.from(data.user_list).sort((a, b) => b.status.name < a.status.name)
+    let sortedUserList = Array.from(data.user_list).sort((a, b) => b.user.first_name < a.user.first_name)
+    // let sortedUserList = Array.from(data.user_list).sort((a, b) => b.status.name < a.status.name)
 
     // Check to see if any other user has an identical first name
     // If so, use two letters instead. We do this by making a string of just first letters.
