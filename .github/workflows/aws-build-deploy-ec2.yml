@@ -48,6 +48,7 @@ jobs:
           CONNECT_INSTANCE: ${{ secrets.CONNECT_INSTANCE }}
           CONNECT_DOMAIN: ${{ vars.CONNECT_DOMAIN }}
           TIME_ZONE: ${{ vars.TIME_ZONE }}
+          TELEMETRY_URL: ${{ vars.TELEMETRY_URL }}
         with:
           context: .
           push: true
