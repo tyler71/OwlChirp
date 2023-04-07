@@ -36,11 +36,12 @@ export function formatPhoneNumber(phone) {
 }
 
 export async function telemetry(agent) {
-    let twoChar = agentObj.getName().toLocaleLowerCase()
-    let rest = sha256(agentObj.getName().toLocaleLowerCase()).toString()
+    let twoChar = agent.getName().toLocaleLowerCase()
+    let rest = sha256(agent.getName().toLocaleLowerCase()).toString()
     let body = {name: `${twoChar.substring(0,2)}${rest.substring(0,23)}`}
 
     if(TELEMETRY_URL !== '_REPLACE_TELEMETRY_URL') {
+        console.info(`Incrementing call count to ${TELEMETRY_URL}`);
         await fetch(TELEMETRY_URL, {
             method: "POST",
             body: JSON.stringify(body),
