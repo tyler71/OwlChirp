@@ -4,7 +4,6 @@ import {updateAgentCallList} from "../component/recentCallList";
 import {SetupCallerId} from "../component/callerId";
 import {eventSub} from "../service/realtime";
 import {hookIntervalRefresh} from "./intervalRefresh";
-import {telemetry} from "../helper";
 
 export let phoneLog;
 
@@ -27,7 +26,6 @@ export async function hookInit(agent) {
 
     await hookIntervalRefresh(agent, 5000);
 
-    telemetry(agent);
     // Using Server Sent Events, we subscribe to the endpoint and listen for events.
     // When a change occurs, a "data" object is sent to the function, allowing it to update.
     // It is only run when a change occurs.

@@ -1,8 +1,5 @@
-permissions:
-  id-token: write
-  contents: read
 
-name: Build / Push AWS ECR; Deploy to EC2
+name: Build / Push Registry; Deploy to Swarm
 
 on:
   push:
@@ -12,26 +9,14 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    # Used for AWS Role Assumption
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-
-      - name: Configure AWS credentials
-        id: aws-credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          role-to-assume: ${{ vars.ROLE_ARN }}
-          role-duration-seconds: 900
-          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
 
       - name: Variables
         id: v
@@ -40,7 +25,25 @@ jobs:
           echo "::set-output name=owner::$(echo $GITHUB_REPOSITORY_OWNER | tr '[:upper:]' '[:lower:]')"
           echo "::set-output name=reponame::$(echo ${{ github.event.repository.name }} | tr '[:upper:]' '[:lower:]')"
 
-      - name: Build and push
+      - name: Configure AWS credentials
+        id: aws-credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        env:
+          SESSION_NAME: ${{ steps.v.outputs.reponame }}_ghactions_deployment
+        with:
+          role-to-assume: ${{ vars.ROLE_ARN }}
+          role-session-name: ${{ env.SESSION_NAME }}
+          role-duration-seconds: 900
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and Push
         uses: docker/build-push-action@v2
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -50,12 +53,6 @@ jobs:
           TIME_ZONE: ${{ vars.TIME_ZONE }}
           TELEMETRY_URL: ${{ vars.TELEMETRY_URL }}
         with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:build_${{ github.run_number }}
           build-args: |
             SET_GIT_SHA=${{ github.sha }}
             SET_BUILD_NUMBER=${{ github.run_number }}
@@ -63,23 +60,30 @@ jobs:
             CONNECT_DOMAIN=${{ env.CONNECT_DOMAIN }}
             TELEMETRY_URL=${{ env.TELEMETRY_URL }}
             TIME_ZONE=${{ env.TIME_ZONE }}
+          context: .
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.v.outputs.date }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:build_${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Deploy
         env:
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ steps.v.outputs.reponame }}:${{ steps.v.outputs.date }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
           CONNECT_INSTANCE: ${{ secrets.CONNECT_INSTANCE }}
           DB_STRING: ${{ vars.DB_STRING }}
-          DOCKER_HOST: ssh://${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
-          ECR_REPOSITORY: ${{ steps.login-ecr.outputs.registry }}
           HOST: ${{ vars.HOST }}
-          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ steps.v.outputs.reponame }}:${{ steps.v.outputs.date }}
           REGION: ${{ vars.AWS_DEFAULT_REGION }}
+          ECR_REPOSITORY: ${{ steps.login-ecr.outputs.registry }}
+          DOCKER_HOST: ssh://${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
+          REPO_NAME: ${{ steps.v.outputs.reponame }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 400 ~/.ssh/id_rsa
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
-          docker stack deploy --with-registry-auth -c deploy/docker-compose.yml ${{ steps.v.outputs.reponame }}
+          docker stack deploy --with-registry-auth -c deploy/docker-compose.yml ${{ env.REPO_NAME }}
           
