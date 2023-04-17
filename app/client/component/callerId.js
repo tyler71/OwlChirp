@@ -26,7 +26,7 @@ export function SetupCallerId() {
                 headers: await generateBaseHeader(),
                 body: JSON.stringify({
                     phone_number: this.callerId.dataset.phoneNumber,
-                    name: this.callerId.innerHTML,
+                    name: this.callerId.textContent,
                 })
             })
             if (!updateCallerId.ok) {
