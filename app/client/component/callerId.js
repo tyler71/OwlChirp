@@ -13,14 +13,14 @@ export function SetupCallerId() {
     this.callerId.addEventListener('click', (e) => {
         e.target.contentEditable = true;
         e.target.classList.add("inEdit");
-        this.oldNick = e.target.innerHTML;
+        this.oldNick = e.target.textContent;
     });
     // Click away from the field to save it
     this.callerId.addEventListener('blur', async (e) => {
         e.target.contentEditable = false;
         e.target.classList.remove("inEdit");
 
-        if (e.target.innerHTML !== this.oldNick) {
+        if (e.target.textContent !== this.oldNick) {
             let updateCallerId = await fetch(API + '/calls/callerid', {
                 method: "PUT",
                 headers: await generateBaseHeader(),
