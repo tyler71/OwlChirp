@@ -14,6 +14,7 @@ export function SetupCallerId() {
         e.target.contentEditable = true;
         e.target.classList.add("inEdit");
         this.oldNick = e.target.textContent;
+        navigator.clipboard.writeText(e.target.textContent)
     });
     // Click away from the field to save it
     this.callerId.addEventListener('blur', async (e) => {
