@@ -41,7 +41,7 @@ export async function incomingCallCallerId(phoneNumber) {
     let callerId = document.querySelector('#callerId');
     callerId.setAttribute('data-phone-number', phoneNumber);
 
-    let name = getCallerIdName(phoneNumber)
+    let name = await getCallerIdName(phoneNumber)
     callerId.textContent = name ? name : formatPhoneNumber(phoneNumber)
     callerId.setAttribute("title", formatPhoneNumber(phoneNumber))
 }
