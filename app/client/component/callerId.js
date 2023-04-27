@@ -40,15 +40,22 @@ export async function incomingCallCallerId(phoneNumber) {
     let callerId = document.querySelector('#callerId');
     callerId.setAttribute('data-phone-number', phoneNumber);
 
+    let name = getCallerIdName(phoneNumber)
+    callerId.textContent = name ? name : formatPhoneNumber(phoneNumber)
+    callerId.setAttribute("title", formatPhoneNumber(phoneNumber))
+}
+
+export async function getCallerIdName(phoneNumber) {
     let searchParams = new URLSearchParams({phone_number: phoneNumber});
     let res = await fetch(API + '/calls/callerid?' + searchParams, {
         headers: await generateBaseHeader(),
     });
+    let name = ''
     if (res.ok) {
         let data = await res.json();
-        callerId.innerHTML = data.name;
+        name = data.name;
     } else {
-        callerId.innerHTML = formatPhoneNumber(phoneNumber)
+        name = null
     }
-    callerId.setAttribute("title", formatPhoneNumber(phoneNumber))
+    return name
 }
