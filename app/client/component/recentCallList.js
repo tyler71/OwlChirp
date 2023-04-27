@@ -1,7 +1,8 @@
-import {API, CURSOR_HELP_CLASS, CONNECT_INSTANCE, TIME_ZONE, LOADING_CLASS} from "../const";
+import {API, CURSOR_HELP_CLASS, CONNECT_DOMAIN, TIME_ZONE, LOADING_CLASS} from "../const";
 import {generateBaseHeader} from "../authentication";
 import {formatPhoneNumber, formatSecondsToTime, spinnerToggle} from "../helper";
 import {phoneLog} from "../hook/init";
+import {getCallerIdName} from "./callerId";
 
 export async function updateAgentCallList() {
     let callListSection = document.querySelector('#recentCallList');
@@ -14,12 +15,12 @@ export async function updateAgentCallList() {
         }).format(new Date(call.timestamp))
         let c_username = call.agent.slice(0, (call.agent.indexOf('@')))
     }
-    let newSection = createRecentCallList(calls, "Recent Calls", 'recentCallList', 'click');
+    let newSection = await createRecentCallList(calls, "Recent Calls", 'recentCallList', 'click');
     spinnerToggle(callListSection, false);
     callListSection.parentNode.replaceChild(newSection, callListSection);
 }
 
-function createRecentCallList(array, title = "List", id = null, action = "click") {
+async function createRecentCallList(array, title = "List", id = null, action = "click") {
     const HEADER_EXPANDED = 'expanded';
     const PARENT_HIDE = 'collapsed';
     const CHILD_HIDE = 'hide';
@@ -102,7 +103,7 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
 
                     // Generate the structure for the contact id url
                     let contactIdLink = document.createElement('a')
-                    contactIdLink.href = `${CONNECT_INSTANCE}/contact-trace-records/details/${subTableJson["id"]}?tx=${TIME_ZONE}`;
+                    contactIdLink.href = `${CONNECT_DOMAIN}/contact-trace-records/details/${subTableJson["id"]}?tx=${TIME_ZONE}`;
                     contactIdLink.target = "_blank"
                     contactIdLink.textContent = subTableJson["id"].split("-")[0]
 
@@ -111,7 +112,11 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                         hour: 'numeric',
                         minute: 'numeric'
                     }).format(new Date(subTableJson["answered_timestamp"]))
+
+                    // This is the "extra" in the recent calls. Each of these are loaded when activating each
+                    // entry in the recent call log
                     let subTableData = {
+                        "CallerId": null,
                         "Name": {value: subTableJson["agent_name"]},
                         "Answered": {
                             value: c_time,
@@ -123,6 +128,13 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
                         },
                         "Id": {value: contactIdLink.outerHTML},
                     }
+                    let callerId = await getCallerIdName(row.dataset.phonenumber)
+                    if(callerId === null) {
+                        delete subTableData["CallerId"];
+                    } else {
+                        subTableData["CallerId"] = callerId
+                    }
+
                     for (let [key, value] of Object.entries(subTableData)) {
                         let subTableRow = document.createElement("tr")
                         let subTableKey = document.createElement('td');
@@ -165,6 +177,7 @@ function createRecentCallList(array, title = "List", id = null, action = "click"
         ts.innerHTML = c_time;
 
         tr.setAttribute('data-contactid', obj.contactId);
+        tr.setAttribute('data-phonenumber', obj.phoneNumber);
         tr.appendChild(ts);
         tr.appendChild(pn);
         tbody.appendChild(tr);
