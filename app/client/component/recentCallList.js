@@ -130,9 +130,9 @@ async function createRecentCallList(array, title = "List", id = null, action = "
                     }
                     let callerId = await getCallerIdName(row.dataset.phonenumber)
                     if(callerId === null) {
-                        delete subTableData["CallerId"];
+                        delete subTableData.CallerId;
                     } else {
-                        subTableData["CallerId"] = callerId
+                        subTableData["CallerId"] = {value: callerId}
                     }
 
                     for (let [key, value] of Object.entries(subTableData)) {
