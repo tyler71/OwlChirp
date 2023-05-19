@@ -23,7 +23,14 @@ let [statusDivA, statusDivB] = statusDiv.children;
 
 export let agentObj;
 
-document.querySelector('#alertSection').innerHTML = `Thanks for using my program! -Tyler<br><small>If OwlChirp isn't loading, try logging in<small></small><br><a href='${CONNECT_DOMAIN}/login' target="_blank"><button type="button" class="btn btn-primary m-4">Login</button>`
+// Initial loading screen for OwlChirp. We want to
+// display a message, provide a login button, provide a refresh button.
+let welcomeString = `Thanks for using my program! -Tyler<br>
+    <small>If OwlChirp isn't loading, login and refresh</small><br>
+    <a href='${CONNECT_DOMAIN}/login' target="_blank"><button type="button" class="btn btn-primary mt-3">Login</button></a><br>
+    <button type="button" id="reloadButton" class="btn btn-primary mt-2">Reload</button>`
+document.querySelector('#alertSection').innerHTML = welcomeString;
+document.querySelector('#reloadButton').addEventListener('click', () => {window.location.reload()})
 
 
 // Starts the CCP instance.
