@@ -42,6 +42,11 @@ async def ping():
 
 @app.route('/ccp')
 async def ccp():
+    """
+    Get all core js / css files. This is done dynamically as webpack can change the files.
+    For each file, we get the filename and hash value. This is then fed into the template
+    for listing the asset files securely.
+    """
     core_js_files = list()
     core_css_files = list()
     dir_path = os.path.dirname(os.path.realpath(__file__))
