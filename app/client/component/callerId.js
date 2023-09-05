@@ -21,7 +21,7 @@ export function SetupCallerId() {
         e.target.contentEditable = false;
         e.target.classList.remove("inEdit");
 
-        if (e.target.textContent !== this.oldNick) {
+        if (e.target.textContent !== this.oldNick && e.target.textContent.length > 0) {
             let updateCallerId = await fetch(API + '/calls/callerid', {
                 method: "PUT",
                 headers: await generateBaseHeader(),
@@ -33,6 +33,8 @@ export function SetupCallerId() {
             if (!updateCallerId.ok) {
                 console.error("Failed to update caller Id, network error")
             }
+        } else {
+            e.target.textContent = this.oldNick
         }
     })
 }
