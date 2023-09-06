@@ -48,7 +48,7 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ steps.v.outputs.reponame }}
-          CONNECT_INSTANCE: ${{ secrets.CONNECT_INSTANCE }}
+          CONNECT_INSTANCE: ${{ vars.CONNECT_INSTANCE }}
           CONNECT_DOMAIN: ${{ vars.CONNECT_DOMAIN }}
           TIME_ZONE: ${{ vars.TIME_ZONE }}
           TELEMETRY_URL: ${{ vars.TELEMETRY_URL }}
@@ -73,16 +73,16 @@ jobs:
         env:
           IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ steps.v.outputs.reponame }}:${{ steps.v.outputs.date }}
           AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
-          CONNECT_INSTANCE: ${{ secrets.CONNECT_INSTANCE }}
+          CONNECT_INSTANCE: ${{ vars.CONNECT_INSTANCE }}
           DB_STRING: ${{ vars.DB_STRING }}
           HOST: ${{ vars.HOST }}
           REGION: ${{ vars.AWS_DEFAULT_REGION }}
           ECR_REPOSITORY: ${{ steps.login-ecr.outputs.registry }}
-          DOCKER_HOST: ssh://${{ secrets.REMOTE_SERVER_USERNAME }}@${{ secrets.REMOTE_SERVER_HOSTNAME }}
+          DOCKER_HOST: ssh://${{ vars.REMOTE_SERVER_USERNAME }}@${{ vars.REMOTE_SERVER_HOSTNAME }}
           REPO_NAME: ${{ steps.v.outputs.reponame }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.REMOTE_SERVER_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo -n "${{ secrets.BASE64_REMOTE_SERVER_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 400 ~/.ssh/id_rsa
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
           docker stack deploy --with-registry-auth -c deploy/docker-compose.yml ${{ env.REPO_NAME }}
