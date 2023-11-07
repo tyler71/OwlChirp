@@ -1,9 +1,9 @@
-SQLAlchemy==1.4.46
-aiosqlite==0.18.0
-boto3==1.26.78
+SQLAlchemy==2.0.23
+aiosqlite==0.19.0
+boto3==1.28.79
 asyncache==0.3.1
-cachetools==5.3.0
-quart==0.18.3
-uvicorn==0.20.0
+cachetools==5.3.2
+quart==0.19.3
+uvicorn==0.24.0
 pytz==2022.7.1
-botocore==1.29.78
+botocore==1.31.79
