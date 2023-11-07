@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import pytz
 import boto3
 from botocore.exceptions import ClientError
 from cachetools import cached, TTLCache, LRUCache
@@ -224,7 +225,7 @@ class ConnectMetrics:
 
     def handled_incoming(self, date=None) -> int:
         if date is None:
-            date = datetime.now().replace(hour=5, minute=0, second=0, microsecond=0)
+            date = datetime.now(pytz.timezone('America/Los_Angeles')).replace(hour=5, minute=0, second=0, microsecond=0)
         data = self._refresh_hist_metric(date)
         for row in data:
             if row['Metric']['Name'] == 'CONTACTS_HANDLED_INCOMING':
