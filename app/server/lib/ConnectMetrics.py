@@ -89,6 +89,8 @@ class ConnectMetrics:
         else:
             raise ValueError("_refresh_hist_metric: Invalid start_time: must be datetime or int")
 
+        assert end_time_conv > start_time_conv, f'StartTime {start_time_conv} EndTime {end_time_conv}'
+
         metric_hist_data = self.client.get_metric_data(
             InstanceId=self.connect_instance,
             StartTime=start_time_conv.replace(microsecond=0, second=0),
