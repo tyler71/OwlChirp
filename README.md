@@ -1,3 +1,7 @@
+
+![CopyQ yuCRQR](https://github.com/user-attachments/assets/f6351a2f-1269-40e9-82be-9b980ae1d380)
+
+
 ### Libraries
 - [Amazon Stream Connect](https://github.com/amazon-connect/amazon-connect-streams/blob/master/Documentation.md#connectcore)
 - [Amazon Connect API](https://docs.aws.amazon.com/connect/latest/APIReference/Welcome.html)
