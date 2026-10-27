@@ -37,6 +37,13 @@ and fill it in. With docker compose, variables are read from `../.env` (next to
 | `TIME_ZONE` | `UTC` | [IANA time zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) used by the frontend for call times and metrics, e.g. `America/Los_Angeles`. |
 | `TELEMETRY_URL` | empty | Telemetry endpoint passed to the frontend. Empty disables telemetry. |
 
+### Browser requirements
+
+The CCP is an iframe from `CONNECT_DOMAIN`, so:
+
+- Every origin agents open OwlChirp from (e.g. `http://127.0.0.1:4321` in dev, the production URL) must be listed under the Connect instance's **Approved origins**.
+- Browsers that partition third-party cookies (Firefox Enhanced Tracking Protection, Safari, Chrome without third-party cookies) show a Connect "Allow access" banner in the phone panel on first load. Agents click it once and allow the browser prompt. Tracking protection doesn't need to be turned off.
+
 ### Not yet used
 
 `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` are reserved for web

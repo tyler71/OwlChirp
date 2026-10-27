@@ -57,6 +57,10 @@ export const $alert = atom<Alert>({ kind: 'welcome' });
 
 export const $wsStatus = atom<'connecting' | 'open' | 'closed'>('connecting');
 
+// Whether the CCP iframe can read its Connect cookies (blocked by Firefox ETP
+// and other third-party cookie partitioning until the agent allows access).
+export const $storageAccess = atom<'unknown' | 'needed' | 'granted' | 'denied'>('unknown');
+
 // ---- Persisted across reloads (localStorage) ----
 
 // Last time (ms epoch) a notification tag was shown, so reloading the CCP

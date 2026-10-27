@@ -15,11 +15,14 @@ export default function AlertSection() {
         <br />
         {config && (
           <>
-            <a href={`${config.connectDomain}/login`} target="_blank" rel="noreferrer">
-              <button type="button" className="btn btn-primary mt-3">
-                Login
-              </button>
-            </a>
+            {/* A popup (not noopener) lets Firefox grant the CCP frame storage access. */}
+            <button
+              type="button"
+              className="btn btn-primary mt-3"
+              onClick={() => window.open(`${config.connectDomain}/login`, 'connect-login', 'width=500,height=700')}
+            >
+              Login
+            </button>
             <br />
           </>
         )}

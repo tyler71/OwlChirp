@@ -20,7 +20,7 @@ import {
 import { agentSideline, formatPhoneNumber, telemetry } from './helpers';
 import { authorize, notify, snooze } from './notifier';
 import { startRealtime } from './realtime';
-import { $agent, $alert, $config, $metrics, type AppConfig } from './stores';
+import { $agent, $alert, $config, $metrics, $storageAccess, type AppConfig } from './stores';
 
 export async function loadConfig(): Promise<AppConfig> {
   const existing = $config.get();
@@ -45,8 +45,12 @@ export async function initCcp(container: HTMLElement): Promise<void> {
 
   connect.core.initCCP(container, {
     ccpUrl: `${config.connectDomain}/connect/ccp-v2`,
-    loginPopup: false,
-    loginPopupAutoClose: false,
+    // A popup opened from this page keeps window.opener, which lets Firefox
+    // grant the CCP frame storage access once the agent signs in.
+    loginPopup: true,
+    loginPopupAutoClose: true,
+    loginUrl: `${config.connectDomain}/login`,
+    loginOptions: { autoClose: true },
     softphone: {
       allowFramedSoftphone: true,
       disableRingtone: false,
@@ -60,6 +64,15 @@ export async function initCcp(container: HTMLElement): Promise<void> {
     storageAccess: {
       canRequest: true,
       mode: 'default',
+    },
+  });
+
+  connect.storageAccess.onRequest({
+    onInit: ({ data }) => $storageAccess.set(data.hasAccess ? 'granted' : 'needed'),
+    onGrant: () => $storageAccess.set('granted'),
+    onDeny: () => {
+      $storageAccess.set('denied');
+      $alert.set({ kind: 'warning', message: 'Allow cookie access for Amazon Connect, then reload.' });
     },
   });
 
