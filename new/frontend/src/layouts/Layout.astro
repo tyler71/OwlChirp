@@ -1,0 +1,23 @@
+---
+import 'bootstrap/dist/css/bootstrap.css';
+import '../styles/ccp.css';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'OwlChirp' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" href="/favicon.ico" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

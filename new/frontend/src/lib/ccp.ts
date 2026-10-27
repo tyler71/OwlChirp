@@ -1,0 +1,157 @@
+// Wires the Amazon Connect CCP to OwlChirp: agent/contact hooks, periodic
+// state checks, and notifications driven by realtime metrics.
+// https://github.com/amazon-connect/amazon-connect-streams/blob/master/Documentation.md
+import 'amazon-connect-streams';
+
+import { addCall, refreshCalls } from './callHistory';
+import { loadCallerId } from './callerId';
+import {
+  API,
+  BREAK_STATUSES,
+  HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL,
+  LONG_BREAK_NOTIFICATION_INTERVAL,
+  LONG_BREAK_SNOOZE_MINUTES,
+  MAX_QUEUE_COUNT,
+  MIN_AGENT_STAFFED,
+  SIDELINE_NOTIFICATION_INTERVAL,
+  STATE_CHECK_INTERVAL_MS,
+  STATUS_ON_CONTACT,
+} from './const';
+import { agentSideline, formatPhoneNumber, telemetry } from './helpers';
+import { authorize, notify, snooze } from './notifier';
+import { startRealtime } from './realtime';
+import { $agent, $alert, $config, $metrics, type AppConfig } from './stores';
+
+export async function loadConfig(): Promise<AppConfig> {
+  const existing = $config.get();
+  if (existing) return existing;
+
+  const res = await fetch(`${API}/config`);
+  if (!res.ok) throw new Error(`Failed to load config: ${res.status}`);
+  const config: AppConfig = await res.json();
+  $config.set(config);
+  return config;
+}
+
+let initialised = false;
+
+export async function initCcp(container: HTMLElement): Promise<void> {
+  if (initialised) return;
+  initialised = true;
+
+  const config = await loadConfig();
+
+  authorize();
+
+  connect.core.initCCP(container, {
+    ccpUrl: `${config.connectDomain}/connect/ccp-v2`,
+    loginPopup: false,
+    loginPopupAutoClose: false,
+    softphone: {
+      allowFramedSoftphone: true,
+      disableRingtone: false,
+    },
+    pageOptions: {
+      enableAudioDeviceSettings: false,
+      enablePhoneTypeSettings: true,
+    },
+    // Firefox ETP / third-party cookie blocking partitions the CCP iframe's
+    // session; prompt the agent to grant storage access via Connect's banner.
+    storageAccess: {
+      canRequest: true,
+      mode: 'default',
+    },
+  });
+
+  connect.agent((agent) => {
+    onAgent(agent).catch((e) => console.error('agent init', e));
+  });
+
+  connect.contact((contact) => {
+    contact.onConnecting((c) => {
+      onIncomingCall(c).catch((e) => console.error('incoming call', e));
+    });
+    contact.onConnected(() => {
+      console.log('Call has been connected', contact);
+    });
+  });
+}
+
+async function onAgent(agent: connect.Agent): Promise<void> {
+  $agent.set(agent);
+  $alert.set({ kind: 'none' });
+
+  await refreshCalls();
+
+  setInterval(() => checkStateDuration(agent), STATE_CHECK_INTERVAL_MS);
+
+  $metrics.listen((metrics, _old, changedKey) => {
+    if (changedKey === 'queue_count') notifyQueueCount(metrics.queue_count ?? 0);
+    if (changedKey === 'active_agent_count') notifyAgentCount(metrics.active_agent_count ?? 0);
+  });
+
+  void startRealtime();
+}
+
+async function onIncomingCall(contact: connect.Contact): Promise<void> {
+  const phoneNumber = contact.getActiveInitialConnection()?.getEndpoint().phoneNumber ?? '';
+  const contactId = contact.getContactId();
+
+  notify(`Incoming Call from ${formatPhoneNumber(phoneNumber)}`, 'Incoming Call', 'incomingCall');
+
+  await loadCallerId(phoneNumber);
+  await addCall(contactId, phoneNumber);
+
+  const agent = $agent.get();
+  if (agent) void telemetry(agent);
+}
+
+// Remind agents who have been in a break-like status too long.
+function checkStateDuration(agent: connect.Agent): void {
+  const stateName = agent.getState().name.toLowerCase();
+  const maxMinutes = BREAK_STATUSES[stateName];
+  if (maxMinutes === undefined) return;
+
+  const minutes = Math.floor(agent.getStateDuration() / 1000 / 60);
+  if (minutes <= maxMinutes) return;
+
+  const tag = 'Long Break';
+  notify(
+    `Hi ${agent.getName()}! Letting you know you've been on ${stateName} for ${minutes} minutes`,
+    stateName,
+    tag,
+    LONG_BREAK_NOTIFICATION_INTERVAL,
+    [
+      {
+        name: 'click',
+        handler: () => snooze(tag, Date.now() + LONG_BREAK_SNOOZE_MINUTES * 60 * 1000),
+      },
+    ],
+  );
+}
+
+function notifyQueueCount(value: number): void {
+  if (value <= MAX_QUEUE_COUNT) return;
+
+  if (agentSideline()) {
+    notify(`Queue Count is ${value}!\nCan you help?`, 'Callers Waiting', 'queueCount', HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL);
+  } else if ($agent.get()?.getState().name.toLowerCase() === STATUS_ON_CONTACT) {
+    notify(
+      `Queue Count is ${value}\nWe're asking for help!`,
+      'Support Requested',
+      'supportRequest',
+      HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL,
+    );
+  }
+}
+
+function notifyAgentCount(activeAgentCount: number): void {
+  if (activeAgentCount < MIN_AGENT_STAFFED && agentSideline()) {
+    notify(
+      `There are currently ${activeAgentCount} available agents`,
+      'Available Agents',
+      'availableAgents',
+      SIDELINE_NOTIFICATION_INTERVAL,
+    );
+  }
+}

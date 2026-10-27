@@ -1,0 +1,61 @@
+set dotenv-load
+
+backend_port := env("APP_PORT", "4444")
+image_name := "owlchirp"
+
+default:
+    @just --list
+
+# Install frontend dependencies
+install:
+    cd frontend && pnpm install
+
+# Run backend (live reload, :4444) and frontend (astro dev, :4321) together
+dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill 0' EXIT
+    just dev-backend &
+    just dev-frontend &
+    wait -n
+
+# Go backend with live reload on file changes
+dev-backend:
+    cd backend && DEV_MODE=true DB_STRING=./_data/owlchirp.sqlite3 go run github.com/air-verse/air@latest \
+        --build.cmd "go build -o ./tmp/owlchirp ./app/cmd/api" --build.bin "./tmp/owlchirp" \
+        --build.delay "100" \
+        --build.include_ext "go,sql" \
+        --build.exclude_dir "app/assets/web,tmp,build,_data" \
+        --misc.clean_on_exit "true"
+
+# Astro dev server; proxies /api (including the WebSocket) to the backend
+dev-frontend:
+    cd frontend && BACKEND_URL=http://127.0.0.1:{{ backend_port }} pnpm dev
+
+# Build the static Astro site into frontend/dist
+[working-directory: 'frontend']
+build-frontend:
+    pnpm build
+
+# Copy the Astro build into the Go embed directory
+embed: build-frontend
+    find backend/app/assets/web -mindepth 1 ! -name .gitkeep -delete
+    cp -r frontend/dist/. backend/app/assets/web/
+
+# Build the single binary (frontend embedded) into backend/build/
+build os_arch="linux/amd64": embed
+    cd backend && NO_COMPRESS=1 VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo dev)" ./build.sh {{ os_arch }}
+
+# Build and run the embedded binary
+run: build
+    "$(ls -t backend/build/owlchirp-linux-amd64* | head -1)"
+
+# Backend tests and frontend type checks
+test:
+    cd backend && go test -race ./...
+    cd frontend && pnpm astro check
+
+# Build the Docker image (frontend + backend)
+docker:
+    docker build --progress plain --build-arg VERSION="$(git -C backend rev-parse --short HEAD 2>/dev/null || echo dev)" \
+        -t {{ image_name }} -f backend/Dockerfile .

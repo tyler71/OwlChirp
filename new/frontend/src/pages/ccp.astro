@@ -1,0 +1,17 @@
+---
+import AlertSection from '../components/AlertSection';
+import Ccp from '../components/Ccp';
+import DataPanel from '../components/DataPanel';
+import StatusBar from '../components/StatusBar';
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout>
+  <main id="content">
+    <StatusBar client:only="react" />
+    <AlertSection client:only="react" />
+    <Ccp client:only="react" />
+    <div id="action"></div>
+    <DataPanel client:only="react" />
+  </main>
+</Layout>

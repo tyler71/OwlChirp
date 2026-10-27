@@ -1,0 +1,4 @@
+_data/
+build/
+tmp/
+.env

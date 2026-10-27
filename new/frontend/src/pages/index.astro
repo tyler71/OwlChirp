@@ -1,0 +1,21 @@
+---
+// Opens the CCP in a compact popup window and closes this tab.
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" href="/favicon.ico" />
+    <title>OwlChirp</title>
+  </head>
+  <body>
+    <p>Opening OwlChirp&hellip; If nothing happens, allow popups or <a href="/ccp">open it here</a>.</p>
+    <script>
+      const options = ['width=350', 'height=640', 'scrollbars=no', 'location=no', 'status=no', 'toolbar=no'];
+      const popup = window.open('/ccp', 'owlchirp', options.join(','));
+      if (popup) window.close();
+    </script>
+  </body>
+</html>

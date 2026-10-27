@@ -1,0 +1,47 @@
+# Go-only tasks. Frontend/dev/build recipes live in ../justfile.
+set dotenv-load
+
+default:
+    @just --list
+
+## audit: run quality control checks
+audit:
+    go mod tidy -diff
+    go mod verify
+    test -z "$(gofmt -l .)"
+    go vet ./...
+    go run honnef.co/go/tools/cmd/staticcheck@latest -checks=all,-ST1000,-U1000 ./...
+    go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+## test: run all tests
+test:
+    go test -v -race -buildvcs ./...
+
+## test-cover: run all tests and display coverage
+test-cover:
+    go test -v -race -buildvcs -coverprofile=/tmp/coverage.out ./...
+    go tool cover -html=/tmp/coverage.out
+
+## tidy: tidy modfiles and format .go files
+tidy:
+    go mod tidy -v
+    go fix ./...
+    go fmt ./...
+
+## upgradeable: list direct dependencies that have upgrades available
+upgradeable:
+    go run github.com/oligot/go-mod-upgrade@latest
+
+profile-cpu new-sample:
+    #!/usr/bin/env bash
+    if [ "{{new-sample}}" == "true" ]; then
+        curl "http://127.0.0.1:${APP_PORT:-4444}/debug/pprof/profile?seconds=30" > profiles/cpu.pprof
+    fi
+    go tool pprof -no_browser -http=:8085 profiles/cpu.pprof
+
+profile-heap new-sample:
+    #!/usr/bin/env bash
+    if [ "{{new-sample}}" == "true" ]; then
+        curl "http://127.0.0.1:${APP_PORT:-4444}/debug/pprof/heap?seconds=30" > profiles/heap.pprof
+    fi
+    go tool pprof -no_browser -http=:8085 profiles/heap.pprof

@@ -1,0 +1,13 @@
+.env
+
+_data/
+build/
+tmp/
+build-errors.log
+
+.serena/
+.vscode/
+
+# Astro build output copied in by `just embed`
+app/assets/web/*
+!app/assets/web/.gitkeep
