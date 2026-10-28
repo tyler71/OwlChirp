@@ -75,9 +75,16 @@ export const $callerId = atom<CallerId | null>(null);
 // Past wrap-ups for the number of the current (or last) contact.
 export const $wrapups = atom<WrapupFeed | null>(null);
 
+// Which main view the sidebar has selected.
+export const $view = atom<'phone' | 'settings'>('phone');
+
 export const $alert = atom<Alert>({ kind: 'welcome' });
 
 export const $wsStatus = atom<'connecting' | 'open' | 'closed'>('connecting');
+
+// The owlchirp feature flag for this agent, sent by the server after socket
+// auth. null until the first connection reports it.
+export const $owlchirpEnabled = atom<boolean | null>(null);
 
 // Whether the CCP iframe can read its Connect cookies (blocked by Firefox ETP
 // and other third-party cookie partitioning until the agent allows access).

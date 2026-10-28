@@ -1,31 +1,49 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: all;
+}
 
-/* Tailkit components use primary/secondary scales. */
-@theme {
-  --color-primary-50: var(--color-blue-50);
-  --color-primary-100: var(--color-blue-100);
-  --color-primary-200: var(--color-blue-200);
-  --color-primary-300: var(--color-blue-300);
-  --color-primary-400: var(--color-blue-400);
-  --color-primary-500: var(--color-blue-500);
-  --color-primary-600: var(--color-blue-600);
-  --color-primary-700: var(--color-blue-700);
-  --color-primary-800: var(--color-blue-800);
-  --color-primary-900: var(--color-blue-900);
-  --color-primary-950: var(--color-blue-950);
+/* `dark:` follows the active daisyUI theme's scheme (set by lib/theme.ts),
+   not the OS preference. */
+@custom-variant dark (&:where([data-scheme=dark], [data-scheme=dark] *));
 
-  --color-secondary-50: var(--color-zinc-50);
-  --color-secondary-100: var(--color-zinc-100);
-  --color-secondary-200: var(--color-zinc-200);
-  --color-secondary-300: var(--color-zinc-300);
-  --color-secondary-400: var(--color-zinc-400);
-  --color-secondary-500: var(--color-zinc-500);
-  --color-secondary-600: var(--color-zinc-600);
-  --color-secondary-700: var(--color-zinc-700);
-  --color-secondary-800: var(--color-zinc-800);
-  --color-secondary-900: var(--color-zinc-900);
-  --color-secondary-950: var(--color-zinc-950);
+/* Tailkit components use primary/secondary scales; derive them from the
+   active daisyUI theme. The secondary (neutral) scale runs light -> dark, so
+   its ends swap in dark themes to keep `dark:` pairs like
+   `bg-secondary-100 dark:bg-secondary-950` reading correctly. */
+:root {
+  --sc-light: var(--color-base-100);
+  --sc-dark: var(--color-base-content);
+}
+[data-scheme="dark"] {
+  --sc-light: var(--color-base-content);
+  --sc-dark: var(--color-base-100);
+}
+
+@theme inline {
+  --color-primary-50: color-mix(in oklab, var(--color-primary) 8%, white);
+  --color-primary-100: color-mix(in oklab, var(--color-primary) 16%, white);
+  --color-primary-200: color-mix(in oklab, var(--color-primary) 30%, white);
+  --color-primary-300: color-mix(in oklab, var(--color-primary) 50%, white);
+  --color-primary-400: color-mix(in oklab, var(--color-primary) 75%, white);
+  --color-primary-500: var(--color-primary);
+  --color-primary-600: color-mix(in oklab, var(--color-primary) 85%, black);
+  --color-primary-700: color-mix(in oklab, var(--color-primary) 72%, black);
+  --color-primary-800: color-mix(in oklab, var(--color-primary) 58%, black);
+  --color-primary-900: color-mix(in oklab, var(--color-primary) 45%, black);
+  --color-primary-950: color-mix(in oklab, var(--color-primary) 30%, black);
+
+  --color-secondary-50: color-mix(in oklab, var(--sc-dark) 3%, var(--sc-light));
+  --color-secondary-100: color-mix(in oklab, var(--sc-dark) 7%, var(--sc-light));
+  --color-secondary-200: color-mix(in oklab, var(--sc-dark) 14%, var(--sc-light));
+  --color-secondary-300: color-mix(in oklab, var(--sc-dark) 24%, var(--sc-light));
+  --color-secondary-400: color-mix(in oklab, var(--sc-dark) 42%, var(--sc-light));
+  --color-secondary-500: color-mix(in oklab, var(--sc-dark) 55%, var(--sc-light));
+  --color-secondary-600: color-mix(in oklab, var(--sc-dark) 68%, var(--sc-light));
+  --color-secondary-700: color-mix(in oklab, var(--sc-dark) 78%, var(--sc-light));
+  --color-secondary-800: color-mix(in oklab, var(--sc-dark) 86%, var(--sc-light));
+  --color-secondary-900: color-mix(in oklab, var(--sc-dark) 92%, var(--sc-light));
+  --color-secondary-950: color-mix(in oklab, var(--sc-dark) 96%, var(--sc-light));
 }
 
 @layer base {

@@ -25,7 +25,17 @@ func (f fakeUsers) RegisteredUsers(context.Context) ([]connect.RegisteredUser, e
 	return f, nil
 }
 
-var testAgent = connect.RegisteredUser{ID: "agent-1", Username: "agent@example.com"}
+// fakeFlags turns owlchirp on for the usernames it holds.
+type fakeFlags map[string]bool
+
+func (f fakeFlags) Owlchirp(_ context.Context, username string) bool {
+	return f[username]
+}
+
+var (
+	testAgent    = connect.RegisteredUser{ID: "agent-1", Username: "agent@example.com"}
+	disabledUser = connect.RegisteredUser{ID: "agent-2", Username: "disabled@example.com"}
+)
 
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -39,8 +49,9 @@ func newTestServer(t *testing.T) *httptest.Server {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	app := &application{
 		db:     db,
-		auth:   auth.NewVerifier(fakeUsers{testAgent}),
+		auth:   auth.NewVerifier(fakeUsers{testAgent, disabledUser}),
 		hub:    realtime.NewHub(nil, time.Hour, logger),
+		flags:  fakeFlags{testAgent.Username: true},
 		logger: logger,
 	}
 	app.handlers = app.wsHandlers()
@@ -75,8 +86,12 @@ func dial(t *testing.T, srv *httptest.Server, token string) *testClient {
 }
 
 func validToken() string {
+	return tokenFor(testAgent)
+}
+
+func tokenFor(u connect.RegisteredUser) string {
 	hour := time.Now().UTC().Truncate(time.Hour).Unix()
-	return auth.Token(hour, testAgent.ID, testAgent.Username)
+	return auth.Token(hour, u.ID, u.Username)
 }
 
 func (c *testClient) send(v any) {
@@ -143,6 +158,31 @@ func TestSocketRejectsBadToken(t *testing.T) {
 
 	_, _, err := c.conn.Read(context.Background())
 	assert.Equal(t, websocket.CloseStatus(err), wsStatusUnauthorized)
+}
+
+func TestSocketFlags(t *testing.T) {
+	srv := newTestServer(t)
+
+	t.Run("enabled", func(t *testing.T) {
+		c := dial(t, srv, validToken())
+		msg := c.readUntil(func(testMessage) bool { return true })
+		assert.Equal(t, msg.Type, "flags")
+		assert.Equal(t, string(msg.Data), `{"owlchirp":true}`)
+
+		reply := c.call("calls.agent", map[string]any{})
+		assert.NotEqual(t, reply.Error, "owlchirp is not enabled for this user")
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		c := dial(t, srv, tokenFor(disabledUser))
+		msg := c.readUntil(func(testMessage) bool { return true })
+		assert.Equal(t, msg.Type, "flags")
+		assert.Equal(t, string(msg.Data), `{"owlchirp":false}`)
+
+		reply := c.call("calls.agent", map[string]any{})
+		assert.Equal(t, reply.Type, "error")
+		assert.Equal(t, reply.Error, "owlchirp is not enabled for this user")
+	})
 }
 
 func TestSocketWrapups(t *testing.T) {

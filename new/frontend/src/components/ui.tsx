@@ -35,6 +35,7 @@ const ICONS = {
     'M17 4.25A2.25 2.25 0 0 0 14.75 2h-5.5A2.25 2.25 0 0 0 7 4.25v2a.75.75 0 0 0 1.5 0v-2a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 .75.75v11.5a.75.75 0 0 1-.75.75h-5.5a.75.75 0 0 1-.75-.75v-2a.75.75 0 0 0-1.5 0v2A2.25 2.25 0 0 0 9.25 18h5.5A2.25 2.25 0 0 0 17 15.75V4.25ZM14 10a.75.75 0 0 0-.75-.75H3.704l1.048-.943a.75.75 0 1 0-1.004-1.114l-2.5 2.25a.75.75 0 0 0 0 1.114l2.5 2.25a.75.75 0 1 0 1.004-1.114l-1.048-.943h9.546A.75.75 0 0 0 14 10Z',
   exclamation:
     'M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z',
+  cog: 'M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
 } as const;
 
 export type IconName = keyof typeof ICONS | 'keypad' | 'microphoneSlash';
@@ -64,11 +65,11 @@ export function Icon({ name, className = 'size-5' }: { name: IconName; className
 
 const BUTTON_VARIANTS = {
   default:
-    'border-secondary-200 bg-white text-secondary-800 hover:border-secondary-300 hover:text-secondary-900 hover:shadow-xs active:border-secondary-200 active:shadow-none dark:border-secondary-700 dark:bg-secondary-800 dark:text-secondary-300 dark:hover:border-secondary-600 dark:hover:text-secondary-200 dark:active:border-secondary-700',
+    'border-secondary-200 bg-base-100 text-secondary-800 hover:border-secondary-300 hover:text-secondary-900 hover:shadow-xs active:border-secondary-200 active:shadow-none dark:border-secondary-700 dark:bg-secondary-800 dark:text-secondary-300 dark:hover:border-secondary-600 dark:hover:text-secondary-200 dark:active:border-secondary-700',
   active:
     'border-primary-200 bg-primary-50 text-primary-800 hover:border-primary-300 dark:border-primary-700/60 dark:bg-primary-500/15 dark:text-primary-200',
   primary:
-    'border-primary-700 bg-primary-700 text-white hover:border-primary-600 hover:bg-primary-600 active:border-primary-700 active:bg-primary-700 dark:border-primary-600 dark:bg-primary-600 dark:hover:border-primary-500 dark:hover:bg-primary-500',
+    'border-primary-500 bg-primary-500 text-primary-content hover:border-primary-600 hover:bg-primary-600 active:border-primary-700 active:bg-primary-700',
   success:
     'border-emerald-700 bg-emerald-600 text-white hover:border-emerald-600 hover:bg-emerald-500 active:bg-emerald-600',
   danger: 'border-rose-700 bg-rose-600 text-white hover:border-rose-600 hover:bg-rose-500 active:bg-rose-600',
@@ -102,7 +103,7 @@ export function Button({ variant = 'default', size = 'md', icon, className = '',
 export function Card({ title, actions, children, className = '' }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section
-      className={`flex flex-col overflow-hidden rounded-lg border border-secondary-200 bg-white dark:border-secondary-800 dark:bg-secondary-900 ${className}`}
+      className={`flex flex-col overflow-hidden rounded-lg border border-secondary-200 bg-base-100 dark:border-secondary-800 dark:bg-secondary-900 ${className}`}
     >
       {(title || actions) && (
         <div className="flex items-center justify-between gap-2 border-b border-secondary-100 px-4 py-3 dark:border-secondary-800">

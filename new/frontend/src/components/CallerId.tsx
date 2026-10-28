@@ -5,7 +5,7 @@ import { saveCallerId } from '../lib/callerId';
 import { formatPhoneNumber } from '../lib/helpers';
 import { $callerId } from '../lib/stores';
 
-const EDITING_CLASSES = ['ring-2', 'ring-primary-500', 'bg-white', 'dark:bg-secondary-800'];
+const EDITING_CLASSES = ['ring-2', 'ring-primary-500', 'bg-base-100', 'dark:bg-secondary-800'];
 
 // Click to rename the current caller; blur saves it.
 export default function CallerId() {
@@ -59,7 +59,7 @@ export default function CallerId() {
     <div className="min-w-0 flex-none basis-48">
       <div
         ref={ref}
-        className="cursor-text truncate rounded-md px-2 py-1 text-sm font-semibold outline-none empty:before:font-normal empty:before:text-secondary-400 empty:before:content-['No_caller'] hover:bg-white dark:hover:bg-secondary-800"
+        className="cursor-text truncate rounded-md px-2 py-1 text-sm font-semibold outline-none empty:before:font-normal empty:before:text-secondary-400 empty:before:content-['No_caller'] hover:bg-base-100 dark:hover:bg-secondary-800"
         contentEditable={false}
         suppressContentEditableWarning
         spellCheck={false}

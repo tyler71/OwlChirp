@@ -42,7 +42,11 @@ func (app *application) wsHandlers() map[string]wsHandler {
 	}
 }
 
-func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, req wsRequest) wsReply {
+func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, enabled bool, req wsRequest) wsReply {
+	if !enabled {
+		return wsReply{ID: req.ID, Type: "error", Error: "owlchirp is not enabled for this user"}
+	}
+
 	handler, ok := app.handlers[req.Type]
 	if !ok {
 		return wsReply{ID: req.ID, Type: "error", Error: fmt.Sprintf("unknown request type %q", req.Type)}

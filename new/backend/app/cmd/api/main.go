@@ -17,6 +17,7 @@ import (
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
 	"github.com/tyler71/owlchirp/app/internal/env"
+	"github.com/tyler71/owlchirp/app/internal/flags"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
 	"github.com/tyler71/owlchirp/app/internal/version"
 
@@ -59,6 +60,14 @@ type config struct {
 		timeZone     string
 		telemetryURL string
 	}
+	flags struct {
+		endpoint string
+		apiKey   string
+	}
+}
+
+type flagEvaluator interface {
+	Owlchirp(ctx context.Context, username string) bool
 }
 
 type application struct {
@@ -67,6 +76,7 @@ type application struct {
 	connect  *connect.Client
 	auth     *auth.Verifier
 	hub      *realtime.Hub
+	flags    flagEvaluator
 	handlers map[string]wsHandler
 	logger   *slog.Logger
 	wg       sync.WaitGroup
@@ -88,6 +98,9 @@ func run(logger *slog.Logger) error {
 
 	cfg.frontend.timeZone = env.GetString("TIME_ZONE", "UTC")
 	cfg.frontend.telemetryURL = env.GetString("TELEMETRY_URL", "")
+
+	cfg.flags.endpoint = env.GetString("GOFF_ENDPOINT", "https://flag.sandcatdev.com")
+	cfg.flags.apiKey = env.GetString("GOFF_API_KEY", "")
 
 	showVersion := flag.Bool("version", false, "display version and exit")
 	flag.Parse()
@@ -113,12 +126,22 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("connect client: %w", err)
 	}
 
+	if cfg.flags.endpoint == "" {
+		logger.Warn("GOFF_ENDPOINT is empty; feature flags disabled, owlchirp is off for everyone")
+	}
+	ff, err := flags.New(cfg.flags.endpoint, cfg.flags.apiKey, logger)
+	if err != nil {
+		return fmt.Errorf("feature flags: %w", err)
+	}
+	defer ff.Close()
+
 	app := &application{
 		config:  cfg,
 		db:      db,
 		connect: cc,
 		auth:    auth.NewVerifier(cc),
 		hub:     realtime.NewHub(cc.Snapshot, time.Second, logger),
+		flags:   ff,
 		logger:  logger,
 	}
 

@@ -95,7 +95,7 @@ export default function DialPad() {
         {/*      type="button"*/}
         {/*      disabled={busy}*/}
         {/*      onClick={() => press(key)}*/}
-        {/*      className="flex flex-col items-center justify-center rounded-lg border border-secondary-200 bg-white py-2.5 transition hover:border-secondary-300 hover:bg-secondary-50 active:bg-secondary-100 disabled:opacity-50 dark:border-secondary-700 dark:bg-secondary-800 dark:hover:border-secondary-600 dark:hover:bg-secondary-700/60"*/}
+        {/*      className="flex flex-col items-center justify-center rounded-lg border border-secondary-200 bg-base-100 py-2.5 transition hover:border-secondary-300 hover:bg-secondary-50 active:bg-secondary-100 disabled:opacity-50 dark:border-secondary-700 dark:bg-secondary-800 dark:hover:border-secondary-600 dark:hover:bg-secondary-700/60"*/}
         {/*    >*/}
         {/*      <span className="text-lg leading-6 font-semibold">{key}</span>*/}
         {/*      <span className="h-3.5 text-[10px] leading-3.5 font-medium tracking-widest text-secondary-400">{letters}</span>*/}

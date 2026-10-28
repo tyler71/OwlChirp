@@ -36,7 +36,7 @@ export default function TabbedFunctions() {
                 }}
             >
                 {/* Nav Tabs */}
-                <TabList className="flex items-center border-b border-gray-200/75 text-sm">
+                <TabList className="flex items-center border-b border-secondary-200/75 text-sm">
                 {
                     tabs.map(t => (
                         <Tab as={Fragment}>
@@ -46,7 +46,7 @@ export default function TabbedFunctions() {
                                     className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-3 font-medium md:px-5 ${
                                         selected && !collapsed
                                             ? "border-primary-500 text-primary-600"
-                                            : "border-transparent text-gray-600 hover:border-gray-200 hover:text-primary-500"
+                                            : "border-transparent text-secondary-600 hover:border-secondary-200 hover:text-primary-500"
                                     }`}
                                     onClick={() => selected && setCollapsed(c => !c)}
                                 >

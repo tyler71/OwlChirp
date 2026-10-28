@@ -15,6 +15,17 @@ const { title = 'OwlChirp' } = Astro.props;
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" href="/favicon.ico" />
     <title>{title}</title>
+    <script is:inline>
+      // Apply the saved theme before first paint; lib/theme.ts takes over once loaded.
+      (() => {
+        const dark = ['abyss', 'aqua', 'black', 'business', 'coffee', 'dark', 'dim', 'dracula', 'forest', 'halloween', 'luxury', 'night', 'sunset', 'synthwave'];
+        let name = 'system';
+        try { name = localStorage.getItem('owlchirp:theme') || 'system'; } catch {}
+        if (name === 'system') name = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = name;
+        document.documentElement.dataset.scheme = dark.includes(name) ? 'dark' : 'light';
+      })();
+    </script>
   </head>
   <body>
     <slot />

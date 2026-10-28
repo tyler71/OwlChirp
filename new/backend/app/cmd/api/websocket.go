@@ -8,6 +8,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/tyler71/owlchirp/app/internal/connect"
+	"github.com/tyler71/owlchirp/app/internal/flags"
+	"github.com/tyler71/owlchirp/app/internal/realtime"
 )
 
 const (
@@ -47,8 +49,10 @@ type wsReply struct {
 // Browsers can't set headers on a WebSocket, so the first message must be
 // {"type":"auth","token":"<X-Api-Key>"}. After that:
 //   - the server pushes events as {"type":"<event>","data":...}
-//     ("metrics", "call.logged", "callerid.updated", "wrapup.saved")
-//   - the client sends wsRequest calls, answered with a wsReply.
+//     ("flags", "metrics", "call.logged", "callerid.updated", "wrapup.saved");
+//     "flags" is always the first, sent once per connection
+//   - the client sends wsRequest calls, answered with a wsReply. Users
+//     without the owlchirp flag get an error for every request.
 func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	// The connection outlives the server's Read/WriteTimeout.
 	rc := http.NewResponseController(w)
@@ -72,13 +76,24 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(wsReadLimit)
 
+	// Evaluated once per connection; the client reconnects to pick up changes.
+	enabled := app.flags.Owlchirp(ctx, user.Username)
+	msg, err := realtime.Message("flags", map[string]bool{flags.OwlchirpKey: enabled})
+	if err != nil {
+		app.logger.Error("websocket encode flags", "error", err)
+		return
+	}
+	if err := wsWrite(ctx, conn, msg); err != nil {
+		return
+	}
+
 	client := app.hub.Subscribe()
 	defer app.hub.Unsubscribe(client)
 
 	// coder/websocket allows one concurrent writer, so request handlers hand
 	// their replies to the write loop below.
 	replies := make(chan []byte, wsReplyBuffer)
-	go app.wsReadLoop(ctx, cancel, conn, user, replies)
+	go app.wsReadLoop(ctx, cancel, conn, user, enabled, replies)
 
 	ping := time.NewTicker(wsPingInterval)
 	defer ping.Stop()
@@ -111,7 +126,7 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 
 // wsReadLoop handles client requests until the connection fails, then
 // cancels the connection's context so the write loop exits too.
-func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, user connect.RegisteredUser, replies chan<- []byte) {
+func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, user connect.RegisteredUser, enabled bool, replies chan<- []byte) {
 	defer cancel()
 
 	for {
@@ -134,7 +149,7 @@ func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFun
 		go func() {
 			reqCtx, reqCancel := context.WithTimeout(ctx, wsRequestTimeout)
 			defer reqCancel()
-			app.sendReply(ctx, replies, app.handleRequest(reqCtx, user, req))
+			app.sendReply(ctx, replies, app.handleRequest(reqCtx, user, enabled, req))
 		}()
 	}
 }

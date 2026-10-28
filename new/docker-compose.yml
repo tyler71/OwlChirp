@@ -19,6 +19,9 @@ services:
       AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
       TIME_ZONE: "${TIME_ZONE:-America/Los_Angeles}"
       TELEMETRY_URL: "${TELEMETRY_URL:-}"
+      # GO Feature Flag relay proxy; the owlchirp flag is evaluated per username
+      GOFF_ENDPOINT: "${GOFF_ENDPOINT-https://flag.sandcatdev.com}"
+      GOFF_API_KEY: "${GOFF_API_KEY:-}"
       # Web push notifications (not yet read by the backend)
       VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:-}"
       VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY:-}"

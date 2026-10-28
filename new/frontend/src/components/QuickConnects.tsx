@@ -78,7 +78,7 @@ export default function QuickConnects() {
               onClick={() => setFilter(f.type)}
               className={`grow rounded-md px-2 py-1 text-xs font-semibold transition ${
                 filter === f.type
-                  ? 'bg-white text-secondary-900 shadow-xs dark:bg-secondary-700 dark:text-white'
+                  ? 'bg-base-100 text-secondary-900 shadow-xs dark:bg-secondary-700 dark:text-white'
                   : 'text-secondary-500 hover:text-secondary-800 dark:text-secondary-400 dark:hover:text-secondary-200'
               }`}
             >

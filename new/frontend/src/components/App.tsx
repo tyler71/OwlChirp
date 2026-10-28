@@ -4,15 +4,17 @@ import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/r
 import { useStore } from '@nanostores/react';
 import { useState } from 'react';
 
-import { $agent, $agentSnapshot, $config } from '../lib/stores';
+import { $agent, $agentSnapshot, $config, $owlchirpEnabled, $view } from '../lib/stores';
+import '../lib/theme';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
+import Settings from './Settings';
 import StatusBar from './StatusBar';
-import { Icon, stateDotClass } from './ui';
+import { Icon, type IconName, stateDotClass } from './ui';
 
 function Brand() {
   return (
@@ -25,6 +27,11 @@ function Brand() {
     </a>
   );
 }
+
+const NAV: { view: 'phone' | 'settings'; label: string; icon: IconName }[] = [
+  { view: 'phone', label: 'Phone', icon: 'phone' },
+  { view: 'settings', label: 'Settings', icon: 'cog' },
+];
 
 function initialsOf(name: string): string {
   return name
@@ -61,7 +68,7 @@ function UserMenu() {
         <span className="relative inline-flex items-center gap-2">
           <span className="relative inline-block flex-none">
             <span
-              className={`absolute top-0 right-0 -mt-1 -mr-1 size-3 rounded-full border-2 border-white dark:border-secondary-900 ${stateDotClass(agent.stateType)}`}
+              className={`absolute top-0 right-0 -mt-1 -mr-1 size-3 rounded-full border-2 border-base-100 dark:border-secondary-900 ${stateDotClass(agent.stateType)}`}
             />
             <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary-100 text-xs font-bold text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
               {initialsOf(agent.name)}
@@ -87,7 +94,7 @@ function UserMenu() {
           modal={false}
           className="absolute right-0 bottom-full left-0 z-10 mb-1 origin-bottom rounded-lg shadow-xl shadow-secondary-500/10 focus:outline-hidden dark:shadow-secondary-900"
         >
-          <div className="rounded-lg bg-white p-2.5 ring-1 ring-black/5 dark:bg-secondary-800 dark:ring-secondary-700">
+          <div className="rounded-lg bg-base-100 p-2.5 ring-1 ring-black/5 dark:bg-secondary-800 dark:ring-secondary-700">
             <MenuItem>
               {({ focus }) => (
                 <button
@@ -115,6 +122,8 @@ function UserMenu() {
 export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const agent = useStore($agent);
+  const view = useStore($view);
+  const owlchirpEnabled = useStore($owlchirpEnabled);
 
   return (
     <div
@@ -168,14 +177,31 @@ export default function App() {
         <div className="grow overflow-y-auto">
           <div className="flex flex-col gap-4 px-4 py-6">
             <nav className="flex flex-col gap-0.5">
-              <a
-                href="/ccp"
-                aria-current="page"
-                className="group flex items-center gap-2.5 rounded-lg px-2 text-sm font-semibold text-primary-700 hover:bg-secondary-200/60 dark:text-primary-400 dark:hover:bg-secondary-700/50"
-              >
-                <Icon name="phone" className="size-5 text-primary-600 dark:text-primary-400" />
-                <span className="grow py-2">Phone</span>
-              </a>
+              {NAV.map((item) => {
+                const active = item.view === view;
+                return (
+                  <button
+                    key={item.view}
+                    type="button"
+                    onClick={() => {
+                      $view.set(item.view);
+                      setMobileSidebarOpen(false);
+                    }}
+                    aria-current={active ? 'page' : undefined}
+                    className={`group flex items-center gap-2.5 rounded-lg px-2 text-left text-sm hover:bg-secondary-200/60 dark:hover:bg-secondary-700/50 ${
+                      active
+                        ? 'font-semibold text-primary-700 dark:text-primary-400'
+                        : 'font-medium text-secondary-800 hover:text-secondary-900 dark:text-secondary-200 dark:hover:text-white'
+                    }`}
+                  >
+                    <Icon
+                      name={item.icon}
+                      className={`size-5 ${active ? 'text-primary-600 dark:text-primary-400' : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'}`}
+                    />
+                    <span className="grow py-2">{item.label}</span>
+                  </button>
+                );
+              })}
             </nav>
           </div>
         </div>
@@ -215,10 +241,14 @@ export default function App() {
           </div>
 
           <AlertSection />
+          {/* The CCP iframe carries the softphone, so it stays mounted across views. */}
           <Ccp />
 
+          {view === 'settings' && <Settings />}
+
+          {/* Owlchirp features are gated per agent by the owlchirp feature flag. */}
           {agent && (
-            <>
+            <div className={view === 'phone' ? 'contents' : 'hidden'}>
               <StatusBar />
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
                 <div className="flex flex-col gap-6 lg:col-span-3">
@@ -227,7 +257,7 @@ export default function App() {
                 </div>
               </div>
               <DataPanel />
-            </>
+            </div>
           )}
         </div>
       </main>
