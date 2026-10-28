@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 
 import react from '@astrojs/react';
+import tailwindcss from '@tailwindcss/vite';
 
 // The Go backend (just dev-backend) listens here during development.
 const backend = process.env.BACKEND_URL ?? 'http://127.0.0.1:4444';
@@ -21,6 +22,7 @@ export default defineConfig({
   },
 
   vite: {
+    plugins: [tailwindcss()],
     // amazon-connect-streams alone is ~600 kB.
     build: { chunkSizeWarningLimit: 1024 },
     server: {

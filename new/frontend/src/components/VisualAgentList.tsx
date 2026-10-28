@@ -11,13 +11,13 @@ import {
 } from '../lib/const';
 import { $metrics, type ActiveUser } from '../lib/stores';
 
-function statusClass(status: string): string | undefined {
+function statusClass(status: string): string {
   const sn = status.toLowerCase();
-  if (sn === STATUS_ERROR || sn === STATUS_MISSED_CALL) return 'visual_list_error';
-  if (sn === STATUS_ON_CALL) return 'visual_list_on_call';
-  if (SIDELINE_STATUSES.has(sn)) return 'visual_list_sideline_status';
-  if (EXCLUDED_STATUSES.has(sn)) return 'visual_list_excluded_status';
-  return undefined;
+  if (sn === STATUS_ERROR || sn === STATUS_MISSED_CALL) return 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300';
+  if (sn === STATUS_ON_CALL) return 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300';
+  if (SIDELINE_STATUSES.has(sn)) return 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300';
+  if (EXCLUDED_STATUSES.has(sn)) return 'bg-secondary-100 text-secondary-400 line-through dark:bg-secondary-800';
+  return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300';
 }
 
 // Agents shown by initial; two letters when initials collide.
@@ -37,20 +37,18 @@ export default function VisualAgentList() {
   const userList = useStore($metrics, { keys: ['user_list'] }).user_list;
 
   if (!userList) {
-    return <div id="visualAgentList" className={`${LOADING_CLASS} noselect`} />;
+    return <div className={`h-6 grow select-none ${LOADING_CLASS}`} />;
   }
 
   const sorted = [...userList].sort((a, b) => a.user.first_name.localeCompare(b.user.first_name));
   const letters = initials(sorted);
 
   return (
-    <div id="visualAgentList" className="noselect">
+    <div className="flex min-w-0 grow flex-wrap justify-center gap-1 select-none">
       {sorted.map((u, i) => (
         <span
           key={u.user_id}
-          className={[CURSOR_HELP_CLASS, statusClass(u.status.name)].filter(Boolean).join(' ')}
-          data-toggle="tooltip"
-          data-placement="bottom"
+          className={`inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold ${CURSOR_HELP_CLASS} ${statusClass(u.status.name)}`}
           title={`${u.user.first_name} ${u.user.last_name}: ${u.status.name}`}
         >
           {letters[i]}

@@ -1,11 +1,12 @@
 import { useStore } from '@nanostores/react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { apiFetch } from '../lib/auth';
 import { getCallerIdName } from '../lib/callerId';
 import { API, CURSOR_HELP_CLASS, LOADING_CLASS } from '../lib/const';
 import { formatCallTime, formatPhoneNumber, formatSecondsToTime } from '../lib/helpers';
 import { $calls, $config, $recentCallsExpanded, type Call } from '../lib/stores';
+import { Button, Card, Icon } from './ui';
 
 const TITLE = 'Recent Calls';
 
@@ -23,14 +24,10 @@ function DetailTable({ detail }: { detail: Detail }) {
   const config = useStore($config);
 
   if (detail.status === 'loading') {
-    return <table className={`table subTable ${LOADING_CLASS}`}><tbody /></table>;
+    return <div className={`h-16 ${LOADING_CLASS}`} />;
   }
   if (detail.status === 'error') {
-    return (
-      <table className="table subTable">
-        <tbody><tr><td>Details unavailable</td></tr></tbody>
-      </table>
-    );
+    return <p className="text-xs text-secondary-500 dark:text-secondary-400">Details unavailable</p>;
   }
 
   const { contact, callerId } = detail;
@@ -51,6 +48,8 @@ function DetailTable({ detail }: { detail: Detail }) {
         href={`${config.connectDomain}/contact-trace-records/details/${contact.id}?tx=${encodeURIComponent(config.timeZone)}`}
         target="_blank"
         rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="font-medium text-primary-600 hover:underline dark:text-primary-400"
       >
         {contact.id.split('-')[0]}
       </a>
@@ -60,22 +59,16 @@ function DetailTable({ detail }: { detail: Detail }) {
   });
 
   return (
-    <table className="table subTable">
-      <tbody>
-        {rows.map((row) => (
-          <tr
-            key={row.key}
-            className={row.tooltip ? CURSOR_HELP_CLASS : undefined}
-            data-toggle={row.tooltip ? 'tooltip' : undefined}
-            data-placement={row.tooltip ? 'top' : undefined}
-            title={row.tooltip}
-          >
-            <td>{row.key}</td>
-            <td>{row.value}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-lg bg-secondary-50 p-3 text-xs dark:bg-secondary-950/40">
+      {rows.map((row) => (
+        <Fragment key={row.key}>
+          <dt className="text-secondary-500 dark:text-secondary-400">{row.key}</dt>
+          <dd className={`font-medium ${row.tooltip ? CURSOR_HELP_CLASS : ''}`} title={row.tooltip}>
+            {row.value}
+          </dd>
+        </Fragment>
+      ))}
+    </dl>
   );
 }
 
@@ -96,7 +89,13 @@ export default function RecentCallList() {
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   if (calls === null) {
-    return <div id="recentCallList" className={LOADING_CLASS} />;
+    return (
+      <Card title={TITLE}>
+        <div id="recentCallList" className="p-4">
+          <div className={`h-10 ${LOADING_CLASS}`} />
+        </div>
+      </Card>
+    );
   }
 
   const toggleDetail = async (call: Call) => {
@@ -117,33 +116,52 @@ export default function RecentCallList() {
   const visible = expanded ? calls : calls.slice(0, 1);
 
   return (
-    <div id="recentCallList">
-      <div className="listTitle noselect" onClick={() => calls.length > 0 && $recentCallsExpanded.set(!expanded)}>
-        <h2 className={expanded ? 'expanded' : undefined}>
-          {calls.length > 0 ? `${TITLE} (${calls.length})` : TITLE}
-        </h2>
+    <Card
+      title={calls.length > 0 ? `${TITLE} (${calls.length})` : TITLE}
+      actions={
+        calls.length > 1 && (
+          <Button size="sm" onClick={() => $recentCallsExpanded.set(!expanded)} aria-expanded={expanded}>
+            {expanded ? 'Show less' : 'Show all'}
+            <Icon name="chevronDown" className={`size-4 transition ${expanded ? 'rotate-180' : ''}`} />
+          </Button>
+        )
+      }
+    >
+      <div id="recentCallList">
+        {calls.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-secondary-500 dark:text-secondary-400">No calls yet</p>
+        ) : (
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-secondary-100 dark:divide-secondary-800">
+              {visible.map((call) => {
+                const key = call.contactId;
+                const detail = open[key] ? details[key] : undefined;
+                return (
+                  <Fragment key={`${key}-${call.timestamp}`}>
+                    <tr
+                      className={key ? 'cursor-pointer hover:bg-secondary-50 dark:hover:bg-secondary-800/50' : undefined}
+                      onClick={() => key && toggleDetail(call)}
+                      title={key ? 'Show details' : undefined}
+                    >
+                      <td className="px-4 py-2.5 text-secondary-500 tabular-nums dark:text-secondary-400">
+                        {formatCallTime(call.timestamp)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-medium tabular-nums">{formatPhoneNumber(call.phoneNumber)}</td>
+                    </tr>
+                    {detail && (
+                      <tr>
+                        <td colSpan={2} className="px-4 pb-3">
+                          <DetailTable detail={detail} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
-      <div className="list">
-        <table className="table table-striped table-hover">
-          <tbody>
-            {visible.map((call, i) => (
-              <tr
-                key={`${call.contactId}-${call.timestamp}`}
-                className={!expanded && i === 0 ? 'collapsed' : undefined}
-                onDoubleClick={() => call.contactId && toggleDetail(call)}
-              >
-                <td>{formatCallTime(call.timestamp)}</td>
-                <td>{formatPhoneNumber(call.phoneNumber)}</td>
-                {open[call.contactId] && details[call.contactId] && (
-                  <td>
-                    <DetailTable detail={details[call.contactId]} />
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </Card>
   );
 }

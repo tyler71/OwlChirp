@@ -7,19 +7,16 @@ import RecentCallList from './RecentCallList';
 // Metrics and call history, shown once the CCP agent is ready.
 export default function DataPanel() {
   const agent = useStore($agent);
+  if (!agent) return null;
 
   return (
-    <div id="data" className={agent ? undefined : 'hide'}>
-      {agent && (
-        <>
-          <MetricsTable />
-          <div id="statusDiv">
-            <div id="statusA">
-              <RecentCallList />
-            </div>
-          </div>
-        </>
-      )}
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+      <div className="lg:col-span-2">
+        <MetricsTable />
+      </div>
+      <div className="lg:col-span-3">
+        <RecentCallList />
+      </div>
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { saveCallerId } from '../lib/callerId';
 import { formatPhoneNumber } from '../lib/helpers';
 import { $callerId } from '../lib/stores';
 
+const EDITING_CLASSES = ['ring-2', 'ring-primary-500', 'bg-white', 'dark:bg-secondary-800'];
+
 // Click to rename the current caller; blur saves it.
 export default function CallerId() {
   const callerId = useStore($callerId);
@@ -24,7 +26,7 @@ export default function CallerId() {
     if (!callerId || !ref.current) return;
     editing.current = true;
     ref.current.contentEditable = 'true';
-    ref.current.classList.add('inEdit');
+    ref.current.classList.add(...EDITING_CLASSES);
     ref.current.focus();
   };
 
@@ -33,7 +35,7 @@ export default function CallerId() {
     if (!el || !editing.current) return;
     editing.current = false;
     el.contentEditable = 'false';
-    el.classList.remove('inEdit');
+    el.classList.remove(...EDITING_CLASSES);
 
     const name = (el.textContent ?? '').trim();
     if (callerId && name.length > 0 && name !== display) {
@@ -54,16 +56,14 @@ export default function CallerId() {
   };
 
   return (
-    <div id="callerIdContainer">
+    <div className="min-w-0 flex-none basis-48">
       <div
-        id="callerId"
         ref={ref}
+        className="cursor-text truncate rounded-md px-2 py-1 text-sm font-semibold outline-none empty:before:font-normal empty:before:text-secondary-400 empty:before:content-['No_caller'] hover:bg-white dark:hover:bg-secondary-800"
         contentEditable={false}
         suppressContentEditableWarning
         spellCheck={false}
         title={callerId ? formatPhoneNumber(callerId.phoneNumber) : undefined}
-        data-toggle="tooltip"
-        data-placement="top"
         onClick={startEdit}
         onBlur={finishEdit}
         onKeyDown={onKeyDown}

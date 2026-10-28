@@ -1,8 +1,8 @@
 export const API = '/api';
 
-export const TABLE_ALERT_CLASS = 'table-warning';
-export const CURSOR_HELP_CLASS = 'helpCursor';
-export const LOADING_CLASS = 'alert-secondary';
+export const TABLE_ALERT_CLASS = 'bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200';
+export const CURSOR_HELP_CLASS = 'cursor-help';
+export const LOADING_CLASS = 'animate-pulse rounded-sm bg-secondary-200 dark:bg-secondary-700';
 
 export const STATUS_AFTERCALL = 'aftercallwork';
 export const STATUS_AVAILABLE = 'available';

@@ -20,6 +20,7 @@ import {
 import { agentSideline, formatPhoneNumber, telemetry } from './helpers';
 import { authorize, notify, snooze } from './notifier';
 import { startRealtime } from './realtime';
+import { trackAgent, trackContact } from './softphone';
 import { $agent, $alert, $config, $metrics, $storageAccess, type AppConfig } from './stores';
 
 export async function loadConfig(): Promise<AppConfig> {
@@ -81,11 +82,9 @@ export async function initCcp(container: HTMLElement): Promise<void> {
   });
 
   connect.contact((contact) => {
+    trackContact(contact);
     contact.onConnecting((c) => {
       onIncomingCall(c).catch((e) => console.error('incoming call', e));
-    });
-    contact.onConnected(() => {
-      console.log('Call has been connected', contact);
     });
   });
 }
@@ -93,6 +92,7 @@ export async function initCcp(container: HTMLElement): Promise<void> {
 async function onAgent(agent: connect.Agent): Promise<void> {
   $agent.set(agent);
   $alert.set({ kind: 'none' });
+  trackAgent(agent);
 
   await refreshCalls();
 

@@ -9,6 +9,14 @@ import {
   TABLE_ALERT_CLASS,
 } from '../lib/const';
 import { $metrics } from '../lib/stores';
+import { Card } from './ui';
+
+const KEY_CLASS = 'px-4 py-2.5 text-secondary-600 select-none dark:text-secondary-400';
+const VALUE_CLASS = 'px-4 py-2.5 text-right font-semibold tabular-nums';
+
+function Loading() {
+  return <span className={`inline-block h-4 w-8 align-middle ${LOADING_CLASS}`} />;
+}
 
 export default function MetricsTable() {
   const metrics = useStore($metrics);
@@ -28,29 +36,24 @@ export default function MetricsTable() {
   }
 
   return (
-    <div id="metrics">
-      <table className="table table-sm">
-        <tbody>
+    <Card title="Queue">
+      <table id="metrics" className="w-full text-sm">
+        <tbody className="divide-y divide-secondary-100 dark:divide-secondary-800">
           <tr id="queueCount" className={queueLoaded && queue_count >= MAX_QUEUE_COUNT ? TABLE_ALERT_CLASS : undefined}>
-            <td className="key noselect">Calls in Queue</td>
-            <td className={`value ${queueLoaded ? '' : LOADING_CLASS}`}>{queue_count}</td>
+            <td className={KEY_CLASS}>Calls in Queue</td>
+            <td className={VALUE_CLASS}>{queueLoaded ? queue_count : <Loading />}</td>
           </tr>
           <tr
             id="availableAgentCount"
             className={agentsLoaded && active_agent_count <= MIN_AGENT_STAFFED ? TABLE_ALERT_CLASS : undefined}
           >
-            <td className="key noselect">Available Agents</td>
-            <td
-              className={`value ${CURSOR_HELP_CLASS} ${agentsLoaded ? '' : LOADING_CLASS}`}
-              data-toggle="tooltip"
-              data-placement="top"
-              title={agentsTitle || undefined}
-            >
-              {agentsText}
+            <td className={KEY_CLASS}>Available Agents</td>
+            <td className={`${VALUE_CLASS} ${CURSOR_HELP_CLASS}`} title={agentsTitle || undefined}>
+              {agentsLoaded ? agentsText : <Loading />}
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

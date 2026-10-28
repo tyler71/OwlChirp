@@ -2,10 +2,12 @@ import { useStore } from '@nanostores/react';
 import { useEffect, useRef } from 'react';
 
 import { initCcp } from '../lib/ccp';
-import { $agent, $storageAccess } from '../lib/stores';
+import { $storageAccess } from '../lib/stores';
 
+// Host for the Amazon Connect CCP iframe. It only carries softphone audio and
+// signalling, so it stays rendered but off-screen (display:none can stall the
+// iframe). It's shown only when Connect's storage-access banner needs a click.
 export default function Ccp() {
-  const agent = useStore($agent);
   const storageAccess = useStore($storageAccess);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -15,8 +17,17 @@ export default function Ccp() {
     }
   }, []);
 
-  // The CCP iframe must exist (but stays hidden) until the agent logs in. It's
-  // shown early when Connect's storage-access banner needs a click.
-  const visible = agent || storageAccess === 'needed' || storageAccess === 'denied';
-  return <div id="ccp" ref={ref} className={visible ? undefined : 'hide'} />;
+  const visible = storageAccess === 'needed' || storageAccess === 'denied';
+  return (
+    <div
+      id="ccp"
+      ref={ref}
+      aria-hidden={!visible}
+      className={
+        visible
+          ? 'mx-auto h-[480px] w-full max-w-sm overflow-hidden rounded-lg border border-secondary-200 dark:border-secondary-800'
+          : 'pointer-events-none fixed top-0 -left-[10000px] h-[480px] w-[320px] opacity-0'
+      }
+    />
+  );
 }

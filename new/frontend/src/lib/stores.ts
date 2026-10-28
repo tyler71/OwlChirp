@@ -61,6 +61,49 @@ export const $wsStatus = atom<'connecting' | 'open' | 'closed'>('connecting');
 // and other third-party cookie partitioning until the agent allows access).
 export const $storageAccess = atom<'unknown' | 'needed' | 'granted' | 'denied'>('unknown');
 
+// ---- Softphone ----
+// Streams objects mutate in place, so the UI renders from plain snapshots
+// that lib/softphone.ts refreshes on every agent/contact event.
+
+export type AgentSnapshot = {
+  name: string;
+  stateName: string;
+  stateType: string;
+  stateStartedAt: number;
+  nextStateName: string | null;
+  states: connect.AgentStateDefinition[];
+  muted: boolean;
+};
+
+export type ConnectionSnapshot = {
+  id: string;
+  isInitial: boolean;
+  label: string;
+  status: string;
+  statusStartedAt: number;
+};
+
+export type ContactSnapshot = {
+  contactId: string;
+  status: string;
+  statusStartedAt: number;
+  isInbound: boolean;
+  phoneNumber: string;
+  connections: ConnectionSnapshot[];
+};
+
+export type QuickConnect = {
+  endpointARN: string;
+  name: string;
+  type: string;
+};
+
+export const $agentSnapshot = atom<AgentSnapshot | null>(null);
+
+export const $contactSnapshot = atom<ContactSnapshot | null>(null);
+
+export const $quickConnects = atom<QuickConnect[] | null>(null);
+
 // ---- Persisted across reloads (localStorage) ----
 
 // Last time (ms epoch) a notification tag was shown, so reloading the CCP
