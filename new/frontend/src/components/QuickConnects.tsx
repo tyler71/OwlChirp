@@ -43,7 +43,7 @@ export default function QuickConnects() {
 
   return (
     <Card
-      title="Quick connects"
+      title="Transfers"
       className="max-h-[42rem]"
       actions={
         <button

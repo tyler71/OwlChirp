@@ -17,6 +17,20 @@ export const STATUS_PROJECT = 'on a project';
 export const STATUS_TICKET_BREAK = 'ticket break';
 export const STATUS_ERROR = 'error';
 
+export type STATUS =
+    typeof STATUS_AFTERCALL
+  | typeof STATUS_AVAILABLE
+  | typeof STATUS_BREAK
+  | typeof STATUS_IN_MEETING
+  | typeof STATUS_LUNCH
+  | typeof STATUS_MISSED_CALL
+  | typeof STATUS_OFFLINE
+  | typeof STATUS_ON_CONTACT
+  | typeof STATUS_ON_CALL
+  | typeof STATUS_PROJECT
+  | typeof STATUS_TICKET_BREAK
+  | typeof STATUS_ERROR
+
 // Sideline statuses can receive notifications.
 // Excluded statuses are not notified.
 export const SIDELINE_STATUSES = new Set([STATUS_BREAK, STATUS_PROJECT, STATUS_TICKET_BREAK, STATUS_ERROR]);

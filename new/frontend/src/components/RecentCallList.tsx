@@ -113,13 +113,13 @@ export default function RecentCallList() {
     setDetails((d) => ({ ...d, [key]: detail }));
   };
 
-  const visible = expanded ? calls : calls.slice(0, 1);
+  const visible = expanded ? calls : calls.slice(0, 5);
 
   return (
     <Card
       title={calls.length > 0 ? `${TITLE} (${calls.length})` : TITLE}
       actions={
-        calls.length > 1 && (
+        calls.length > 5 && (
           <Button size="sm" onClick={() => $recentCallsExpanded.set(!expanded)} aria-expanded={expanded}>
             {expanded ? 'Show less' : 'Show all'}
             <Icon name="chevronDown" className={`size-4 transition ${expanded ? 'rotate-180' : ''}`} />

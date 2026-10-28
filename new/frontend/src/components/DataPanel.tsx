@@ -14,9 +14,6 @@ export default function DataPanel() {
       <div className="lg:col-span-2">
         <MetricsTable />
       </div>
-      <div className="lg:col-span-3">
-        <RecentCallList />
-      </div>
     </div>
   );
 }

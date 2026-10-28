@@ -71,20 +71,19 @@ export default function CallPanel() {
     const routable = agent?.stateType === connect.AgentStateType.ROUTABLE;
     return (
       <Card>
-        <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+        <div className="flex flex-col items-center gap-3 px-4 py-2 lg:py-10 text-center">
           <span
-            className={`flex size-12 items-center justify-center rounded-full ${
+            className={`flex size-8 lg:size-12 items-center justify-center rounded-full ${
               routable
                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
                 : 'bg-secondary-100 text-secondary-500 dark:bg-secondary-800 dark:text-secondary-400'
             }`}
           >
-            <Icon name="phone" className="size-6" />
+            <Icon name="phone" className="size-4 lg:size-6" />
           </span>
           <div>
-            <p className="font-semibold">{routable ? 'Ready for calls' : 'Not taking calls'}</p>
+            <p className="font-semibold">{routable ? 'Available' : 'Ignoring Calls'}</p>
             <p className="text-sm text-secondary-500 dark:text-secondary-400">
-              {routable ? 'Incoming calls will ring here.' : 'Set your status to Available to receive calls.'}
             </p>
           </div>
         </div>
@@ -157,7 +156,7 @@ export default function CallPanel() {
             </p>
           </div>
           <Button variant="primary" onClick={() => void clearContact()}>
-            Clear contact
+            Finish call
           </Button>
         </div>
       </Card>

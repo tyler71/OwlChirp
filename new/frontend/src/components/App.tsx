@@ -1,5 +1,3 @@
-// Page shell based on Tailkit "Subtle Sidebar" (a-l-various-02). The sidebar is
-// reserved for upcoming OwlChirp features; the softphone lives in the main area.
 import 'amazon-connect-streams';
 
 import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
@@ -10,10 +8,9 @@ import { $agent, $agentSnapshot, $config } from '../lib/stores';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
 import CallPanel from './CallPanel';
+import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
-import DialPad from './DialPad';
-import QuickConnects from './QuickConnects';
 import StatusBar from './StatusBar';
 import { Icon, stateDotClass } from './ui';
 
@@ -21,7 +18,7 @@ function Brand() {
   return (
     <a
       href="/ccp"
-      className="group inline-flex items-center gap-2 px-2 font-bold text-secondary-900 hover:text-secondary-600 dark:text-secondary-100 dark:hover:text-secondary-300"
+      className="group inline-flex items-center gap-1 px-2 font-bold text-secondary-900 hover:text-secondary-600 dark:text-secondary-100 dark:hover:text-secondary-300"
     >
       <img src="/favicon.ico" alt="" className="size-6" />
       <span>OwlChirp</span>
@@ -191,7 +188,7 @@ export default function App() {
       {/* Page Header (mobile) */}
       <header
         id="page-header"
-        className="fixed top-0 right-0 left-0 z-30 flex h-16 flex-none items-center bg-white/90 backdrop-blur-xs lg:hidden dark:bg-secondary-900/90"
+        className="top-0 right-0 left-0 z-30 flex h-16 flex-none items-center backdrop-blur-xs lg:hidden dark:bg-secondary-900/90"
       >
         <div className="container mx-auto flex w-full items-center justify-between px-4">
           <button
@@ -201,13 +198,7 @@ export default function App() {
             className="group relative inline-flex items-center gap-2 rounded-lg p-2 text-sm leading-5 text-secondary-800 hover:text-secondary-900 dark:text-secondary-200 dark:hover:text-white"
           >
             <span className="absolute inset-0 scale-50 rounded-lg bg-secondary-100 opacity-0 transition ease-out group-hover:scale-100 group-hover:opacity-100 group-active:scale-105 group-active:bg-secondary-200 dark:bg-secondary-700/50 dark:group-active:bg-secondary-700/75" />
-            <svg className="relative inline-block size-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-              <path
-                fillRule="evenodd"
-                d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <svg className="relative inline-block size-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden> <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
           </button>
           <Brand />
           <span className="size-9" />
@@ -215,13 +206,11 @@ export default function App() {
       </header>
 
       {/* Page Content */}
-      <main
-        id="page-content"
-        className="flex max-w-full flex-auto flex-col bg-white pt-16 lg:my-3 lg:mr-3 lg:rounded-lg lg:border lg:border-secondary-200 lg:pt-0 dark:bg-secondary-900 dark:lg:border-secondary-800"
+      <main id="page-content"
+        className="flex max-w-full flex-auto flex-col lg:my-3 lg:mr-3 lg:rounded-lg lg:border lg:border-secondary-200 lg:pt-0 dark:bg-secondary-900 dark:lg:border-secondary-800"
       >
-        <div className="container mx-auto flex w-full grow flex-col gap-6 p-4 lg:p-8 xl:max-w-7xl">
+        <div className="container mx-auto flex w-full grow flex-col gap-1 pl-2 pr-2 lg:p-8 xl:max-w-7xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold">Phone</h1>
             {agent && <AgentStatusMenu />}
           </div>
 
@@ -234,10 +223,7 @@ export default function App() {
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
                 <div className="flex flex-col gap-6 lg:col-span-3">
                   <CallPanel />
-                  <DialPad />
-                </div>
-                <div className="flex flex-col gap-6 lg:col-span-2">
-                  <QuickConnects />
+                  <TabbedFunctions />
                 </div>
               </div>
               <DataPanel />

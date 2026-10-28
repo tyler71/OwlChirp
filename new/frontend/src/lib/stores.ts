@@ -1,5 +1,6 @@
 import { atom, map } from 'nanostores';
 import { persistentAtom, persistentMap } from '@nanostores/persistent';
+import type { STATUS } from './const';
 
 export type AppConfig = {
   connectDomain: string;
@@ -10,7 +11,7 @@ export type AppConfig = {
 
 export type ActiveUser = {
   user_id: string;
-  status: { name: string };
+  status: { name: STATUS };
   user: { username: string; first_name: string; last_name: string };
 };
 
