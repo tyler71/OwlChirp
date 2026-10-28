@@ -194,3 +194,57 @@ func (db *DB) UpsertCallerID(ctx context.Context, phoneNumber, name string) erro
 		phoneNumber, name, ts, ts)
 	return err
 }
+
+type Wrapup struct {
+	ContactID   string `db:"contact_id" json:"contactId"`
+	PhoneNumber string `db:"phone_number" json:"phoneNumber"`
+	Agent       string `db:"agent" json:"agent"`
+	Incident    string `db:"incident" json:"incident"`
+	Mood        string `db:"mood" json:"mood"`
+	Thoughts    string `db:"thoughts" json:"thoughts"`
+	Timestamp   int64  `db:"timestamp" json:"timestamp"`
+}
+
+// UpsertWrapup stores the wrap-up for w.ContactID, replacing an earlier save
+// for the same contact. The original timestamp is kept on update.
+func (db *DB) UpsertWrapup(ctx context.Context, username string, w Wrapup) (Wrapup, error) {
+	agentID, err := db.GetOrCreateUser(ctx, username)
+	if err != nil {
+		return Wrapup{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	ts := now()
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO wrapups (contact_id, phone_number, agent_id, incident, mood, thoughts, timestamp, created_on, updated_on)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (contact_id) DO UPDATE SET
+		   agent_id = excluded.agent_id, incident = excluded.incident, mood = excluded.mood,
+		   thoughts = excluded.thoughts, updated_on = excluded.updated_on`,
+		w.ContactID, w.PhoneNumber, agentID, w.Incident, w.Mood, w.Thoughts, time.Now().UnixMilli(), ts, ts)
+	if err != nil {
+		return Wrapup{}, err
+	}
+
+	var saved Wrapup
+	err = db.GetContext(ctx, &saved, wrapupSelect+` WHERE w.contact_id = ?`, w.ContactID)
+	return saved, err
+}
+
+func (db *DB) GetWrapups(ctx context.Context, phoneNumber string, maxRecords int) ([]Wrapup, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	wrapups := []Wrapup{}
+	err := db.SelectContext(ctx, &wrapups,
+		wrapupSelect+` WHERE w.phone_number = ? ORDER BY w.timestamp DESC, w.id DESC LIMIT ?`,
+		phoneNumber, limit(maxRecords))
+	return wrapups, err
+}
+
+const wrapupSelect = `SELECT w.contact_id, w.phone_number, COALESCE(u.username, '') AS agent,
+	COALESCE(w.incident, '') AS incident, COALESCE(w.mood, '') AS mood,
+	COALESCE(w.thoughts, '') AS thoughts, COALESCE(w.timestamp, 0) AS timestamp
+	FROM wrapups w LEFT JOIN users u ON u.id = w.agent_id`

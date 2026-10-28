@@ -5,6 +5,7 @@ import 'amazon-connect-streams';
 
 import { addCall, refreshCalls } from './callHistory';
 import { loadCallerId } from './callerId';
+import { loadWrapups } from './wrapups';
 import {
   API,
   BREAK_STATUSES,
@@ -94,6 +95,8 @@ async function onAgent(agent: connect.Agent): Promise<void> {
   $alert.set({ kind: 'none' });
   trackAgent(agent);
 
+  // Call history, caller ID and wrap-ups all go over the realtime socket.
+  void startRealtime();
   await refreshCalls();
 
   setInterval(() => checkStateDuration(agent), STATE_CHECK_INTERVAL_MS);
@@ -102,8 +105,6 @@ async function onAgent(agent: connect.Agent): Promise<void> {
     if (changedKey === 'queue_count') notifyQueueCount(metrics.queue_count ?? 0);
     if (changedKey === 'active_agent_count') notifyAgentCount(metrics.active_agent_count ?? 0);
   });
-
-  void startRealtime();
 }
 
 async function onIncomingCall(contact: connect.Contact): Promise<void> {
@@ -112,8 +113,11 @@ async function onIncomingCall(contact: connect.Contact): Promise<void> {
 
   notify(`Incoming Call from ${formatPhoneNumber(phoneNumber)}`, 'Incoming Call', 'incomingCall');
 
-  await loadCallerId(phoneNumber);
-  await addCall(contactId, phoneNumber);
+  await Promise.all([
+    loadCallerId(phoneNumber).catch((e) => console.error('loadCallerId', e)),
+    loadWrapups(phoneNumber),
+    addCall(contactId, phoneNumber),
+  ]);
 
   const agent = $agent.get();
   if (agent) void telemetry(agent);

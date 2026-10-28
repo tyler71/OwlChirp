@@ -1,10 +1,10 @@
 import { useStore } from '@nanostores/react';
 import { Fragment, useState } from 'react';
 
-import { apiFetch } from '../lib/auth';
 import { getCallerIdName } from '../lib/callerId';
-import { API, CURSOR_HELP_CLASS, LOADING_CLASS } from '../lib/const';
+import { CURSOR_HELP_CLASS, LOADING_CLASS } from '../lib/const';
 import { formatCallTime, formatPhoneNumber, formatSecondsToTime } from '../lib/helpers';
+import { request } from '../lib/realtime';
 import { $calls, $config, $recentCallsExpanded, type Call } from '../lib/stores';
 import { Button, Card, Icon } from './ui';
 
@@ -73,13 +73,11 @@ function DetailTable({ detail }: { detail: Detail }) {
 }
 
 async function loadDetail(call: Call): Promise<Detail> {
-  const params = new URLSearchParams({ contact_id: call.contactId });
-  const [res, callerId] = await Promise.all([
-    apiFetch(`${API}/calls/detail?${params}`),
+  const [contact, callerId] = await Promise.all([
+    request<ContactDetail>('calls.detail', { contactId: call.contactId }),
     getCallerIdName(call.phoneNumber).catch(() => null),
   ]);
-  if (!res.ok) return { status: 'error' };
-  return { status: 'ready', contact: await res.json(), callerId };
+  return { status: 'ready', contact, callerId };
 }
 
 export default function RecentCallList() {

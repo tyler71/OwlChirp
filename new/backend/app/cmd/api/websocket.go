@@ -7,12 +7,16 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/tyler71/owlchirp/app/internal/connect"
 )
 
 const (
-	wsAuthTimeout  = 5 * time.Second
-	wsWriteTimeout = 10 * time.Second
-	wsPingInterval = 30 * time.Second
+	wsAuthTimeout    = 5 * time.Second
+	wsWriteTimeout   = 10 * time.Second
+	wsPingInterval   = 30 * time.Second
+	wsRequestTimeout = 15 * time.Second
+	wsReadLimit      = 64 << 10
+	wsReplyBuffer    = 16
 
 	// Application close codes (4000-4999).
 	wsStatusUnauthorized websocket.StatusCode = 4401
@@ -24,10 +28,28 @@ type wsAuthMessage struct {
 	Token string `json:"token"`
 }
 
-// metricsSocket streams realtime metric changes. Browsers can't set headers
-// on a WebSocket, so the first message must be {"type":"auth","token":"<X-Api-Key>"}.
-// Each following server message is a JSON object of the keys that changed.
-func (app *application) metricsSocket(w http.ResponseWriter, r *http.Request) {
+// wsRequest is a client call: {"id":1,"type":"wrapups.list","data":{...}}.
+type wsRequest struct {
+	ID   int64           `json:"id"`
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
+}
+
+// wsReply answers a wsRequest with the same id and type "result" or "error".
+type wsReply struct {
+	ID    int64  `json:"id"`
+	Type  string `json:"type"`
+	Data  any    `json:"data,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
+// socket is the single realtime channel between the frontend and backend.
+// Browsers can't set headers on a WebSocket, so the first message must be
+// {"type":"auth","token":"<X-Api-Key>"}. After that:
+//   - the server pushes events as {"type":"<event>","data":...}
+//     ("metrics", "call.logged", "callerid.updated", "wrapup.saved")
+//   - the client sends wsRequest calls, answered with a wsReply.
+func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	// The connection outlives the server's Read/WriteTimeout.
 	rc := http.NewResponseController(w)
 	_ = rc.SetReadDeadline(time.Time{})
@@ -40,19 +62,23 @@ func (app *application) metricsSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.CloseNow()
 
-	ctx := r.Context()
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 
-	if !app.wsAuthenticate(ctx, conn) {
+	user, ok := app.wsAuthenticate(ctx, conn)
+	if !ok {
 		conn.Close(wsStatusUnauthorized, "unauthorized")
 		return
 	}
-
-	// Clients only send the auth message; CloseRead handles control frames
-	// and cancels ctx when the client goes away.
-	ctx = conn.CloseRead(ctx)
+	conn.SetReadLimit(wsReadLimit)
 
 	client := app.hub.Subscribe()
 	defer app.hub.Unsubscribe(client)
+
+	// coder/websocket allows one concurrent writer, so request handlers hand
+	// their replies to the write loop below.
+	replies := make(chan []byte, wsReplyBuffer)
+	go app.wsReadLoop(ctx, cancel, conn, user, replies)
 
 	ping := time.NewTicker(wsPingInterval)
 	defer ping.Stop()
@@ -68,6 +94,10 @@ func (app *application) metricsSocket(w http.ResponseWriter, r *http.Request) {
 			if err := wsWrite(ctx, conn, msg); err != nil {
 				return
 			}
+		case msg := <-replies:
+			if err := wsWrite(ctx, conn, msg); err != nil {
+				return
+			}
 		case <-ping.C:
 			pingCtx, cancel := context.WithTimeout(ctx, wsWriteTimeout)
 			err := conn.Ping(pingCtx)
@@ -79,7 +109,49 @@ func (app *application) metricsSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *application) wsAuthenticate(ctx context.Context, conn *websocket.Conn) bool {
+// wsReadLoop handles client requests until the connection fails, then
+// cancels the connection's context so the write loop exits too.
+func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, user connect.RegisteredUser, replies chan<- []byte) {
+	defer cancel()
+
+	for {
+		typ, data, err := conn.Read(ctx)
+		if err != nil {
+			return
+		}
+		if typ != websocket.MessageText {
+			continue
+		}
+
+		var req wsRequest
+		if err := json.Unmarshal(data, &req); err != nil {
+			app.sendReply(ctx, replies, wsReply{Type: "error", Error: "invalid message"})
+			continue
+		}
+
+		// Requests run concurrently so a slow Connect lookup doesn't block
+		// quick ones; the client matches replies by id.
+		go func() {
+			reqCtx, reqCancel := context.WithTimeout(ctx, wsRequestTimeout)
+			defer reqCancel()
+			app.sendReply(ctx, replies, app.handleRequest(reqCtx, user, req))
+		}()
+	}
+}
+
+func (app *application) sendReply(ctx context.Context, replies chan<- []byte, reply wsReply) {
+	msg, err := json.Marshal(reply)
+	if err != nil {
+		app.logger.Error("websocket encode reply", "error", err)
+		return
+	}
+	select {
+	case replies <- msg:
+	case <-ctx.Done():
+	}
+}
+
+func (app *application) wsAuthenticate(ctx context.Context, conn *websocket.Conn) (connect.RegisteredUser, bool) {
 	// A read whose ctx expires tears the connection down without a close
 	// frame, so close explicitly instead to give the client a 4401.
 	timer := time.AfterFunc(wsAuthTimeout, func() {
@@ -91,20 +163,20 @@ func (app *application) wsAuthenticate(ctx context.Context, conn *websocket.Conn
 
 	typ, data, err := conn.Read(ctx)
 	if err != nil || typ != websocket.MessageText {
-		return false
+		return connect.RegisteredUser{}, false
 	}
 
 	var msg wsAuthMessage
 	if err := json.Unmarshal(data, &msg); err != nil || msg.Type != "auth" {
-		return false
+		return connect.RegisteredUser{}, false
 	}
 
-	ok, err := app.auth.Verify(ctx, msg.Token)
+	user, ok, err := app.auth.Verify(ctx, msg.Token)
 	if err != nil {
 		app.logger.Error("websocket auth", "error", err)
-		return false
+		return connect.RegisteredUser{}, false
 	}
-	return ok
+	return user, ok
 }
 
 func wsWrite(ctx context.Context, conn *websocket.Conn, msg []byte) error {

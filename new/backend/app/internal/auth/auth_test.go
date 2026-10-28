@@ -30,24 +30,25 @@ func TestVerify(t *testing.T) {
 
 	hour := time.Date(2026, 10, 26, 14, 0, 0, 0, time.UTC).Unix()
 
-	ok, err := v.Verify(context.Background(), Token(hour, "abc-123", "agent@example.com"))
+	user, ok, err := v.Verify(context.Background(), Token(hour, "abc-123", "agent@example.com"))
 	assert.Nil(t, err)
 	assert.True(t, ok)
+	assert.Equal(t, user.Username, "agent@example.com")
 
-	ok, _ = v.Verify(context.Background(), Token(hour-3600, "abc-123", "agent@example.com"))
+	_, ok, _ = v.Verify(context.Background(), Token(hour-3600, "abc-123", "agent@example.com"))
 	assert.True(t, ok)
 
-	ok, _ = v.Verify(context.Background(), Token(hour-7200, "abc-123", "agent@example.com"))
+	_, ok, _ = v.Verify(context.Background(), Token(hour-7200, "abc-123", "agent@example.com"))
 	assert.False(t, ok)
 
-	ok, _ = v.Verify(context.Background(), Token(hour, "abc-123", "someone@example.com"))
+	_, ok, _ = v.Verify(context.Background(), Token(hour, "abc-123", "someone@example.com"))
 	assert.False(t, ok)
 
-	ok, _ = v.Verify(context.Background(), "")
+	_, ok, _ = v.Verify(context.Background(), "")
 	assert.False(t, ok)
 
 	// Rolls over at midnight (the Python version did not).
 	now = time.Date(2026, 10, 27, 0, 5, 0, 0, time.UTC)
-	ok, _ = v.Verify(context.Background(), Token(now.Truncate(time.Hour).Unix(), "abc-123", "agent@example.com"))
+	_, ok, _ = v.Verify(context.Background(), Token(now.Truncate(time.Hour).Unix(), "abc-123", "agent@example.com"))
 	assert.True(t, ok)
 }

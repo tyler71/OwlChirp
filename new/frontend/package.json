@@ -21,6 +21,7 @@
     "@types/react-dom": "^19.3.0",
     "amazon-connect-streams": "^2.30.2",
     "astro": "^7.4.2",
+    "daisyui": "^5.7.50",
     "nanostores": "^1.5.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -5,20 +5,20 @@ import { dialNumber, sendDigits } from '../lib/softphone';
 import { $contactSnapshot } from '../lib/stores';
 import { Button, Card, Icon } from './ui';
 
-const KEYS: [string, string][] = [
-  ['1', ''],
-  ['2', 'ABC'],
-  ['3', 'DEF'],
-  ['4', 'GHI'],
-  ['5', 'JKL'],
-  ['6', 'MNO'],
-  ['7', 'PQRS'],
-  ['8', 'TUV'],
-  ['9', 'WXYZ'],
-  ['*', ''],
-  ['0', '+'],
-  ['#', ''],
-];
+// const KEYS: [string, string][] = [
+//   ['1', ''],
+//   ['2', 'ABC'],
+//   ['3', 'DEF'],
+//   ['4', 'GHI'],
+//   ['5', 'JKL'],
+//   ['6', 'MNO'],
+//   ['7', 'PQRS'],
+//   ['8', 'TUV'],
+//   ['9', 'WXYZ'],
+//   ['*', ''],
+//   ['0', '+'],
+//   ['#', ''],
+// ];
 
 const DIGIT = /^[0-9*#+]$/;
 

@@ -13,8 +13,11 @@ import {
   swapConnections,
   toggleMute,
 } from '../lib/softphone';
-import { $agentSnapshot, $callerId, $contactSnapshot, type ConnectionSnapshot } from '../lib/stores';
+import { $agentSnapshot, $callerId, $contactSnapshot, type ConnectionSnapshot, type ContactSnapshot } from '../lib/stores';
+import { $wrapupStatus, saveDraft } from '../lib/wrapups';
 import { Button, Card, Icon, formatElapsed, useNow } from './ui';
+import WrapupFeed from './WrapupFeed';
+import WrapupForm from './WrapupForm';
 
 const CS = connect.ContactStateType;
 const HOLD = connect.ConnectionStateType.HOLD;
@@ -59,6 +62,37 @@ function ConnectionRow({ conn, canDrop }: { conn: ConnectionSnapshot; canDrop: b
         <Button size="sm" icon="xMark" title="Disconnect" aria-label="Disconnect" onClick={() => void dropConnection(conn.id)} />
       )}
     </li>
+  );
+}
+
+function AfterCallWork({ contact, name }: { contact: ContactSnapshot; name: string }) {
+  const { saving } = useStore($wrapupStatus);
+
+  // Save any unsaved notes first; if that fails, stay in after-call work so
+  // the form (which shows the error) isn't lost.
+  const finish = async () => {
+    if (await saveDraft()) await clearContact();
+  };
+
+  return (
+    <Card>
+      <div className="flex items-center gap-3 px-4 py-4">
+        <span className="flex size-10 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+          <Icon name="check" />
+        </span>
+        <div className="min-w-0 grow">
+          <p className="font-semibold">After call work</p>
+          <p className="truncate text-sm text-secondary-500 dark:text-secondary-400">
+            {name} · <Timer since={contact.statusStartedAt} />
+          </p>
+        </div>
+        <Button variant="primary" disabled={saving} onClick={() => void finish()}>
+          {saving ? 'Saving notes…' : 'Finish call'}
+        </Button>
+      </div>
+      {contact.phoneNumber && <WrapupForm contactId={contact.contactId} phoneNumber={contact.phoneNumber} />}
+      <WrapupFeed phoneNumber={contact.phoneNumber} collapsible />
+    </Card>
   );
 }
 
@@ -123,6 +157,7 @@ export default function CallPanel() {
             </Button>
           </div>
         </div>
+        <WrapupFeed phoneNumber={contact.phoneNumber} />
       </Card>
     );
   }
@@ -143,24 +178,7 @@ export default function CallPanel() {
   }
 
   if (contact.status === CS.ENDED) {
-    return (
-      <Card>
-        <div className="flex items-center gap-3 px-4 py-4">
-          <span className="flex size-10 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-            <Icon name="check" />
-          </span>
-          <div className="grow">
-            <p className="font-semibold">After call work</p>
-            <p className="text-sm text-secondary-500 dark:text-secondary-400">
-              {name} · <Timer since={contact.statusStartedAt} />
-            </p>
-          </div>
-          <Button variant="primary" onClick={() => void clearContact()}>
-            Finish call
-          </Button>
-        </div>
-      </Card>
-    );
+    return <AfterCallWork contact={contact} name={name} />;
   }
 
   // Connecting (outbound) or connected.
@@ -221,6 +239,11 @@ export default function CallPanel() {
           ))}
         </ul>
       )}
+
+      {/* Without a number (e.g. an internal transfer) there's nothing to attach notes to. */}
+      {contact.phoneNumber && <WrapupForm contactId={contact.contactId} phoneNumber={contact.phoneNumber} />}
+
+      <WrapupFeed phoneNumber={contact.phoneNumber} collapsible />
 
       {multiParty && (
         <p className="border-t border-secondary-100 px-4 py-2 text-xs text-secondary-500 dark:border-secondary-800 dark:text-secondary-400">

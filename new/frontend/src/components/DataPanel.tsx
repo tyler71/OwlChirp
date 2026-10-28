@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react';
 
 import { $agent } from '../lib/stores';
 import MetricsTable from './MetricsTable';
-import RecentCallList from './RecentCallList';
 
 // Metrics and call history, shown once the CCP agent is ready.
 export default function DataPanel() {

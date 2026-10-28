@@ -67,3 +67,46 @@ func TestCallerID(t *testing.T) {
 	assert.True(t, found)
 	assert.Equal(t, c.Name, "Alice B")
 }
+
+func TestWrapups(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	wrapups, err := db.GetWrapups(ctx, "+15550001", 10)
+	assert.Nil(t, err)
+	assert.Equal(t, len(wrapups), 0)
+
+	first, err := db.UpsertWrapup(ctx, "agent@example.com", Wrapup{
+		ContactID: "c-1", PhoneNumber: "+15550001", Incident: "INC-1", Mood: "intense", Thoughts: "loud",
+	})
+	assert.Nil(t, err)
+	assert.Equal(t, first.Agent, "agent@example.com")
+	assert.True(t, first.Timestamp > 0)
+
+	_, err = db.UpsertWrapup(ctx, "other@example.com", Wrapup{
+		ContactID: "c-2", PhoneNumber: "+15550001", Mood: "friendly",
+	})
+	assert.Nil(t, err)
+
+	// Saving the same contact again edits it and keeps the original timestamp.
+	edited, err := db.UpsertWrapup(ctx, "agent@example.com", Wrapup{
+		ContactID: "c-1", PhoneNumber: "+15550001", Incident: "INC-2", Mood: "spam",
+	})
+	assert.Nil(t, err)
+	assert.Equal(t, edited.Incident, "INC-2")
+	assert.Equal(t, edited.Thoughts, "")
+	assert.Equal(t, edited.Timestamp, first.Timestamp)
+
+	wrapups, err = db.GetWrapups(ctx, "+15550001", 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(wrapups), 2)
+	assert.Equal(t, wrapups[0].ContactID, "c-2")
+
+	wrapups, err = db.GetWrapups(ctx, "+15550001", 1)
+	assert.Nil(t, err)
+	assert.Equal(t, len(wrapups), 1)
+
+	wrapups, err = db.GetWrapups(ctx, "+15559999", 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(wrapups), 0)
+}

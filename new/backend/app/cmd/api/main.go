@@ -62,13 +62,14 @@ type config struct {
 }
 
 type application struct {
-	config  config
-	db      *database.DB
-	connect *connect.Client
-	auth    *auth.Verifier
-	hub     *realtime.Hub
-	logger  *slog.Logger
-	wg      sync.WaitGroup
+	config   config
+	db       *database.DB
+	connect  *connect.Client
+	auth     *auth.Verifier
+	hub      *realtime.Hub
+	handlers map[string]wsHandler
+	logger   *slog.Logger
+	wg       sync.WaitGroup
 }
 
 func run(logger *slog.Logger) error {
@@ -120,6 +121,8 @@ func run(logger *slog.Logger) error {
 		hub:     realtime.NewHub(cc.Snapshot, time.Second, logger),
 		logger:  logger,
 	}
+
+	app.handlers = app.wsHandlers()
 
 	go app.hub.Run(ctx)
 

@@ -30,7 +30,7 @@ type Verifier struct {
 	mu      sync.Mutex
 	hour    int64
 	builtAt time.Time
-	tokens  map[string]struct{}
+	tokens  map[string]connect.RegisteredUser
 }
 
 func NewVerifier(users UserSource) *Verifier {
@@ -42,11 +42,12 @@ func Token(hour int64, agentID, username string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Verify reports whether token is valid for the current hour. Tokens from the
-// previous hour are also accepted to tolerate clock skew at the boundary.
-func (v *Verifier) Verify(ctx context.Context, token string) (bool, error) {
+// Verify reports whether token is valid for the current hour and, if so, which
+// user it belongs to. Tokens from the previous hour are also accepted to
+// tolerate clock skew at the boundary.
+func (v *Verifier) Verify(ctx context.Context, token string) (connect.RegisteredUser, bool, error) {
 	if token == "" {
-		return false, nil
+		return connect.RegisteredUser{}, false, nil
 	}
 
 	now := v.now().UTC()
@@ -58,13 +59,13 @@ func (v *Verifier) Verify(ctx context.Context, token string) (bool, error) {
 	if hour != v.hour || now.Sub(v.builtAt) > rebuildInterval {
 		users, err := v.users.RegisteredUsers(ctx)
 		if err != nil {
-			return false, err
+			return connect.RegisteredUser{}, false, err
 		}
 
-		tokens := make(map[string]struct{}, len(users)*2)
+		tokens := make(map[string]connect.RegisteredUser, len(users)*2)
 		for _, u := range users {
-			tokens[Token(hour, u.ID, u.Username)] = struct{}{}
-			tokens[Token(hour-3600, u.ID, u.Username)] = struct{}{}
+			tokens[Token(hour, u.ID, u.Username)] = u
+			tokens[Token(hour-3600, u.ID, u.Username)] = u
 		}
 
 		v.tokens = tokens
@@ -72,6 +73,6 @@ func (v *Verifier) Verify(ctx context.Context, token string) (bool, error) {
 		v.builtAt = now
 	}
 
-	_, ok := v.tokens[token]
-	return ok, nil
+	user, ok := v.tokens[token]
+	return user, ok, nil
 }

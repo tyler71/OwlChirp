@@ -40,20 +40,3 @@ func (app *application) logRequest(next http.Handler) http.Handler {
 		app.logger.Debug("access", userAttrs, requestAttrs, responseAttrs)
 	})
 }
-
-// requireAPIKey rejects requests without a valid X-Api-Key header.
-func (app *application) requireAPIKey(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ok, err := app.auth.Verify(r.Context(), r.Header.Get("X-Api-Key"))
-		if err != nil {
-			app.serverError(w, r, err)
-			return
-		}
-		if !ok {
-			app.unauthorized(w, r)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}

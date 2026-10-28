@@ -35,6 +35,24 @@ export type CallerId = {
   name: string | null;
 };
 
+export type Mood = 'intense' | 'friendly' | 'spam';
+
+export type Wrapup = {
+  contactId: string;
+  phoneNumber: string;
+  agent: string;
+  incident: string;
+  mood: Mood | '';
+  thoughts: string;
+  timestamp: number;
+};
+
+export type WrapupFeed = {
+  phoneNumber: string;
+  items: Wrapup[];
+  loading: boolean;
+};
+
 export type Alert = {
   kind: 'welcome' | 'warning' | 'none';
   message?: string;
@@ -53,6 +71,9 @@ export const $metrics = map<Metrics>({});
 export const $calls = atom<Call[] | null>(null);
 
 export const $callerId = atom<CallerId | null>(null);
+
+// Past wrap-ups for the number of the current (or last) contact.
+export const $wrapups = atom<WrapupFeed | null>(null);
 
 export const $alert = atom<Alert>({ kind: 'welcome' });
 

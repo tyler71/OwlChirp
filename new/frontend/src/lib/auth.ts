@@ -14,17 +14,3 @@ export async function apiKey(agent: connect.Agent | null = $agent.get()): Promis
 
   return sha256Hex(`${timestamp}${agentId}${username}`);
 }
-
-export async function apiHeaders(): Promise<HeadersInit> {
-  return {
-    'Content-Type': 'application/json;charset=UTF-8',
-    'X-Api-Key': await apiKey(),
-  };
-}
-
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(path, {
-    ...init,
-    headers: { ...(await apiHeaders()), ...(init.headers ?? {}) },
-  });
-}

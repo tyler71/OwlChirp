@@ -29,3 +29,19 @@ CREATE TABLE IF NOT EXISTS callerid (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_callerid_phone_number ON callerid (phone_number);
 CREATE INDEX IF NOT EXISTS ix_callerid_name ON callerid (name);
+
+-- Post-call wrap-up an agent fills in after each contact; one row per contact.
+CREATE TABLE IF NOT EXISTS wrapups (
+	id INTEGER NOT NULL PRIMARY KEY,
+	contact_id VARCHAR(36) NOT NULL,
+	phone_number VARCHAR(20) NOT NULL,
+	agent_id INTEGER REFERENCES users (id),
+	incident VARCHAR(100),
+	mood VARCHAR(10),
+	thoughts TEXT,
+	timestamp INTEGER,
+	created_on DATETIME,
+	updated_on DATETIME
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wrapups_contact_id ON wrapups (contact_id);
+CREATE INDEX IF NOT EXISTS ix_wrapups_phone_number ON wrapups (phone_number, timestamp);

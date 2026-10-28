@@ -13,18 +13,34 @@ func newTestHub() *Hub {
 	return NewHub(nil, 0, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
-func recv(t *testing.T, c *Client) map[string]any {
+type envelope struct {
+	Type string         `json:"type"`
+	Data map[string]any `json:"data"`
+}
+
+func recvEnvelope(t *testing.T, c *Client) *envelope {
 	t.Helper()
 	select {
 	case msg := <-c.Send:
-		var m map[string]any
-		if err := json.Unmarshal(msg, &m); err != nil {
+		var e envelope
+		if err := json.Unmarshal(msg, &e); err != nil {
 			t.Fatal(err)
 		}
-		return m
+		return &e
 	default:
 		return nil
 	}
+}
+
+// recv returns the data of the next metrics message, or nil if none is queued.
+func recv(t *testing.T, c *Client) map[string]any {
+	t.Helper()
+	e := recvEnvelope(t, c)
+	if e == nil {
+		return nil
+	}
+	assert.Equal(t, e.Type, "metrics")
+	return e.Data
 }
 
 func TestPublishSendsOnlyChangedKeys(t *testing.T) {
@@ -69,4 +85,20 @@ func TestSlowClientIsDropped(t *testing.T) {
 		t.Fatal("expected slow client to be dropped")
 	}
 	assert.Equal(t, h.clientCount(), 0)
+}
+
+func TestBroadcastReachesAllClients(t *testing.T) {
+	h := newTestHub()
+	a, b := h.Subscribe(), h.Subscribe()
+
+	msg, err := Message("wrapup.saved", map[string]any{"contactId": "c-1"})
+	assert.Nil(t, err)
+	h.Broadcast(msg)
+
+	for _, c := range []*Client{a, b} {
+		e := recvEnvelope(t, c)
+		assert.True(t, e != nil)
+		assert.Equal(t, e.Type, "wrapup.saved")
+		assert.Equal(t, e.Data["contactId"], any("c-1"))
+	}
 }

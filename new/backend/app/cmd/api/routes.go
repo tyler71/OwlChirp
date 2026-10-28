@@ -21,19 +21,9 @@ func (app *application) routes() http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/config", app.frontendConfig)
 
-		// Authenticates with its first message instead of a header.
-		r.Get("/ws", app.metricsSocket)
-
-		r.Group(func(r chi.Router) {
-			r.Use(app.requireAPIKey)
-
-			r.Get("/calls/agent", app.getAgentCalls)
-			r.Post("/calls/agent", app.addAgentCall)
-			r.Get("/calls/number", app.getNumberCalls)
-			r.Get("/calls/detail", app.getCallDetail)
-			r.Get("/calls/callerid", app.getCallerID)
-			r.Put("/calls/callerid", app.putCallerID)
-		})
+		// Metrics and all call handling. Authenticates with its first
+		// message instead of a header; see socket.
+		r.Get("/ws", app.socket)
 
 		r.NotFound(app.notFound)
 	})

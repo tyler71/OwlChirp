@@ -1,7 +1,9 @@
-// Package realtime fans out metric changes to connected WebSocket clients.
+// Package realtime fans out metric changes and call events to connected
+// WebSocket clients.
 //
 // A single poller fetches the metric snapshot once per interval (only while
-// clients are connected) and broadcasts only the keys whose values changed.
+// clients are connected) and broadcasts only the keys whose values changed,
+// as {"type":"metrics","data":{...}}. Other events go out through Broadcast.
 package realtime
 
 import (
@@ -52,7 +54,7 @@ func (h *Hub) Subscribe() *Client {
 
 	h.clients[c] = struct{}{}
 	if len(h.last) > 0 {
-		if msg, err := json.Marshal(h.last); err == nil {
+		if msg, err := Message("metrics", h.last); err == nil {
 			c.Send <- msg
 		}
 	}
@@ -134,12 +136,32 @@ func (h *Hub) publish(snapshot map[string]any) {
 		return
 	}
 
-	msg, err := json.Marshal(changed)
+	msg, err := Message("metrics", changed)
 	if err != nil {
 		h.logger.Error("realtime: encode message", "error", err)
 		return
 	}
 
+	h.fanOut(msg)
+}
+
+// Message encodes a server event as {"type": typ, "data": data}.
+func Message(typ string, data any) ([]byte, error) {
+	return json.Marshal(struct {
+		Type string `json:"type"`
+		Data any    `json:"data"`
+	}{typ, data})
+}
+
+// Broadcast sends msg to every connected client.
+func (h *Hub) Broadcast(msg []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.fanOut(msg)
+}
+
+// fanOut must be called with h.mu held.
+func (h *Hub) fanOut(msg []byte) {
 	for c := range h.clients {
 		select {
 		case c.Send <- msg:
