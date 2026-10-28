@@ -15,6 +15,20 @@ export function formatPhoneNumber(phone: string): string {
   return `(${fn.slice(0, 3)}) ${fn.slice(3, 6)}-${fn.slice(6, 10)}`;
 }
 
+/** Best-effort E.164 for a typed number; US numbers without a country code get +1. */
+export function normalizePhoneNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+  if (phone.trim().startsWith('+')) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  return `+${digits}`;
+}
+
+/** Short display name for a Connect username (drops any email domain). */
+export function agentName(username: string): string {
+  return username.split('@')[0];
+}
+
 const callTimeFormat = new Intl.DateTimeFormat('en-US', {
   weekday: 'short',
   hour: 'numeric',

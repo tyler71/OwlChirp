@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -248,3 +249,51 @@ const wrapupSelect = `SELECT w.contact_id, w.phone_number, COALESCE(u.username, 
 	COALESCE(w.incident, '') AS incident, COALESCE(w.mood, '') AS mood,
 	COALESCE(w.thoughts, '') AS thoughts, COALESCE(w.timestamp, 0) AS timestamp
 	FROM wrapups w LEFT JOIN users u ON u.id = w.agent_id`
+
+// Settings are an agent's preferences, stored as JSON so new fields need no
+// schema change.
+type Settings struct {
+	Theme string `json:"theme"`
+}
+
+// GetSettings returns zero Settings when the user has saved none.
+func (db *DB) GetSettings(ctx context.Context, username string) (Settings, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var data string
+	err := db.GetContext(ctx, &data,
+		`SELECT s.data FROM user_settings s JOIN users u ON u.id = s.user_id WHERE u.username = ?`, username)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Settings{}, nil
+	}
+	if err != nil {
+		return Settings{}, err
+	}
+
+	var s Settings
+	err = json.Unmarshal([]byte(data), &s)
+	return s, err
+}
+
+func (db *DB) SaveSettings(ctx context.Context, username string, s Settings) (Settings, error) {
+	userID, err := db.GetOrCreateUser(ctx, username)
+	if err != nil {
+		return Settings{}, err
+	}
+
+	data, err := json.Marshal(s)
+	if err != nil {
+		return Settings{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	ts := now()
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO user_settings (user_id, data, created_on, updated_on) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (user_id) DO UPDATE SET data = excluded.data, updated_on = excluded.updated_on`,
+		userID, string(data), ts, ts)
+	return s, err
+}

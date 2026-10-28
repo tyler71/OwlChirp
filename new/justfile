@@ -58,4 +58,4 @@ test:
 # Build the Docker image (frontend + backend)
 docker:
     docker build --progress plain --build-arg VERSION="$(git -C backend rev-parse --short HEAD 2>/dev/null || echo dev)" \
-        -t {{ image_name }} -f backend/Dockerfile .
+        -t {{ image_name }} -f ./Dockerfile .

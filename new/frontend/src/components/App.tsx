@@ -4,7 +4,7 @@ import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/r
 import { useStore } from '@nanostores/react';
 import { useState } from 'react';
 
-import { $agent, $agentSnapshot, $config, $owlchirpEnabled, $view } from '../lib/stores';
+import { $agent, $agentSnapshot, $config, $owlchirpEnabled, $view, type View } from '../lib/stores';
 import '../lib/theme';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
@@ -12,6 +12,7 @@ import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
+import Feed from './Feed';
 import Settings from './Settings';
 import StatusBar from './StatusBar';
 import { Icon, type IconName, stateDotClass } from './ui';
@@ -28,8 +29,9 @@ function Brand() {
   );
 }
 
-const NAV: { view: 'phone' | 'settings'; label: string; icon: IconName }[] = [
+const NAV: { view: View; label: string; icon: IconName }[] = [
   { view: 'phone', label: 'Phone', icon: 'phone' },
+  { view: 'feed', label: 'Feed', icon: 'chat' },
   { view: 'settings', label: 'Settings', icon: 'cog' },
 ];
 
@@ -245,6 +247,7 @@ export default function App() {
           <Ccp />
 
           {view === 'settings' && <Settings />}
+          {view === 'feed' && agent && <Feed />}
 
           {/* Owlchirp features are gated per agent by the owlchirp feature flag. */}
           {agent && (

@@ -1,14 +1,10 @@
 import { useStore } from '@nanostores/react';
 
 import { LOADING_CLASS } from '../lib/const';
-import { formatCallTime } from '../lib/helpers';
+import { agentName, formatCallTime } from '../lib/helpers';
 import { $wrapups, type Wrapup } from '../lib/stores';
 import { MOODS } from '../lib/wrapups';
 import { Icon } from './ui';
-
-function agentName(username: string): string {
-  return username.split('@')[0];
-}
 
 function Entry({ wrapup }: { wrapup: Wrapup }) {
   const mood = MOODS.find((m) => m.value === wrapup.mood);

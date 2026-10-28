@@ -1,5 +1,8 @@
 import { persistentAtom } from '@nanostores/persistent';
 
+import { request } from './realtime';
+import { $alert, $wsStatus } from './stores';
+
 // All daisyUI 5 themes (enabled with `themes: all` in global.css).
 export const THEMES = [
   'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate', 'synthwave', 'retro', 'cyberpunk',
@@ -18,7 +21,42 @@ export const DARK_THEMES: ReadonlySet<string> = new Set([
   'night', 'sunset', 'synthwave',
 ]);
 
+// Saved per user on the server; localStorage is a cache so layouts/Layout.astro
+// can apply the theme before first paint.
 export const $theme = persistentAtom<ThemeChoice>('owlchirp:theme', 'system');
+
+type Settings = { theme: string };
+
+function isThemeChoice(name: string): name is ThemeChoice {
+  return name === 'system' || (THEMES as readonly string[]).includes(name);
+}
+
+export async function setTheme(choice: ThemeChoice): Promise<void> {
+  $theme.set(choice);
+  try {
+    await request('settings.save', { theme: choice });
+  } catch (e) {
+    console.error('save settings', e);
+    $alert.set({ kind: 'warning', message: 'Theme could not be saved to your account.' });
+  }
+}
+
+// On each (re)connect the server's settings win. An account with none saved
+// adopts this browser's choice, carrying over themes picked before settings
+// moved to the server.
+async function syncSettings(): Promise<void> {
+  try {
+    const settings = await request<Settings>('settings.get');
+    if (isThemeChoice(settings.theme)) $theme.set(settings.theme);
+    else if ($theme.get() !== 'system') await request('settings.save', { theme: $theme.get() });
+  } catch {
+    // Not enabled for this user, or the connection dropped; retried on reconnect.
+  }
+}
+
+$wsStatus.subscribe((status) => {
+  if (status === 'open') void syncSettings();
+});
 
 const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
 

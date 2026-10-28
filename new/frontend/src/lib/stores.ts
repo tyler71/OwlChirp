@@ -75,8 +75,12 @@ export const $callerId = atom<CallerId | null>(null);
 // Past wrap-ups for the number of the current (or last) contact.
 export const $wrapups = atom<WrapupFeed | null>(null);
 
+// Wrap-ups for the number looked up in the Feed view.
+export const $numberFeed = atom<WrapupFeed | null>(null);
+
 // Which main view the sidebar has selected.
-export const $view = atom<'phone' | 'settings'>('phone');
+export type View = 'phone' | 'feed' | 'settings';
+export const $view = atom<View>('phone');
 
 export const $alert = atom<Alert>({ kind: 'welcome' });
 

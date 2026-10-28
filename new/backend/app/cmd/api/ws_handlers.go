@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -21,6 +22,9 @@ const (
 
 var validMoods = map[string]bool{"": true, "intense": true, "friendly": true, "spam": true}
 
+// Theme names are daisyUI theme names or "system"; the frontend owns the list.
+var validTheme = regexp.MustCompile(`^[a-z]{0,20}$`)
+
 // clientError is a problem with the request; its message is sent to the
 // client. Any other error is logged and reported generically.
 type clientError string
@@ -31,19 +35,24 @@ type wsHandler func(ctx context.Context, user connect.RegisteredUser, data json.
 
 func (app *application) wsHandlers() map[string]wsHandler {
 	return map[string]wsHandler{
-		"calls.agent":  app.wsAgentCalls,
-		"calls.log":    app.wsLogCall,
-		"calls.number": app.wsNumberCalls,
-		"calls.detail": app.wsCallDetail,
-		"callerid.get": app.wsGetCallerID,
-		"callerid.set": app.wsSetCallerID,
-		"wrapups.list": app.wsListWrapups,
-		"wrapups.save": app.wsSaveWrapup,
+		"calls.agent":   app.wsAgentCalls,
+		"calls.log":     app.wsLogCall,
+		"calls.number":  app.wsNumberCalls,
+		"calls.detail":  app.wsCallDetail,
+		"callerid.get":  app.wsGetCallerID,
+		"callerid.set":  app.wsSetCallerID,
+		"wrapups.list":  app.wsListWrapups,
+		"wrapups.save":  app.wsSaveWrapup,
+		"settings.get":  app.wsGetSettings,
+		"settings.save": app.wsSaveSettings,
 	}
 }
 
+// ungatedRequests are available to every agent regardless of the owlchirp flag.
+var ungatedRequests = map[string]bool{"settings.get": true, "settings.save": true}
+
 func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, enabled bool, req wsRequest) wsReply {
-	if !enabled {
+	if !enabled && !ungatedRequests[req.Type] {
 		return wsReply{ID: req.ID, Type: "error", Error: "owlchirp is not enabled for this user"}
 	}
 
@@ -250,4 +259,21 @@ func (app *application) wsSaveWrapup(ctx context.Context, user connect.Registere
 
 	app.broadcast("wrapup.saved", saved)
 	return saved, nil
+}
+
+func (app *application) wsGetSettings(ctx context.Context, user connect.RegisteredUser, _ json.RawMessage) (any, error) {
+	return app.db.GetSettings(ctx, user.Username)
+}
+
+// wsSaveSettings replaces the user's settings. Not broadcast: settings are
+// private to the user.
+func (app *application) wsSaveSettings(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input database.Settings
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if !validTheme.MatchString(input.Theme) {
+		return nil, clientError("theme is invalid")
+	}
+	return app.db.SaveSettings(ctx, user.Username, input)
 }

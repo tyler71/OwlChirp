@@ -1,8 +1,9 @@
-import { atom } from 'nanostores';
+import { atom, type WritableAtom } from 'nanostores';
 import { onEvent, request } from './realtime';
-import { $wrapups, type Mood, type Wrapup } from './stores';
+import { $numberFeed, $wrapups, type Mood, type Wrapup, type WrapupFeed } from './stores';
 
 const MAX_WRAPUPS = 50;
+const MAX_FEED = 200;
 
 export const MOODS: { value: Mood; emoji: string; label: string }[] = [
   { value: 'intense', emoji: '😤', label: 'Intense' },
@@ -15,36 +16,51 @@ export const THOUGHTS_MAX_LENGTH = 4000;
 
 export type WrapupInput = Pick<Wrapup, 'contactId' | 'phoneNumber' | 'incident' | 'mood' | 'thoughts'>;
 
-/** Insert or replace (by contact) a wrap-up in the feed if it's for the shown number. */
-function applyWrapup(wrapup: Wrapup): void {
-  const feed = $wrapups.get();
+/** Insert or replace (by contact) a wrap-up in a feed if it's for that feed's number. */
+function applyTo(store: WritableAtom<WrapupFeed | null>, wrapup: Wrapup): void {
+  const feed = store.get();
   if (!feed || feed.phoneNumber !== wrapup.phoneNumber) return;
 
   const items = [wrapup, ...feed.items.filter((w) => w.contactId !== wrapup.contactId)].sort(
     (a, b) => b.timestamp - a.timestamp,
   );
-  $wrapups.set({ ...feed, items });
+  store.set({ ...feed, items });
+}
+
+function applyWrapup(wrapup: Wrapup): void {
+  applyTo($wrapups, wrapup);
+  applyTo($numberFeed, wrapup);
 }
 
 onEvent<Wrapup>('wrapup.saved', applyWrapup);
 
-export async function loadWrapups(phoneNumber: string): Promise<void> {
-  $wrapups.set({ phoneNumber, items: [], loading: true });
+async function loadInto(store: WritableAtom<WrapupFeed | null>, phoneNumber: string, maxRecords: number): Promise<void> {
+  store.set({ phoneNumber, items: [], loading: true });
 
   let items: Wrapup[] = [];
   try {
-    items = (await request<Wrapup[]>('wrapups.list', { phoneNumber, maxRecords: MAX_WRAPUPS })) ?? [];
+    items = (await request<Wrapup[]>('wrapups.list', { phoneNumber, maxRecords })) ?? [];
   } catch (e) {
     console.error('loadWrapups', e);
   }
 
-  // Ignore stale responses if another call came in meanwhile.
-  const feed = $wrapups.get();
+  // Ignore stale responses if another number was loaded meanwhile.
+  const feed = store.get();
   if (feed?.phoneNumber === phoneNumber) {
     // Keep anything pushed by wrapup.saved while the list was loading.
     const pushed = feed.items.filter((p) => !items.some((w) => w.contactId === p.contactId));
-    $wrapups.set({ phoneNumber, items: [...pushed, ...items], loading: false });
+    store.set({ phoneNumber, items: [...pushed, ...items], loading: false });
   }
+}
+
+/** Load history for the current contact's number (shown in the call panel). */
+export function loadWrapups(phoneNumber: string): Promise<void> {
+  return loadInto($wrapups, phoneNumber, MAX_WRAPUPS);
+}
+
+/** Load history for a number looked up in the Feed view. */
+export function loadNumberFeed(phoneNumber: string): Promise<void> {
+  return loadInto($numberFeed, phoneNumber, MAX_FEED);
 }
 
 export function isEmptyWrapup(input: WrapupInput): boolean {

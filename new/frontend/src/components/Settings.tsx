@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 
-import { $theme, THEMES, type ThemeChoice } from '../lib/theme';
+import { $theme, setTheme, THEMES, type ThemeChoice } from '../lib/theme';
 import { Card, Icon } from './ui';
 
 function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolean }) {
@@ -10,7 +10,7 @@ function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolea
     <button
       type="button"
       data-theme={previewTheme}
-      onClick={() => $theme.set(choice)}
+      onClick={() => void setTheme(choice)}
       aria-pressed={selected}
       className={`overflow-hidden rounded-lg border text-left transition hover:-translate-y-0.5 hover:shadow-md ${
         selected
@@ -42,7 +42,7 @@ export default function Settings() {
       <div className="flex flex-col gap-3 p-4">
         <div>
           <h3 className="text-sm font-semibold">Theme</h3>
-          <p className="text-xs text-secondary-500 dark:text-secondary-400">Saved in this browser.</p>
+          <p className="text-xs text-secondary-500 dark:text-secondary-400">Saved to your account.</p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {(['system', ...THEMES] as ThemeChoice[]).map((t) => (

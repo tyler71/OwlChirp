@@ -45,3 +45,11 @@ CREATE TABLE IF NOT EXISTS wrapups (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_wrapups_contact_id ON wrapups (contact_id);
 CREATE INDEX IF NOT EXISTS ix_wrapups_phone_number ON wrapups (phone_number, timestamp);
+
+-- Per-user preferences as a JSON object; one row per user.
+CREATE TABLE IF NOT EXISTS user_settings (
+	user_id INTEGER NOT NULL PRIMARY KEY REFERENCES users (id),
+	data TEXT NOT NULL,
+	created_on DATETIME,
+	updated_on DATETIME
+);

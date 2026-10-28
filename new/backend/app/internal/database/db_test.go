@@ -110,3 +110,25 @@ func TestWrapups(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, len(wrapups), 0)
 }
+
+func TestSettings(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	s, err := db.GetSettings(ctx, "alice")
+	assert.Nil(t, err)
+	assert.Equal(t, s.Theme, "")
+
+	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "dracula"})
+	assert.Nil(t, err)
+	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "nord"})
+	assert.Nil(t, err)
+
+	s, err = db.GetSettings(ctx, "alice")
+	assert.Nil(t, err)
+	assert.Equal(t, s.Theme, "nord")
+
+	s, err = db.GetSettings(ctx, "bob")
+	assert.Nil(t, err)
+	assert.Equal(t, s.Theme, "")
+}

@@ -182,6 +182,12 @@ func TestSocketFlags(t *testing.T) {
 		reply := c.call("calls.agent", map[string]any{})
 		assert.Equal(t, reply.Type, "error")
 		assert.Equal(t, reply.Error, "owlchirp is not enabled for this user")
+
+		reply = c.call("settings.save", map[string]any{"theme": "dark"})
+		assert.Equal(t, reply.Type, "result")
+
+		reply = c.call("settings.get", map[string]any{})
+		assert.Equal(t, reply.Type, "result")
 	})
 }
 
@@ -217,6 +223,23 @@ func TestSocketWrapups(t *testing.T) {
 	assert.Equal(t, list[0].Mood, "spam")
 }
 
+func TestSocketSettings(t *testing.T) {
+	srv := newTestServer(t)
+	c := dial(t, srv, validToken())
+
+	reply := c.call("settings.get", nil)
+	assert.Equal(t, reply.Type, "result")
+	assert.Equal(t, string(reply.Data), `{"theme":""}`)
+
+	reply = c.call("settings.save", map[string]any{"theme": "dracula"})
+	assert.Equal(t, reply.Type, "result")
+
+	// A second connection for the same user sees the saved settings.
+	other := dial(t, srv, validToken())
+	reply = other.call("settings.get", nil)
+	assert.Equal(t, string(reply.Data), `{"theme":"dracula"}`)
+}
+
 func TestSocketValidation(t *testing.T) {
 	srv := newTestServer(t)
 	c := dial(t, srv, validToken())
@@ -231,6 +254,7 @@ func TestSocketValidation(t *testing.T) {
 		{"wrapups.save", map[string]any{"contactId": "c-1", "phoneNumber": "+1"}, "wrap-up is empty"},
 		{"wrapups.save", map[string]any{"phoneNumber": "+1", "mood": "spam"}, "contactId is required"},
 		{"callerid.set", map[string]any{"phoneNumber": "+1"}, "name is required"},
+		{"settings.save", map[string]any{"theme": "Dracula!"}, "theme is invalid"},
 	}
 	for _, tt := range tests {
 		reply := c.call(tt.typ, tt.data)
