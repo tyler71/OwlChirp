@@ -47,38 +47,44 @@ type wsHandler func(ctx context.Context, user connect.RegisteredUser, data json.
 
 func (app *application) wsHandlers() map[string]wsHandler {
 	return map[string]wsHandler{
-		"calls.agent":        app.wsAgentCalls,
-		"calls.log":          app.wsLogCall,
-		"calls.number":       app.wsNumberCalls,
-		"calls.detail":       app.wsCallDetail,
-		"callerid.get":       app.wsGetCallerID,
-		"callerid.set":       app.wsSetCallerID,
-		"callerid.list":      app.wsListCallerIDs,
-		"callerid.delete":    app.wsDeleteCallerID,
-		"wrapups.list":       app.wsListWrapups,
-		"wrapups.save":       app.wsSaveWrapup,
-		"settings.get":       app.wsGetSettings,
-		"settings.save":      app.wsSaveSettings,
-		"syslog.append":      app.wsAppendCallLog,
-		"syslog.list":        app.wsListCallLogs,
-		"syslog.get":         app.wsGetCallLog,
-		"flowcalls.list":     app.wsListFlowCalls,
-		"flowcalls.timeline": app.wsFlowTimeline,
-		"help.request":       app.wsRequestHelp,
+		"calls.agent":           app.wsAgentCalls,
+		"calls.log":             app.wsLogCall,
+		"calls.number":          app.wsNumberCalls,
+		"calls.detail":          app.wsCallDetail,
+		"callerid.get":          app.wsGetCallerID,
+		"callerid.set":          app.wsSetCallerID,
+		"callerid.list":         app.wsListCallerIDs,
+		"callerid.delete":       app.wsDeleteCallerID,
+		"wrapups.list":          app.wsListWrapups,
+		"wrapups.save":          app.wsSaveWrapup,
+		"settings.get":          app.wsGetSettings,
+		"settings.save":         app.wsSaveSettings,
+		"syslog.append":         app.wsAppendCallLog,
+		"syslog.list":           app.wsListCallLogs,
+		"syslog.get":            app.wsGetCallLog,
+		"flowcalls.list":        app.wsListFlowCalls,
+		"flowcalls.timeline":    app.wsFlowTimeline,
+		"help.request":          app.wsRequestHelp,
+		"users.list":            app.wsListUsers,
+		"users.setPermission":   app.wsSetPermission,
+		"users.resetPermission": app.wsResetPermission,
 	}
 }
 
 // requestPermission lists requests that need more than flags.Standard.
 var requestPermission = map[string]int{
 	"callerid.list": flags.Admin, "callerid.delete": flags.Admin,
+	"users.list": flags.Admin, "users.setPermission": flags.Admin, "users.resetPermission": flags.Admin,
 }
 
-func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, level int, req wsRequest) wsReply {
+// handleRequest serves req. flagLevel is the user's feature flag level; a
+// level set by an admin overrides it.
+func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, flagLevel int, req wsRequest) wsReply {
 	handler, ok := app.handlers[req.Type]
 	if !ok {
 		return wsReply{ID: req.ID, Type: "error", Error: fmt.Sprintf("unknown request type %q", req.Type)}
 	}
-	if level < requestPermission[req.Type] {
+	if app.perms.level(user.Username, flagLevel) < requestPermission[req.Type] {
 		return wsReply{ID: req.ID, Type: "error", Error: "permission denied"}
 	}
 

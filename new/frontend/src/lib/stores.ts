@@ -112,7 +112,7 @@ export type FlowTimeline = {
 export const $timeline = atom<FlowTimeline | null>(null);
 
 // Which main view the sidebar has selected.
-export type View = 'phone' | 'calls' | 'feed' | 'flow' | 'timeline' | 'callerids' | 'settings' | 'log';
+export type View = 'phone' | 'calls' | 'feed' | 'flow' | 'timeline' | 'callerids' | 'admin' | 'settings' | 'log';
 export const $view = atom<View>('phone');
 
 export const $alert = atom<Alert>({ kind: 'welcome' });

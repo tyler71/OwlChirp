@@ -221,6 +221,61 @@ func (db *DB) DeleteCallerID(ctx context.Context, phoneNumber string) (bool, err
 	return n > 0, err
 }
 
+// ListPermissions returns the permission level set for each user, keyed by
+// username.
+func (db *DB) ListPermissions(ctx context.Context) (map[string]int, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var rows []struct {
+		Username string `db:"username"`
+		Level    int    `db:"level"`
+	}
+	err := db.SelectContext(ctx, &rows,
+		`SELECT u.username, p.level FROM user_permissions p JOIN users u ON u.id = p.user_id`)
+	if err != nil {
+		return nil, err
+	}
+
+	levels := make(map[string]int, len(rows))
+	for _, r := range rows {
+		levels[r.Username] = r.Level
+	}
+	return levels, nil
+}
+
+func (db *DB) SetPermission(ctx context.Context, username string, level int) error {
+	userID, err := db.GetOrCreateUser(ctx, username)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	ts := now()
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO user_permissions (user_id, level, created_on, updated_on) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (user_id) DO UPDATE SET level = excluded.level, updated_on = excluded.updated_on`,
+		userID, level, ts, ts)
+	return err
+}
+
+// DeletePermission removes the level set for username and reports whether
+// there was one.
+func (db *DB) DeletePermission(ctx context.Context, username string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	res, err := db.ExecContext(ctx,
+		`DELETE FROM user_permissions WHERE user_id = (SELECT id FROM users WHERE username = ?)`, username)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 type Wrapup struct {
 	ContactID   string `db:"contact_id" json:"contactId"`
 	PhoneNumber string `db:"phone_number" json:"phoneNumber"`

@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { $agent, $agentSnapshot, $config, $permission, $view, PERMISSION, type View } from '../lib/stores';
 import '../lib/theme';
+import Admin from './Admin';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
 import AskForHelpButton from './AskForHelpButton';
@@ -44,6 +45,7 @@ const NAV: { view: View; label: string; icon: IconName }[] = [
   { view: 'timeline', label: 'Timeline', icon: 'timeline' },
   { view: 'calls', label: 'Recent Calls', icon: 'clock' },
   { view: 'callerids', label: 'Caller IDs', icon: 'user' },
+  { view: 'admin', label: 'Admin', icon: 'shield' },
   { view: 'settings', label: 'Settings', icon: 'cog' },
 ];
 
@@ -140,6 +142,7 @@ const VIEW_PERMISSION: Partial<Record<View, number>> = {
   flow: PERMISSION.power,
   timeline: PERMISSION.power,
   callerids: PERMISSION.admin,
+  admin: PERMISSION.admin,
 };
 
 function canView(view: View, permission: number): boolean {
@@ -279,6 +282,7 @@ export default function App() {
           {view === 'flow' && agent && canView(view, permission) && <FlowCalls />}
           {view === 'timeline' && agent && canView(view, permission) && <Timeline />}
           {view === 'callerids' && canView(view, permission) && <CallerIds />}
+          {view === 'admin' && canView(view, permission) && <Admin />}
 
           {agent && (
             <div className={view === 'phone' ? 'contents' : 'hidden'}>

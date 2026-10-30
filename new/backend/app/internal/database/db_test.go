@@ -86,6 +86,37 @@ func TestCallerID(t *testing.T) {
 	assert.Equal(t, len(callerIDs), 1)
 }
 
+func TestPermissions(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	levels, err := db.ListPermissions(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(levels), 0)
+
+	assert.Nil(t, db.SetPermission(ctx, "agent@example.com", 1))
+	assert.Nil(t, db.SetPermission(ctx, "agent@example.com", 2))
+	assert.Nil(t, db.SetPermission(ctx, "other@example.com", 0))
+
+	levels, err = db.ListPermissions(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(levels), 2)
+	assert.Equal(t, levels["agent@example.com"], 2)
+	assert.Equal(t, levels["other@example.com"], 0)
+
+	deleted, err := db.DeletePermission(ctx, "agent@example.com")
+	assert.Nil(t, err)
+	assert.True(t, deleted)
+
+	deleted, err = db.DeletePermission(ctx, "agent@example.com")
+	assert.Nil(t, err)
+	assert.False(t, deleted)
+
+	levels, err = db.ListPermissions(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(levels), 1)
+}
+
 func TestWrapups(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)

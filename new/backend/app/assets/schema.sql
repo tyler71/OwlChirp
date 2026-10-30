@@ -54,6 +54,15 @@ CREATE TABLE IF NOT EXISTS user_settings (
 	updated_on DATETIME
 );
 
+-- Permission level an admin set for a user (0 standard, 1 power, 2 admin);
+-- overrides the owlchirp feature flag. One row per user.
+CREATE TABLE IF NOT EXISTS user_permissions (
+	user_id INTEGER NOT NULL PRIMARY KEY REFERENCES users (id),
+	level INTEGER NOT NULL,
+	created_on DATETIME,
+	updated_on DATETIME
+);
+
 -- Diagnostic log the browser captures for each contact (app events, console
 -- errors and Amazon Connect Streams entries); one row per contact.
 CREATE TABLE IF NOT EXISTS call_logs (

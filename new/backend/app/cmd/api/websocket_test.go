@@ -53,8 +53,10 @@ func newTestServer(t *testing.T) *httptest.Server {
 	app := &application{
 		db:     db,
 		auth:   auth.NewVerifier(fakeUsers{testAgent, standardUser}),
+		users:  fakeUsers{testAgent, standardUser},
 		hub:    realtime.NewHub(nil, time.Hour, logger),
 		flags:  fakeFlags{testAgent.Username: flags.Admin},
+		perms:  newPermissionStore(nil),
 		logger: logger,
 	}
 	app.handlers = app.wsHandlers()
@@ -399,4 +401,79 @@ func TestSocketHelpRequest(t *testing.T) {
 	})
 	assert.Nil(t, json.Unmarshal(event.Data, &pushed))
 	assert.Equal(t, pushed.Name, standardUser.Username)
+}
+
+func TestSocketPermissions(t *testing.T) {
+	srv := newTestServer(t)
+	admin := dial(t, srv, validToken())
+	standard := dial(t, srv, tokenFor(standardUser))
+
+	reply := standard.call("users.list", nil)
+	assert.Equal(t, reply.Error, "permission denied")
+
+	reply = admin.call("users.list", nil)
+	assert.Equal(t, reply.Type, "result")
+	var users []managedUser
+	assert.Nil(t, json.Unmarshal(reply.Data, &users))
+	assert.Equal(t, len(users), 2)
+	assert.Equal(t, users[0], managedUser{Username: testAgent.Username, Level: flags.Admin, Source: sourceFlag})
+	assert.Equal(t, users[1], managedUser{Username: standardUser.Username, Level: flags.Standard, Source: sourceFlag})
+
+	reply = admin.call("users.setPermission", map[string]any{"username": testAgent.Username, "level": flags.Standard})
+	assert.Equal(t, reply.Error, "you can't change your own permission")
+	reply = admin.call("users.setPermission", map[string]any{"username": "nobody@example.com", "level": flags.Power})
+	assert.Equal(t, reply.Error, "user not found")
+	reply = admin.call("users.setPermission", map[string]any{"username": standardUser.Username, "level": 3})
+	assert.Equal(t, reply.Type, "error")
+
+	// A promotion applies to the user's next request without reconnecting.
+	reply = admin.call("users.setPermission", map[string]any{"username": standardUser.Username, "level": flags.Admin})
+	assert.Equal(t, reply.Type, "result")
+	event := standard.readUntil(func(m testMessage) bool { return m.Type == "permission.updated" })
+	var updated managedUser
+	assert.Nil(t, json.Unmarshal(event.Data, &updated))
+	assert.Equal(t, updated, managedUser{Username: standardUser.Username, Level: flags.Admin, Source: sourceDB})
+
+	reply = standard.call("users.list", nil)
+	assert.Equal(t, reply.Type, "result")
+
+	// A level set in the database overrides the flag, including on connect.
+	reply = standard.call("users.setPermission", map[string]any{"username": testAgent.Username, "level": flags.Power})
+	assert.Equal(t, reply.Type, "result")
+	reply = admin.call("users.list", nil)
+	assert.Equal(t, reply.Error, "permission denied")
+
+	again := dial(t, srv, validToken())
+	msg := again.readUntil(func(testMessage) bool { return true })
+	assert.Equal(t, string(msg.Data), `{"owlchirp":1}`)
+
+	// Resetting returns the user to their flag level.
+	reply = standard.call("users.resetPermission", map[string]any{"username": testAgent.Username})
+	assert.Equal(t, reply.Type, "result")
+	assert.Nil(t, json.Unmarshal(reply.Data, &updated))
+	assert.Equal(t, updated, managedUser{Username: testAgent.Username, Level: flags.Admin, Source: sourceFlag})
+
+	reply = admin.call("users.list", nil)
+	assert.Equal(t, reply.Type, "result")
+}
+
+func TestHardcodedAdmin(t *testing.T) {
+	hardcodedAdmins[standardUser.Username] = true
+	t.Cleanup(func() { delete(hardcodedAdmins, standardUser.Username) })
+
+	srv := newTestServer(t)
+	c := dial(t, srv, tokenFor(standardUser))
+	msg := c.readUntil(func(testMessage) bool { return true })
+	assert.Equal(t, string(msg.Data), `{"owlchirp":2}`)
+
+	admin := dial(t, srv, validToken())
+	reply := admin.call("users.setPermission", map[string]any{"username": standardUser.Username, "level": flags.Standard})
+	assert.Equal(t, reply.Error, "this user is always an admin")
+	reply = admin.call("users.resetPermission", map[string]any{"username": standardUser.Username})
+	assert.Equal(t, reply.Error, "this user is always an admin")
+
+	reply = admin.call("users.list", nil)
+	var users []managedUser
+	assert.Nil(t, json.Unmarshal(reply.Data, &users))
+	assert.Equal(t, users[1], managedUser{Username: standardUser.Username, Level: flags.Admin, Source: sourceHardcoded})
 }

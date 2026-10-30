@@ -80,8 +80,10 @@ type application struct {
 	db       *database.DB
 	connect  *connect.Client
 	auth     *auth.Verifier
+	users    auth.UserSource
 	hub      *realtime.Hub
 	flags    flagEvaluator
+	perms    *permissionStore
 	handlers map[string]wsHandler
 	timeline *cache.Value[flowTimeline]
 	help     helpLimiter
@@ -145,13 +147,20 @@ func run(logger *slog.Logger) error {
 	}
 	defer ff.Close()
 
+	levels, err := db.ListPermissions(ctx)
+	if err != nil {
+		return fmt.Errorf("load permissions: %w", err)
+	}
+
 	app := &application{
 		config:  cfg,
 		db:      db,
 		connect: cc,
 		auth:    auth.NewVerifier(cc),
+		users:   cc,
 		hub:     realtime.NewHub(cc.Snapshot, time.Second, logger),
 		flags:   ff,
+		perms:   newPermissionStore(levels),
 		logger:  logger,
 	}
 
