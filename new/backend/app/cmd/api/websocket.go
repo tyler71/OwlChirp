@@ -49,7 +49,8 @@ type wsReply struct {
 // Browsers can't set headers on a WebSocket, so the first message must be
 // {"type":"auth","token":"<X-Api-Key>"}. After that:
 //   - the server pushes events as {"type":"<event>","data":...}
-//     ("flags", "metrics", "call.logged", "callerid.updated", "wrapup.saved");
+//     ("flags", "metrics", "call.logged", "callerid.updated", "wrapup.saved",
+//     "help.requested");
 //     "flags" is always the first, sent once per connection
 //   - the client sends wsRequest calls, answered with a wsReply. The
 //     permission level in "flags" decides what the UI shows; requests in

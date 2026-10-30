@@ -172,6 +172,20 @@ export type QuickConnect = {
 
 export const $agentSnapshot = atom<AgentSnapshot | null>(null);
 
+// A teammate asking agents who aren't taking calls to become available.
+export type HelpRequest = {
+  agent: string;
+  name: string;
+  queueCount: number;
+  timestamp: number;
+};
+
+// The help request shown to this agent; null when there is none.
+export const $helpRequest = atom<HelpRequest | null>(null);
+
+// When this agent last asked for help (ms epoch), for the button cooldown.
+export const $helpRequestedAt = atom<number>(0);
+
 export const $contactSnapshot = atom<ContactSnapshot | null>(null);
 
 export const $quickConnects = atom<QuickConnect[] | null>(null);

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -24,6 +25,9 @@ const (
 
 	maxLogEntriesPerRequest = 500
 	maxLogTextLength        = 2000
+
+	maxHelpNameLength = 100
+	helpCooldown      = 30 * time.Second
 )
 
 var validMoods = map[string]bool{"": true, "intense": true, "friendly": true, "spam": true}
@@ -60,6 +64,7 @@ func (app *application) wsHandlers() map[string]wsHandler {
 		"syslog.get":         app.wsGetCallLog,
 		"flowcalls.list":     app.wsListFlowCalls,
 		"flowcalls.timeline": app.wsFlowTimeline,
+		"help.request":       app.wsRequestHelp,
 	}
 }
 
@@ -411,4 +416,64 @@ func (app *application) wsListFlowCalls(ctx context.Context, _ connect.Registere
 // 15-minute buckets. The result is shared by all agents and cached 30 minutes.
 func (app *application) wsFlowTimeline(ctx context.Context, _ connect.RegisteredUser, _ json.RawMessage) (any, error) {
 	return app.timeline.Get(ctx)
+}
+
+// helpLimiter remembers when each agent last asked for help so one agent
+// can't flood everyone with popups. The zero value is ready to use.
+type helpLimiter struct {
+	mu   sync.Mutex
+	last map[string]time.Time
+}
+
+// allow reports whether username may ask for help now, and if so records it.
+func (l *helpLimiter) allow(username string, now time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if now.Sub(l.last[username]) < helpCooldown {
+		return false
+	}
+	if l.last == nil {
+		l.last = make(map[string]time.Time)
+	}
+	l.last[username] = now
+	return true
+}
+
+type helpRequest struct {
+	Agent      string `json:"agent"`
+	Name       string `json:"name"`
+	QueueCount int    `json:"queueCount"`
+	Timestamp  int64  `json:"timestamp"`
+}
+
+// wsRequestHelp asks agents who aren't taking calls to become available.
+// Every client gets the "help.requested" event; each decides from its own
+// agent state whether to show it.
+func (app *application) wsRequestHelp(_ context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		Name       string `json:"name"`
+		QueueCount int    `json:"queueCount"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	if !app.help.allow(user.Username, now) {
+		return nil, clientError("help was already requested")
+	}
+
+	req := helpRequest{
+		Agent:      user.Username,
+		Name:       truncate(strings.TrimSpace(input.Name), maxHelpNameLength),
+		QueueCount: input.QueueCount,
+		Timestamp:  now.UnixMilli(),
+	}
+	if req.Name == "" {
+		req.Name = user.Username
+	}
+
+	app.broadcast("help.requested", req)
+	return req, nil
 }

@@ -191,9 +191,16 @@ export function clearContact(): Promise<void> {
     });
   }
   $contactSnapshot.set(null);
-  const available = agent.getAgentStates().find((s) => s.type === connect.AgentStateType.ROUTABLE);
-  if (agent.getState().type === connect.AgentStateType.ERROR && available) return setAgentState(available);
+  if (agent.getState().type === connect.AgentStateType.ERROR) return goAvailable();
   return Promise.resolve();
+}
+
+// Switches to the first routable status (normally "Available").
+export function goAvailable(): Promise<void> {
+  const available = requireAgent()
+    .getAgentStates()
+    .find((s) => s.type === connect.AgentStateType.ROUTABLE);
+  return available ? setAgentState(available) : Promise.resolve();
 }
 
 export const holdConnection = (id: string) => run('Hold', (cb) => findConnection(id).hold(cb));

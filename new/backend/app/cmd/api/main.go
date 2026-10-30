@@ -84,6 +84,7 @@ type application struct {
 	flags    flagEvaluator
 	handlers map[string]wsHandler
 	timeline *cache.Value[flowTimeline]
+	help     helpLimiter
 	logger   *slog.Logger
 	wg       sync.WaitGroup
 }

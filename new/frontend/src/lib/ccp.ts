@@ -19,6 +19,7 @@ import {
   STATUS_ON_CONTACT,
 } from './const';
 import { agentSideline, formatPhoneNumber, telemetry } from './helpers';
+import './help';
 import { authorize, notify, snooze } from './notifier';
 import { startRealtime } from './realtime';
 import { installConsoleCapture } from './systemLog';

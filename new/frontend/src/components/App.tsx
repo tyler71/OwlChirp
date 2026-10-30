@@ -8,12 +8,14 @@ import { $agent, $agentSnapshot, $config, $permission, $view, PERMISSION, type V
 import '../lib/theme';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
+import AskForHelpButton from './AskForHelpButton';
 import CallerIds from './CallerIds';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
 import Feed from './Feed';
+import HelpRequestDialog from './HelpRequestDialog';
 import FlowCalls from './FlowCalls';
 import MiniCallBar from './MiniCallBar';
 import RecentCallList from './RecentCallList';
@@ -263,6 +265,7 @@ export default function App() {
         <div className="container mx-auto flex w-full grow flex-col gap-1 pl-2 pr-2 lg:p-8 xl:max-w-7xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
             {agent && <AgentStatusMenu />}
+            {agent && <AskForHelpButton />}
           </div>
 
           <AlertSection />
@@ -291,6 +294,7 @@ export default function App() {
           )}
 
           {agent && <MiniCallBar />}
+          {agent && <HelpRequestDialog />}
         </div>
       </main>
     </div>

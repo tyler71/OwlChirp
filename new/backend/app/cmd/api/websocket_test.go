@@ -368,3 +368,35 @@ func TestSocketCallsAndCallerID(t *testing.T) {
 	reply = c.call("callerid.get", map[string]any{"phoneNumber": "+15550001"})
 	assert.Equal(t, string(reply.Data), "")
 }
+
+func TestSocketHelpRequest(t *testing.T) {
+	srv := newTestServer(t)
+	a := dial(t, srv, validToken())
+	b := dial(t, srv, tokenFor(standardUser))
+
+	// Make sure b is subscribed before a asks.
+	b.call("settings.get", nil)
+
+	reply := a.call("help.request", map[string]any{"name": " Ada ", "queueCount": 3})
+	assert.Equal(t, reply.Type, "result")
+
+	event := b.readUntil(func(m testMessage) bool { return m.Type == "help.requested" })
+	var pushed helpRequest
+	assert.Nil(t, json.Unmarshal(event.Data, &pushed))
+	assert.Equal(t, pushed.Agent, testAgent.Username)
+	assert.Equal(t, pushed.Name, "Ada")
+	assert.Equal(t, pushed.QueueCount, 3)
+
+	reply = a.call("help.request", map[string]any{"name": "Ada", "queueCount": 4})
+	assert.Equal(t, reply.Type, "error")
+	assert.Equal(t, reply.Error, "help was already requested")
+
+	// The cooldown is per agent.
+	reply = b.call("help.request", nil)
+	assert.Equal(t, reply.Type, "result")
+	event = a.readUntil(func(m testMessage) bool {
+		return m.Type == "help.requested" && strings.Contains(string(m.Data), standardUser.Username)
+	})
+	assert.Nil(t, json.Unmarshal(event.Data, &pushed))
+	assert.Equal(t, pushed.Name, standardUser.Username)
+}

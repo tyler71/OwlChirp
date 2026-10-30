@@ -53,5 +53,8 @@ export const LONG_BREAK_SNOOZE_MINUTES = 15;
 export const MAX_QUEUE_COUNT = 1;
 export const MIN_AGENT_STAFFED = 1;
 
+// Matches the server's per-agent help request cooldown.
+export const HELP_REQUEST_COOLDOWN_MS = 30_000;
+
 export const STATE_CHECK_INTERVAL_MS = 5000;
 export const RECENT_CALLS_MAX = 10;
