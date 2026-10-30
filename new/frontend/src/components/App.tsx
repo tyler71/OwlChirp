@@ -8,12 +8,14 @@ import { $agent, $agentSnapshot, $config, $permission, $view, PERMISSION, type V
 import '../lib/theme';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
+import CallerIds from './CallerIds';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
 import Feed from './Feed';
 import FlowCalls from './FlowCalls';
+import MiniCallBar from './MiniCallBar';
 import RecentCallList from './RecentCallList';
 import Settings from './Settings';
 import StatusBar from './StatusBar';
@@ -38,7 +40,8 @@ const NAV: { view: View; label: string; icon: IconName }[] = [
   { view: 'feed', label: 'Feed', icon: 'chat' },
   { view: 'flow', label: 'Flow Calls', icon: 'queue' },
   { view: 'timeline', label: 'Timeline', icon: 'timeline' },
-  { view: 'calls', label: 'My Recent Calls', icon: 'clock' },
+  { view: 'calls', label: 'Recent Calls', icon: 'clock' },
+  { view: 'callerids', label: 'Caller IDs', icon: 'user' },
   { view: 'settings', label: 'Settings', icon: 'cog' },
 ];
 
@@ -130,9 +133,11 @@ function UserMenu() {
 
 // Views that need more than standard permission.
 const VIEW_PERMISSION: Partial<Record<View, number>> = {
+  calls: PERMISSION.power,
   feed: PERMISSION.power,
   flow: PERMISSION.power,
   timeline: PERMISSION.power,
+  callerids: PERMISSION.admin,
 };
 
 function canView(view: View, permission: number): boolean {
@@ -266,10 +271,11 @@ export default function App() {
 
           {view === 'settings' && <Settings />}
           {view === 'log' && <SystemLog />}
-          {view === 'calls' && agent && <RecentCallList />}
+          {view === 'calls' && agent && canView(view, permission) && <RecentCallList />}
           {view === 'feed' && agent && canView(view, permission) && <Feed />}
           {view === 'flow' && agent && canView(view, permission) && <FlowCalls />}
           {view === 'timeline' && agent && canView(view, permission) && <Timeline />}
+          {view === 'callerids' && canView(view, permission) && <CallerIds />}
 
           {agent && (
             <div className={view === 'phone' ? 'contents' : 'hidden'}>
@@ -283,6 +289,8 @@ export default function App() {
               <DataPanel />
             </div>
           )}
+
+          {agent && <MiniCallBar />}
         </div>
       </main>
     </div>

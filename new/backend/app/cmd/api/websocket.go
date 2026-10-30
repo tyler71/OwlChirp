@@ -52,7 +52,8 @@ type wsReply struct {
 //     ("flags", "metrics", "call.logged", "callerid.updated", "wrapup.saved");
 //     "flags" is always the first, sent once per connection
 //   - the client sends wsRequest calls, answered with a wsReply. The
-//     permission level in "flags" only decides what the UI shows.
+//     permission level in "flags" decides what the UI shows; requests in
+//     requestPermission also need that level on the server.
 func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	// The connection outlives the server's Read/WriteTimeout.
 	rc := http.NewResponseController(w)
@@ -93,7 +94,7 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	// coder/websocket allows one concurrent writer, so request handlers hand
 	// their replies to the write loop below.
 	replies := make(chan []byte, wsReplyBuffer)
-	go app.wsReadLoop(ctx, cancel, conn, user, replies)
+	go app.wsReadLoop(ctx, cancel, conn, user, level, replies)
 
 	ping := time.NewTicker(wsPingInterval)
 	defer ping.Stop()
@@ -126,7 +127,7 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 
 // wsReadLoop handles client requests until the connection fails, then
 // cancels the connection's context so the write loop exits too.
-func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, user connect.RegisteredUser, replies chan<- []byte) {
+func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, user connect.RegisteredUser, level int, replies chan<- []byte) {
 	defer cancel()
 
 	for {
@@ -149,7 +150,7 @@ func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFun
 		go func() {
 			reqCtx, reqCancel := context.WithTimeout(ctx, wsRequestTimeout)
 			defer reqCancel()
-			app.sendReply(ctx, replies, app.handleRequest(reqCtx, user, req))
+			app.sendReply(ctx, replies, app.handleRequest(reqCtx, user, level, req))
 		}()
 	}
 }

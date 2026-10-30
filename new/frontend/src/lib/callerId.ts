@@ -1,12 +1,19 @@
 import { onEvent, request } from './realtime';
 import { $callerId, type CallerId } from './stores';
 
-type SavedCallerId = { phoneNumber: string; name: string };
+export type SavedCallerId = { phoneNumber: string; name: string };
 
 // Any agent renaming the current caller updates everyone's display.
 onEvent<SavedCallerId>('callerid.updated', ({ phoneNumber, name }) => {
   if ($callerId.get()?.phoneNumber === phoneNumber) {
     $callerId.set({ phoneNumber, name });
+  }
+});
+
+// A deleted caller ID falls back to showing the number.
+onEvent<{ phoneNumber: string }>('callerid.deleted', ({ phoneNumber }) => {
+  if ($callerId.get()?.phoneNumber === phoneNumber) {
+    $callerId.set({ phoneNumber, name: null });
   }
 });
 
@@ -35,4 +42,14 @@ export async function saveCallerId(phoneNumber: string, name: string): Promise<b
     $callerId.set({ phoneNumber, name });
   }
   return true;
+}
+
+// Admin only: every saved caller ID, ordered by name.
+export function listCallerIds(): Promise<SavedCallerId[]> {
+  return request<SavedCallerId[]>('callerid.list');
+}
+
+// Admin only.
+export async function deleteCallerId(phoneNumber: string): Promise<void> {
+  await request('callerid.delete', { phoneNumber });
 }

@@ -67,6 +67,23 @@ func TestCallerID(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, found)
 	assert.Equal(t, c.Name, "Alice B")
+
+	assert.Nil(t, db.UpsertCallerID(ctx, "+15550002", "aaron"))
+	callerIDs, err := db.ListCallerIDs(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(callerIDs), 2)
+	assert.Equal(t, callerIDs[0].Name, "aaron")
+
+	deleted, err := db.DeleteCallerID(ctx, "+15550002")
+	assert.Nil(t, err)
+	assert.True(t, deleted)
+	deleted, err = db.DeleteCallerID(ctx, "+15550002")
+	assert.Nil(t, err)
+	assert.False(t, deleted)
+
+	callerIDs, err = db.ListCallerIDs(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(callerIDs), 1)
 }
 
 func TestWrapups(t *testing.T) {

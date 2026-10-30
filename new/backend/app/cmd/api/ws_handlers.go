@@ -12,10 +12,13 @@ import (
 
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
+	"github.com/tyler71/owlchirp/app/internal/flags"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
 )
 
 const (
+	maxCallerIDNameLength = 30
+
 	maxIncidentLength = 100
 	maxThoughtsLength = 4000
 
@@ -46,6 +49,8 @@ func (app *application) wsHandlers() map[string]wsHandler {
 		"calls.detail":       app.wsCallDetail,
 		"callerid.get":       app.wsGetCallerID,
 		"callerid.set":       app.wsSetCallerID,
+		"callerid.list":      app.wsListCallerIDs,
+		"callerid.delete":    app.wsDeleteCallerID,
 		"wrapups.list":       app.wsListWrapups,
 		"wrapups.save":       app.wsSaveWrapup,
 		"settings.get":       app.wsGetSettings,
@@ -58,10 +63,18 @@ func (app *application) wsHandlers() map[string]wsHandler {
 	}
 }
 
-func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, req wsRequest) wsReply {
+// requestPermission lists requests that need more than flags.Standard.
+var requestPermission = map[string]int{
+	"callerid.list": flags.Admin, "callerid.delete": flags.Admin,
+}
+
+func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, level int, req wsRequest) wsReply {
 	handler, ok := app.handlers[req.Type]
 	if !ok {
 		return wsReply{ID: req.ID, Type: "error", Error: fmt.Sprintf("unknown request type %q", req.Type)}
+	}
+	if level < requestPermission[req.Type] {
+		return wsReply{ID: req.ID, Type: "error", Error: "permission denied"}
 	}
 
 	data, err := handler(ctx, user, req.Data)
@@ -202,8 +215,12 @@ func (app *application) wsSetCallerID(ctx context.Context, _ connect.RegisteredU
 	if err := requireField("phoneNumber", input.PhoneNumber); err != nil {
 		return nil, err
 	}
+	input.Name = strings.TrimSpace(input.Name)
 	if err := requireField("name", input.Name); err != nil {
 		return nil, err
+	}
+	if utf8.RuneCountInString(input.Name) > maxCallerIDNameLength {
+		return nil, clientError(fmt.Sprintf("name must be at most %d characters", maxCallerIDNameLength))
 	}
 
 	if err := app.db.UpsertCallerID(ctx, input.PhoneNumber, input.Name); err != nil {
@@ -211,6 +228,33 @@ func (app *application) wsSetCallerID(ctx context.Context, _ connect.RegisteredU
 	}
 
 	app.broadcast("callerid.updated", input)
+	return input, nil
+}
+
+func (app *application) wsListCallerIDs(ctx context.Context, _ connect.RegisteredUser, _ json.RawMessage) (any, error) {
+	return app.db.ListCallerIDs(ctx)
+}
+
+func (app *application) wsDeleteCallerID(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		PhoneNumber string `json:"phoneNumber"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if err := requireField("phoneNumber", input.PhoneNumber); err != nil {
+		return nil, err
+	}
+
+	found, err := app.db.DeleteCallerID(ctx, input.PhoneNumber)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, clientError("caller id not found")
+	}
+
+	app.broadcast("callerid.deleted", input)
 	return input, nil
 }
 

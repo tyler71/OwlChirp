@@ -196,6 +196,31 @@ func (db *DB) UpsertCallerID(ctx context.Context, phoneNumber, name string) erro
 	return err
 }
 
+// ListCallerIDs returns every saved caller ID, ordered by name.
+func (db *DB) ListCallerIDs(ctx context.Context) ([]CallerID, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	callerIDs := []CallerID{}
+	err := db.SelectContext(ctx, &callerIDs,
+		`SELECT COALESCE(name, '') AS name, phone_number FROM callerid ORDER BY name COLLATE NOCASE, phone_number`)
+	return callerIDs, err
+}
+
+// DeleteCallerID removes the name saved for phoneNumber and reports whether
+// there was one.
+func (db *DB) DeleteCallerID(ctx context.Context, phoneNumber string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	res, err := db.ExecContext(ctx, `DELETE FROM callerid WHERE phone_number = ?`, phoneNumber)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 type Wrapup struct {
 	ContactID   string `db:"contact_id" json:"contactId"`
 	PhoneNumber string `db:"phone_number" json:"phoneNumber"`

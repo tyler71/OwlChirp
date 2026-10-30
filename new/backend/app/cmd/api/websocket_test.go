@@ -180,12 +180,21 @@ func TestSocketFlags(t *testing.T) {
 		assert.Equal(t, msg.Type, "flags")
 		assert.Equal(t, string(msg.Data), `{"owlchirp":0}`)
 
-		// Levels only gate the UI; every request is still served.
+		// Most requests are served at every level; only admin requests are refused.
 		reply := c.call("calls.agent", map[string]any{})
 		assert.Equal(t, reply.Type, "result")
 
 		reply = c.call("settings.get", map[string]any{})
 		assert.Equal(t, reply.Type, "result")
+
+		reply = c.call("callerid.set", map[string]any{"phoneNumber": "+15550009", "name": "Ada"})
+		assert.Equal(t, reply.Type, "result")
+
+		for _, typ := range []string{"callerid.list", "callerid.delete"} {
+			reply = c.call(typ, map[string]any{"phoneNumber": "+15550009"})
+			assert.Equal(t, reply.Type, "error")
+			assert.Equal(t, reply.Error, "permission denied")
+		}
 	})
 }
 
@@ -303,6 +312,9 @@ func TestSocketValidation(t *testing.T) {
 		{"wrapups.save", map[string]any{"contactId": "c-1", "phoneNumber": "+1"}, "wrap-up is empty"},
 		{"wrapups.save", map[string]any{"phoneNumber": "+1", "mood": "spam"}, "contactId is required"},
 		{"callerid.set", map[string]any{"phoneNumber": "+1"}, "name is required"},
+		{"callerid.set", map[string]any{"phoneNumber": "+1", "name": strings.Repeat("a", 31)}, "name must be at most 30 characters"},
+		{"callerid.delete", map[string]any{}, "phoneNumber is required"},
+		{"callerid.delete", map[string]any{"phoneNumber": "+1"}, "caller id not found"},
 		{"settings.save", map[string]any{"theme": "Dracula!"}, "theme is invalid"},
 		{"syslog.append", map[string]any{"outcome": "failed"}, "contactId is required"},
 		{"syslog.append", map[string]any{"contactId": "c-1", "outcome": "weird"}, "outcome must be failed or missed"},
@@ -341,4 +353,18 @@ func TestSocketCallsAndCallerID(t *testing.T) {
 	var callerID database.CallerID
 	assert.Nil(t, json.Unmarshal(reply.Data, &callerID))
 	assert.Equal(t, callerID.Name, "Ada")
+
+	reply = c.call("callerid.list", nil)
+	var callerIDs []database.CallerID
+	assert.Nil(t, json.Unmarshal(reply.Data, &callerIDs))
+	assert.Equal(t, len(callerIDs), 1)
+	assert.Equal(t, callerIDs[0].PhoneNumber, "+15550001")
+
+	reply = c.call("callerid.delete", map[string]any{"phoneNumber": "+15550001"})
+	assert.Equal(t, reply.Type, "result")
+	event = c.readUntil(func(m testMessage) bool { return m.Type == "callerid.deleted" })
+	assert.True(t, strings.Contains(string(event.Data), "+15550001"))
+
+	reply = c.call("callerid.get", map[string]any{"phoneNumber": "+15550001"})
+	assert.Equal(t, string(reply.Data), "")
 }

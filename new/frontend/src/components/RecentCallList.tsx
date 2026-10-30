@@ -9,7 +9,7 @@ import { request } from '../lib/realtime';
 import { $calls, $config, $isAdmin, $isPower, $view, type Call } from '../lib/stores';
 import { Card, Icon } from './ui';
 
-const TITLE = 'My Recent Calls';
+const TITLE = 'Recent Calls';
 
 type ContactDetail = {
   id: string;

@@ -13,7 +13,14 @@ import {
   swapConnections,
   toggleMute,
 } from '../lib/softphone';
-import { $agentSnapshot, $callerId, $contactSnapshot, type ConnectionSnapshot, type ContactSnapshot } from '../lib/stores';
+import {
+  $agentSnapshot,
+  $callerId,
+  $contactSnapshot,
+  type CallerId,
+  type ConnectionSnapshot,
+  type ContactSnapshot,
+} from '../lib/stores';
 import { openCallLog } from '../lib/systemLog';
 import { $wrapupStatus, saveDraft } from '../lib/wrapups';
 import { Button, Card, Icon, formatElapsed, useNow } from './ui';
@@ -23,9 +30,16 @@ import WrapupForm from './WrapupForm';
 const CS = connect.ContactStateType;
 const HOLD = connect.ConnectionStateType.HOLD;
 
-function Timer({ since }: { since: number }) {
+export function Timer({ since }: { since: number }) {
   const now = useNow();
   return <span className="font-mono tabular-nums">{formatElapsed(now - since)}</span>;
+}
+
+// Caller ID name when it matches this call, else the formatted number.
+export function contactName(contact: ContactSnapshot, callerId: CallerId | null): string {
+  if (callerId && callerId.phoneNumber === contact.phoneNumber && callerId.name) return callerId.name;
+  if (contact.phoneNumber) return formatPhoneNumber(contact.phoneNumber);
+  return contact.connections[0]?.label ?? 'Unknown';
 }
 
 function ConnectionRow({ conn, canDrop }: { conn: ConnectionSnapshot; canDrop: boolean }) {
@@ -126,12 +140,7 @@ export default function CallPanel() {
     );
   }
 
-  const name =
-    callerId && callerId.phoneNumber === contact.phoneNumber && callerId.name
-      ? callerId.name
-      : contact.phoneNumber
-        ? formatPhoneNumber(contact.phoneNumber)
-        : (contact.connections[0]?.label ?? 'Unknown');
+  const name = contactName(contact, callerId);
   const ringing = contact.isInbound && (contact.status === CS.INCOMING || contact.status === CS.CONNECTING);
 
   if (ringing) {
