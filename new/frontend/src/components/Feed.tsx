@@ -3,13 +3,15 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { LOADING_CLASS } from '../lib/const';
 import { agentName, formatCallTime, formatPhoneNumber, normalizePhoneNumber } from '../lib/helpers';
-import { $agent, $contactSnapshot, $numberFeed, $wrapups, type Wrapup } from '../lib/stores';
+import { $agent, $contactSnapshot, $isAdmin, $numberFeed, $wrapups, type Wrapup } from '../lib/stores';
 import { loadNumberFeed, MOODS } from '../lib/wrapups';
 import { Button, Card } from './ui';
 
 // One wrap-up as chat bubbles: a mood card (the emoji stands in for the file
 // icon of the "file content" bubble), a text bubble for thoughts, then meta.
 function Message({ wrapup, mine }: { wrapup: Wrapup; mine: boolean }) {
+  const isAdmin = useStore($isAdmin);
+  const author = mine ? 'You' : isAdmin ? agentName(wrapup.agent) : null;
   const mood = MOODS.find((m) => m.value === wrapup.mood);
   const tail = mine ? 'rounded-br-none' : 'rounded-bl-none';
   const showIncidentInText = !mood && wrapup.incident;
@@ -26,7 +28,8 @@ function Message({ wrapup, mine }: { wrapup: Wrapup; mine: boolean }) {
           <div className="min-w-0 grow">
             <h3 className="font-semibold break-words">{wrapup.incident || mood.label}</h3>
             <p className="mt-0.5 text-xs text-secondary-600 dark:text-secondary-400">
-              {mood.label} • {mine ? 'You' : agentName(wrapup.agent)}
+              {mood.label}
+              {author && ` • ${author}`}
             </p>
           </div>
         </div>
@@ -45,8 +48,12 @@ function Message({ wrapup, mine }: { wrapup: Wrapup; mine: boolean }) {
 
       <div className="flex h-6 items-center gap-1 text-xs font-medium text-secondary-500 dark:text-secondary-400">
         <time dateTime={new Date(wrapup.timestamp).toISOString()}>{formatCallTime(wrapup.timestamp)}</time>
-        <span className="opacity-50">•</span>
-        <span className={mine ? 'text-primary-700 dark:text-primary-400' : undefined}>{mine ? 'You' : agentName(wrapup.agent)}</span>
+        {author && (
+          <>
+            <span className="opacity-50">•</span>
+            <span className={mine ? 'text-primary-700 dark:text-primary-400' : undefined}>{author}</span>
+          </>
+        )}
       </div>
     </div>
   );

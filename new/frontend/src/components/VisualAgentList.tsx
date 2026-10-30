@@ -65,6 +65,7 @@ export default function VisualAgentList() {
     return <div className={`h-6 grow select-none ${LOADING_CLASS}`} />;
   }
 
+  // Agent names are admin only; everyone else sees anonymous status badges.
   const sorted = [...userList].sort((a, b) => a.user.first_name.localeCompare(b.user.first_name));
   const letters = initials(sorted);
 
@@ -75,7 +76,7 @@ export default function VisualAgentList() {
           key={u.user_id}
           className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1 text-md font-bold after:ml-0.5 after:inline-block after:text-[10px] after:content-[attr(data-emoji)] ${CURSOR_HELP_CLASS} ${statusClass(u.status.name)}`}
           data-emoji={STATUS_EMOJI[u.status.name.toLowerCase()] ?? ''}
-          title={`${u.user.first_name} ${u.user.last_name}: ${u.status.name}`}
+          title={`${u.user.first_name} ${u.user.last_name}`}
         >
           {letters[i]}
         </span>

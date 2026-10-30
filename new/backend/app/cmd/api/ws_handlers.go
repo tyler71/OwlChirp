@@ -58,18 +58,7 @@ func (app *application) wsHandlers() map[string]wsHandler {
 	}
 }
 
-// ungatedRequests are available to every agent regardless of the owlchirp flag.
-// The system log stays available so failures can be diagnosed for anyone.
-var ungatedRequests = map[string]bool{
-	"settings.get": true, "settings.save": true,
-	"syslog.append": true, "syslog.list": true, "syslog.get": true,
-}
-
-func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, enabled bool, req wsRequest) wsReply {
-	//if !enabled && !ungatedRequests[req.Type] {
-	//	return wsReply{ID: req.ID, Type: "error", Error: "owlchirp is not enabled for this user"}
-	//}
-
+func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, req wsRequest) wsReply {
 	handler, ok := app.handlers[req.Type]
 	if !ok {
 		return wsReply{ID: req.ID, Type: "error", Error: fmt.Sprintf("unknown request type %q", req.Type)}

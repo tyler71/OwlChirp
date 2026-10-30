@@ -1,18 +1,27 @@
 // Package flags evaluates feature flags against a GO Feature Flag relay proxy
-// through OpenFeature. Every evaluation fails closed: errors yield false.
+// through OpenFeature. Every evaluation fails closed: errors yield Standard.
 package flags
 
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	gofeatureflag "github.com/open-feature/go-sdk-contrib/providers/go-feature-flag/pkg"
 	"github.com/open-feature/go-sdk/openfeature"
 )
 
-// OwlchirpKey is the flag that enables the Owlchirp features for a user.
+// OwlchirpKey is the integer flag holding a user's Owlchirp permission level.
 const OwlchirpKey = "owlchirp"
+
+// Permission levels. Each level includes everything below it, so compare
+// with >=.
+const (
+	Standard = 0
+	Power    = 1
+	Admin    = 2
+)
 
 const initTimeout = 10 * time.Second
 
@@ -24,7 +33,7 @@ type Client struct {
 // New returns a Client backed by the relay proxy at endpoint, authenticating
 // with apiKey when the relay requires one. With an empty endpoint no provider
 // is set, so OpenFeature's no-op provider answers every evaluation with the
-// default (false).
+// default (Standard).
 func New(endpoint, apiKey string, logger *slog.Logger) (*Client, error) {
 	if endpoint != "" {
 		provider, err := gofeatureflag.NewProvider(gofeatureflag.ProviderOptions{
@@ -50,15 +59,17 @@ func New(endpoint, apiKey string, logger *slog.Logger) (*Client, error) {
 	return &Client{of: openfeature.NewClient("owlchirp"), logger: logger}, nil
 }
 
-// Owlchirp reports whether the owlchirp flag is on for username. Errors are
-// logged and treated as false.
-func (c *Client) Owlchirp(ctx context.Context, username string) bool {
-	details, err := c.of.BooleanValueDetails(ctx, OwlchirpKey, false, openfeature.NewEvaluationContext(username, nil))
+// Permission returns username's permission level from the owlchirp flag,
+// clamped to Standard..Admin. The targeting key is the part of username before
+// any "@". Errors are logged and treated as Standard.
+func (c *Client) Permission(ctx context.Context, username string) int {
+	key, _, _ := strings.Cut(username, "@")
+	details, err := c.of.IntValueDetails(ctx, OwlchirpKey, Standard, openfeature.NewEvaluationContext(key, nil))
 	if err != nil {
 		c.logger.Warn("evaluate flag", "flag", OwlchirpKey, "username", username, "error", err)
-		return false
+		return Standard
 	}
-	return details.Value
+	return int(min(max(details.Value, Standard), Admin))
 }
 
 func (c *Client) Close() {

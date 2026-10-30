@@ -4,7 +4,7 @@ import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/r
 import { useStore } from '@nanostores/react';
 import { useState } from 'react';
 
-import { $agent, $agentSnapshot, $config, $owlchirpEnabled, $view, type View } from '../lib/stores';
+import { $agent, $agentSnapshot, $config, $permission, $view, PERMISSION, type View } from '../lib/stores';
 import '../lib/theme';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
@@ -38,7 +38,7 @@ const NAV: { view: View; label: string; icon: IconName }[] = [
   { view: 'feed', label: 'Feed', icon: 'chat' },
   { view: 'flow', label: 'Flow Calls', icon: 'queue' },
   { view: 'timeline', label: 'Timeline', icon: 'timeline' },
-  { view: 'calls', label: 'Recent Calls', icon: 'clock' },
+  { view: 'calls', label: 'My Recent Calls', icon: 'clock' },
   { view: 'settings', label: 'Settings', icon: 'cog' },
 ];
 
@@ -128,11 +128,22 @@ function UserMenu() {
   );
 }
 
+// Views that need more than standard permission.
+const VIEW_PERMISSION: Partial<Record<View, number>> = {
+  feed: PERMISSION.power,
+  flow: PERMISSION.power,
+  timeline: PERMISSION.power,
+};
+
+function canView(view: View, permission: number): boolean {
+  return permission >= (VIEW_PERMISSION[view] ?? PERMISSION.standard);
+}
+
 export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const agent = useStore($agent);
   const view = useStore($view);
-  const owlchirpEnabled = useStore($owlchirpEnabled);
+  const permission = useStore($permission);
 
   return (
     <div
@@ -186,7 +197,7 @@ export default function App() {
         <div className="grow overflow-y-auto">
           <div className="flex flex-col gap-4 px-4 py-6">
             <nav className="flex flex-col gap-0.5">
-              {NAV.map((item) => {
+              {NAV.filter((item) => canView(item.view, permission)).map((item) => {
                 const active = item.view === view;
                 return (
                   <button
@@ -256,11 +267,10 @@ export default function App() {
           {view === 'settings' && <Settings />}
           {view === 'log' && <SystemLog />}
           {view === 'calls' && agent && <RecentCallList />}
-          {view === 'feed' && agent && <Feed />}
-          {view === 'flow' && agent && <FlowCalls />}
-          {view === 'timeline' && agent && <Timeline />}
+          {view === 'feed' && agent && canView(view, permission) && <Feed />}
+          {view === 'flow' && agent && canView(view, permission) && <FlowCalls />}
+          {view === 'timeline' && agent && canView(view, permission) && <Timeline />}
 
-          {/* Owlchirp features are gated per agent by the owlchirp feature flag. */}
           {agent && (
             <div className={view === 'phone' ? 'contents' : 'hidden'}>
               <StatusBar />

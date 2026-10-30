@@ -17,6 +17,7 @@ import (
 	"github.com/tyler71/owlchirp/app/internal/cache"
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
+	"github.com/tyler71/owlchirp/app/internal/flags"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
 )
 
@@ -26,16 +27,17 @@ func (f fakeUsers) RegisteredUsers(context.Context) ([]connect.RegisteredUser, e
 	return f, nil
 }
 
-// fakeFlags turns owlchirp on for the usernames it holds.
-type fakeFlags map[string]bool
+// fakeFlags gives the usernames it holds their permission level; anyone else
+// is standard.
+type fakeFlags map[string]int
 
-func (f fakeFlags) Owlchirp(_ context.Context, username string) bool {
+func (f fakeFlags) Permission(_ context.Context, username string) int {
 	return f[username]
 }
 
 var (
 	testAgent    = connect.RegisteredUser{ID: "agent-1", Username: "agent@example.com"}
-	disabledUser = connect.RegisteredUser{ID: "agent-2", Username: "disabled@example.com"}
+	standardUser = connect.RegisteredUser{ID: "agent-2", Username: "standard@example.com"}
 )
 
 func newTestServer(t *testing.T) *httptest.Server {
@@ -50,9 +52,9 @@ func newTestServer(t *testing.T) *httptest.Server {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	app := &application{
 		db:     db,
-		auth:   auth.NewVerifier(fakeUsers{testAgent, disabledUser}),
+		auth:   auth.NewVerifier(fakeUsers{testAgent, standardUser}),
 		hub:    realtime.NewHub(nil, time.Hour, logger),
-		flags:  fakeFlags{testAgent.Username: true},
+		flags:  fakeFlags{testAgent.Username: flags.Admin},
 		logger: logger,
 	}
 	app.handlers = app.wsHandlers()
@@ -165,27 +167,21 @@ func TestSocketRejectsBadToken(t *testing.T) {
 func TestSocketFlags(t *testing.T) {
 	srv := newTestServer(t)
 
-	t.Run("enabled", func(t *testing.T) {
+	t.Run("admin", func(t *testing.T) {
 		c := dial(t, srv, validToken())
 		msg := c.readUntil(func(testMessage) bool { return true })
 		assert.Equal(t, msg.Type, "flags")
-		assert.Equal(t, string(msg.Data), `{"owlchirp":true}`)
-
-		reply := c.call("calls.agent", map[string]any{})
-		assert.NotEqual(t, reply.Error, "owlchirp is not enabled for this user")
+		assert.Equal(t, string(msg.Data), `{"owlchirp":2}`)
 	})
 
-	t.Run("disabled", func(t *testing.T) {
-		c := dial(t, srv, tokenFor(disabledUser))
+	t.Run("standard", func(t *testing.T) {
+		c := dial(t, srv, tokenFor(standardUser))
 		msg := c.readUntil(func(testMessage) bool { return true })
 		assert.Equal(t, msg.Type, "flags")
-		assert.Equal(t, string(msg.Data), `{"owlchirp":false}`)
+		assert.Equal(t, string(msg.Data), `{"owlchirp":0}`)
 
+		// Levels only gate the UI; every request is still served.
 		reply := c.call("calls.agent", map[string]any{})
-		assert.Equal(t, reply.Type, "error")
-		assert.Equal(t, reply.Error, "owlchirp is not enabled for this user")
-
-		reply = c.call("settings.save", map[string]any{"theme": "dark"})
 		assert.Equal(t, reply.Type, "result")
 
 		reply = c.call("settings.get", map[string]any{})

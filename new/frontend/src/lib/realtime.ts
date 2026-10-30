@@ -1,7 +1,7 @@
 import { apiKey } from './auth';
 import { API } from './const';
 import { sleep } from './helpers';
-import { $alert, $metrics, $owlchirpEnabled, $wsStatus, type Metrics } from './stores';
+import { $alert, $metrics, $permission, $wsStatus, type Metrics } from './stores';
 
 const FAIL_MESSAGE = 'Realtime connection lost; restoring...';
 const MIN_RETRY_SECONDS = 2;
@@ -36,8 +36,8 @@ export function onEvent<T>(type: string, handler: (data: T) => void): () => void
   return () => handlers.delete(handler);
 }
 
-onEvent<{ owlchirp: boolean }>('flags', (data) => {
-  $owlchirpEnabled.set(data.owlchirp);
+onEvent<{ owlchirp: number }>('flags', (data) => {
+  $permission.set(data.owlchirp ?? 0);
 });
 
 onEvent<Metrics>('metrics', (data) => {

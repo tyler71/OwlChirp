@@ -3,6 +3,7 @@ package flags
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,9 +17,9 @@ func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// fakeRelay answers OFREP evaluations of owlchirp: true for enabledUser,
-// false for anyone else. Other paths (configuration polling) get a 404.
-func fakeRelay(t *testing.T, enabledUser string, status int) *httptest.Server {
+// fakeRelay answers OFREP evaluations of owlchirp: level for user, Standard
+// for anyone else. Other paths (configuration polling) get a 404.
+func fakeRelay(t *testing.T, user string, level int, status int) *httptest.Server {
 	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,17 +40,16 @@ func fakeRelay(t *testing.T, enabledUser string, status int) *httptest.Server {
 			return
 		}
 
-		value := body.Context["targetingKey"] == enabledUser
-		variant := "disabled"
-		if value {
-			variant = "enabled"
+		value := Standard
+		if body.Context["targetingKey"] == user {
+			value = level
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"key":     OwlchirpKey,
 			"value":   value,
-			"variant": variant,
+			"variant": fmt.Sprint(value),
 			"reason":  "TARGETING_MATCH",
 		})
 	}))
@@ -57,31 +57,41 @@ func fakeRelay(t *testing.T, enabledUser string, status int) *httptest.Server {
 	return srv
 }
 
-func TestOwlchirpNoEndpoint(t *testing.T) {
+func TestPermissionNoEndpoint(t *testing.T) {
 	c, err := New("", "", testLogger())
 	assert.Nil(t, err)
 	defer c.Close()
 
-	assert.False(t, c.Owlchirp(context.Background(), "agent@example.com"))
+	assert.Equal(t, c.Permission(context.Background(), "agent@example.com"), Standard)
 }
 
-func TestOwlchirpTargetsUsername(t *testing.T) {
-	srv := fakeRelay(t, "agent@example.com", http.StatusOK)
+func TestPermissionTargetsUsername(t *testing.T) {
+	srv := fakeRelay(t, "agent", Admin, http.StatusOK)
 
 	c, err := New(srv.URL, "", testLogger())
 	assert.Nil(t, err)
 	defer c.Close()
 
-	assert.True(t, c.Owlchirp(context.Background(), "agent@example.com"))
-	assert.False(t, c.Owlchirp(context.Background(), "someone@example.com"))
+	assert.Equal(t, c.Permission(context.Background(), "agent@example.com"), Admin)
+	assert.Equal(t, c.Permission(context.Background(), "someone@example.com"), Standard)
 }
 
-func TestOwlchirpFailsClosed(t *testing.T) {
-	srv := fakeRelay(t, "agent@example.com", http.StatusInternalServerError)
+func TestPermissionClamps(t *testing.T) {
+	srv := fakeRelay(t, "agent", 7, http.StatusOK)
 
 	c, err := New(srv.URL, "", testLogger())
 	assert.Nil(t, err)
 	defer c.Close()
 
-	assert.False(t, c.Owlchirp(context.Background(), "agent@example.com"))
+	assert.Equal(t, c.Permission(context.Background(), "agent@example.com"), Admin)
+}
+
+func TestPermissionFailsClosed(t *testing.T) {
+	srv := fakeRelay(t, "agent", Admin, http.StatusInternalServerError)
+
+	c, err := New(srv.URL, "", testLogger())
+	assert.Nil(t, err)
+	defer c.Close()
+
+	assert.Equal(t, c.Permission(context.Background(), "agent@example.com"), Standard)
 }

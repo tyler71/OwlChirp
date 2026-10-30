@@ -1,4 +1,4 @@
-import { atom, map } from 'nanostores';
+import { atom, computed, map } from 'nanostores';
 import { persistentAtom, persistentMap } from '@nanostores/persistent';
 import type { STATUS } from './const';
 
@@ -119,9 +119,15 @@ export const $alert = atom<Alert>({ kind: 'welcome' });
 
 export const $wsStatus = atom<'connecting' | 'open' | 'closed'>('connecting');
 
-// The owlchirp feature flag for this agent, sent by the server after socket
-// auth. null until the first connection reports it.
-export const $owlchirpEnabled = atom<boolean | null>(null);
+// Permission levels from the owlchirp feature flag. Each level includes
+// everything below it, so compare with >=.
+export const PERMISSION = { standard: 0, power: 1, admin: 2 } as const;
+
+// This agent's permission level, sent by the server after socket auth.
+export const $permission = atom<number>(PERMISSION.standard);
+// Power unlocks the timeline, flow calls and feed; admin also shows agent names.
+export const $isPower = computed($permission, (p) => p >= PERMISSION.power);
+export const $isAdmin = computed($permission, (p) => p >= PERMISSION.admin);
 
 // Whether the CCP iframe can read its Connect cookies (blocked by Firefox ETP
 // and other third-party cookie partitioning until the agent allows access).

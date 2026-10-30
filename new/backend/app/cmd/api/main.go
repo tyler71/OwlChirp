@@ -72,7 +72,7 @@ type config struct {
 }
 
 type flagEvaluator interface {
-	Owlchirp(ctx context.Context, username string) bool
+	Permission(ctx context.Context, username string) int
 }
 
 type application struct {
@@ -136,7 +136,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	if cfg.flags.endpoint == "" {
-		logger.Warn("GOFF_ENDPOINT is empty; feature flags disabled, owlchirp is off for everyone")
+		logger.Warn("GOFF_ENDPOINT is empty; feature flags disabled, everyone gets standard permission")
 	}
 	ff, err := flags.New(cfg.flags.endpoint, cfg.flags.apiKey, logger)
 	if err != nil {
