@@ -14,6 +14,7 @@ import {
   toggleMute,
 } from '../lib/softphone';
 import { $agentSnapshot, $callerId, $contactSnapshot, type ConnectionSnapshot, type ContactSnapshot } from '../lib/stores';
+import { openCallLog } from '../lib/systemLog';
 import { $wrapupStatus, saveDraft } from '../lib/wrapups';
 import { Button, Card, Icon, formatElapsed, useNow } from './ui';
 import WrapupFeed from './WrapupFeed';
@@ -171,6 +172,9 @@ export default function CallPanel() {
             <p className="font-semibold">{contact.status === CS.ERROR ? 'Call failed' : 'Missed call'}</p>
             <p className="text-sm text-secondary-500 dark:text-secondary-400">{name}</p>
           </div>
+          {contact.status === CS.ERROR && (
+            <Button onClick={() => openCallLog(contact.contactId)}>View log</Button>
+          )}
           <Button onClick={() => void clearContact()}>Clear</Button>
         </div>
       </Card>

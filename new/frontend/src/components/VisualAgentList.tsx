@@ -20,8 +20,6 @@ import {
 } from '../lib/const';
 import { $metrics, type ActiveUser } from '../lib/stores';
 
-import type { STATUS } from '../lib/const';
-
 // Rendered via ::after on each agent chip (see data-emoji below).
 const STATUS_EMOJI: Record<string, string> = {
   [STATUS_AVAILABLE]: '',
@@ -38,7 +36,7 @@ const STATUS_EMOJI: Record<string, string> = {
   [STATUS_OFFLINE]: '💤',
 };
 
-export function statusClass(status: STATUS): string {
+export function statusClass(status: string): string {
   const sn = status.toLowerCase();
   if (sn === STATUS_ERROR || sn === STATUS_MISSED_CALL) return 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300';
   if (sn === STATUS_ON_CALL) return 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300';

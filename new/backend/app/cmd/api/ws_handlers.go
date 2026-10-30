@@ -18,9 +18,14 @@ import (
 const (
 	maxIncidentLength = 100
 	maxThoughtsLength = 4000
+
+	maxLogEntriesPerRequest = 500
+	maxLogTextLength        = 2000
 )
 
 var validMoods = map[string]bool{"": true, "intense": true, "friendly": true, "spam": true}
+
+var validOutcomes = map[string]bool{"": true, "failed": true, "missed": true}
 
 // Theme names are daisyUI theme names or "system"; the frontend owns the list.
 var validTheme = regexp.MustCompile(`^[a-z]{0,20}$`)
@@ -35,21 +40,30 @@ type wsHandler func(ctx context.Context, user connect.RegisteredUser, data json.
 
 func (app *application) wsHandlers() map[string]wsHandler {
 	return map[string]wsHandler{
-		"calls.agent":   app.wsAgentCalls,
-		"calls.log":     app.wsLogCall,
-		"calls.number":  app.wsNumberCalls,
-		"calls.detail":  app.wsCallDetail,
-		"callerid.get":  app.wsGetCallerID,
-		"callerid.set":  app.wsSetCallerID,
-		"wrapups.list":  app.wsListWrapups,
-		"wrapups.save":  app.wsSaveWrapup,
-		"settings.get":  app.wsGetSettings,
-		"settings.save": app.wsSaveSettings,
+		"calls.agent":        app.wsAgentCalls,
+		"calls.log":          app.wsLogCall,
+		"calls.number":       app.wsNumberCalls,
+		"calls.detail":       app.wsCallDetail,
+		"callerid.get":       app.wsGetCallerID,
+		"callerid.set":       app.wsSetCallerID,
+		"wrapups.list":       app.wsListWrapups,
+		"wrapups.save":       app.wsSaveWrapup,
+		"settings.get":       app.wsGetSettings,
+		"settings.save":      app.wsSaveSettings,
+		"syslog.append":      app.wsAppendCallLog,
+		"syslog.list":        app.wsListCallLogs,
+		"syslog.get":         app.wsGetCallLog,
+		"flowcalls.list":     app.wsListFlowCalls,
+		"flowcalls.timeline": app.wsFlowTimeline,
 	}
 }
 
 // ungatedRequests are available to every agent regardless of the owlchirp flag.
-var ungatedRequests = map[string]bool{"settings.get": true, "settings.save": true}
+// The system log stays available so failures can be diagnosed for anyone.
+var ungatedRequests = map[string]bool{
+	"settings.get": true, "settings.save": true,
+	"syslog.append": true, "syslog.list": true, "syslog.get": true,
+}
 
 func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, enabled bool, req wsRequest) wsReply {
 	//if !enabled && !ungatedRequests[req.Type] {
@@ -276,4 +290,92 @@ func (app *application) wsSaveSettings(ctx context.Context, user connect.Registe
 		return nil, clientError("theme is invalid")
 	}
 	return app.db.SaveSettings(ctx, user.Username, input)
+}
+
+// truncate shortens s to at most n runes.
+func truncate(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	return string([]rune(s)[:n])
+}
+
+// wsAppendCallLog adds a batch of the agent's own diagnostic entries for a
+// contact. Not broadcast: logs are private to the user.
+func (app *application) wsAppendCallLog(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input database.CallLog
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if err := requireField("contactId", input.ContactID); err != nil {
+		return nil, err
+	}
+	if !validOutcomes[input.Outcome] {
+		return nil, clientError("outcome must be failed or missed")
+	}
+	if len(input.Entries) > maxLogEntriesPerRequest {
+		return nil, clientError(fmt.Sprintf("at most %d entries per request", maxLogEntriesPerRequest))
+	}
+	for i := range input.Entries {
+		e := &input.Entries[i]
+		e.Source = truncate(e.Source, 20)
+		e.Level = truncate(e.Level, 10)
+		e.Message = truncate(e.Message, maxLogTextLength)
+		e.Detail = truncate(e.Detail, maxLogTextLength)
+	}
+	return app.db.AppendCallLog(ctx, user.Username, input)
+}
+
+func (app *application) wsListCallLogs(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		MaxRecords int `json:"maxRecords"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	return app.db.ListCallLogs(ctx, user.Username, input.MaxRecords)
+}
+
+func (app *application) wsGetCallLog(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		ContactID string `json:"contactId"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if err := requireField("contactId", input.ContactID); err != nil {
+		return nil, err
+	}
+
+	log, found, err := app.db.GetCallLog(ctx, user.Username, input.ContactID)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, clientError("log not found")
+	}
+	return log, nil
+}
+
+// wsListFlowCalls returns inbound calls from the last input.Hours (default
+// 24), newest first. Updates arrive as "flowcall.updated" events.
+func (app *application) wsListFlowCalls(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		Hours      int `json:"hours"`
+		MaxRecords int `json:"maxRecords"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if input.Hours <= 0 {
+		input.Hours = 24
+	}
+	since := time.Now().Add(-time.Duration(input.Hours) * time.Hour).UnixMilli()
+	return app.db.ListFlowCalls(ctx, since, input.MaxRecords)
+}
+
+// wsFlowTimeline returns inbound calls from the last 48 hours grouped into
+// 15-minute buckets. The result is shared by all agents and cached 30 minutes.
+func (app *application) wsFlowTimeline(ctx context.Context, _ connect.RegisteredUser, _ json.RawMessage) (any, error) {
+	return app.timeline.Get(ctx)
 }

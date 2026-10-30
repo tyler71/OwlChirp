@@ -13,16 +13,19 @@ import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
 import Feed from './Feed';
+import FlowCalls from './FlowCalls';
 import RecentCallList from './RecentCallList';
 import Settings from './Settings';
 import StatusBar from './StatusBar';
+import SystemLog from './SystemLog';
+import Timeline from './Timeline';
 import { Icon, type IconName, stateDotClass } from './ui';
 
 function Brand() {
   return (
     <a
       href="/ccp"
-      className="group inline-flex items-center gap-1 px-2 font-bold text-secondary-900 hover:text-secondary-600 dark:text-secondary-100 dark:hover:text-secondary-300"
+      className="group inline-flex items-center gap-1 px-2 font-bold text-base-content hover:text-secondary-600 dark:hover:text-secondary-300"
     >
       <img src="/favicon.ico" alt="" className="size-6" />
       <span>OwlChirp</span>
@@ -33,6 +36,8 @@ function Brand() {
 const NAV: { view: View; label: string; icon: IconName }[] = [
   { view: 'phone', label: 'Phone', icon: 'phone' },
   { view: 'feed', label: 'Feed', icon: 'chat' },
+  { view: 'flow', label: 'Flow Calls', icon: 'queue' },
+  { view: 'timeline', label: 'Timeline', icon: 'timeline' },
   { view: 'calls', label: 'Recent Calls', icon: 'clock' },
   { view: 'settings', label: 'Settings', icon: 'cog' },
 ];
@@ -67,7 +72,7 @@ function UserMenu() {
 
   return (
     <Menu as="div" className="relative w-full">
-      <MenuButton className="group relative inline-flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm leading-5 text-secondary-800 hover:text-secondary-900 dark:text-secondary-200 dark:hover:text-white">
+      <MenuButton className="group relative inline-flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm leading-5 text-base-content">
         <span className="absolute inset-0 scale-50 rounded-lg bg-secondary-200/60 opacity-0 transition ease-out group-hover:scale-100 group-hover:opacity-100 group-active:scale-105 group-active:bg-secondary-200 dark:bg-secondary-700/50 dark:group-active:bg-secondary-700/75" />
         <span className="relative inline-flex items-center gap-2">
           <span className="relative inline-block flex-none">
@@ -98,7 +103,7 @@ function UserMenu() {
           modal={false}
           className="absolute right-0 bottom-full left-0 z-10 mb-1 origin-bottom rounded-lg shadow-xl shadow-secondary-500/10 focus:outline-hidden dark:shadow-secondary-900"
         >
-          <div className="rounded-lg bg-base-100 p-2.5 ring-1 ring-black/5 dark:bg-secondary-800 dark:ring-secondary-700">
+          <div className="rounded-lg bg-base-100 p-2.5 text-base-content ring-1 ring-black/5 dark:bg-secondary-800 dark:ring-secondary-700">
             <MenuItem>
               {({ focus }) => (
                 <button
@@ -132,7 +137,7 @@ export default function App() {
   return (
     <div
       id="page-container"
-      className="mx-auto flex min-h-dvh w-full min-w-80 flex-col bg-secondary-100 text-secondary-900 lg:pl-64 dark:bg-secondary-950 dark:text-secondary-100"
+      className="mx-auto flex min-h-dvh w-full min-w-80 flex-col bg-secondary-100 text-base-content lg:pl-64 dark:bg-secondary-950"
     >
       {/* Page overlay when mobile sidebar is open */}
       <Transition
@@ -156,7 +161,7 @@ export default function App() {
       {/* Page Sidebar */}
       <aside
         id="page-sidebar"
-        className={`fixed top-3 bottom-3 z-50 flex w-64 flex-col rounded-lg border border-secondary-200 bg-secondary-100 transition-transform duration-300 ease-out lg:top-0 lg:bottom-0 lg:left-0 lg:translate-x-0 lg:rounded-none lg:border-none lg:py-3 dark:border-secondary-800 dark:bg-secondary-900 dark:text-secondary-200 dark:lg:bg-secondary-950 dark:lg:shadow-none ${
+        className={`fixed top-3 bottom-3 z-50 flex w-64 flex-col rounded-lg border border-secondary-200 bg-secondary-100 text-base-content transition-transform duration-300 ease-out lg:top-0 lg:bottom-0 lg:left-0 lg:translate-x-0 lg:rounded-none lg:border-none lg:py-3 dark:border-secondary-800 dark:bg-secondary-900 dark:lg:bg-secondary-950 dark:lg:shadow-none ${
           mobileSidebarOpen
             ? 'left-3 translate-x-0 shadow-lg shadow-secondary-200 dark:shadow-secondary-950/50'
             : 'left-0 -translate-x-full'
@@ -170,7 +175,7 @@ export default function App() {
               onClick={() => setMobileSidebarOpen(false)}
               type="button"
               aria-label="Close sidebar"
-              className="group relative inline-flex items-center gap-2 rounded-lg p-2 text-sm leading-5 text-secondary-800 hover:text-secondary-900 dark:text-secondary-200 dark:hover:text-white"
+              className="group relative inline-flex items-center gap-2 rounded-lg p-2 text-sm leading-5 text-base-content"
             >
               <span className="absolute inset-0 scale-50 rounded-lg bg-secondary-200/60 opacity-0 transition ease-out group-hover:scale-100 group-hover:opacity-100 group-active:scale-105 group-active:bg-secondary-200 dark:bg-secondary-700/50 dark:group-active:bg-secondary-700/75" />
               <Icon name="xMark" className="relative size-4" />
@@ -195,7 +200,7 @@ export default function App() {
                     className={`group flex items-center gap-2.5 rounded-lg px-2 text-left text-sm hover:bg-secondary-200/60 dark:hover:bg-secondary-700/50 ${
                       active
                         ? 'font-semibold text-primary-700 dark:text-primary-400'
-                        : 'font-medium text-secondary-800 hover:text-secondary-900 dark:text-secondary-200 dark:hover:text-white'
+                        : 'font-medium text-base-content'
                     }`}
                   >
                     <Icon
@@ -225,7 +230,7 @@ export default function App() {
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
             type="button"
             aria-label="Open sidebar"
-            className="group relative inline-flex items-center gap-2 rounded-lg p-2 text-sm leading-5 text-secondary-800 hover:text-secondary-900 dark:text-secondary-200 dark:hover:text-white"
+            className="group relative inline-flex items-center gap-2 rounded-lg p-2 text-sm leading-5 text-base-content"
           >
             <span className="absolute inset-0 scale-50 rounded-lg bg-secondary-100 opacity-0 transition ease-out group-hover:scale-100 group-hover:opacity-100 group-active:scale-105 group-active:bg-secondary-200 dark:bg-secondary-700/50 dark:group-active:bg-secondary-700/75" />
             <svg className="relative inline-block size-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden> <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
@@ -249,8 +254,11 @@ export default function App() {
           <Ccp />
 
           {view === 'settings' && <Settings />}
+          {view === 'log' && <SystemLog />}
           {view === 'calls' && agent && <RecentCallList />}
           {view === 'feed' && agent && <Feed />}
+          {view === 'flow' && agent && <FlowCalls />}
+          {view === 'timeline' && agent && <Timeline />}
 
           {/* Owlchirp features are gated per agent by the owlchirp feature flag. */}
           {agent && (

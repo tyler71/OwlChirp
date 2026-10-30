@@ -1,5 +1,5 @@
 import { atom, map } from 'nanostores';
-import { persistentMap } from '@nanostores/persistent';
+import { persistentAtom, persistentMap } from '@nanostores/persistent';
 import type { STATUS } from './const';
 
 export type AppConfig = {
@@ -53,6 +53,19 @@ export type WrapupFeed = {
   loading: boolean;
 };
 
+// An inbound call seen in the Connect contact flow. Times are ms epoch; 0
+// means the call hasn't reached that stage.
+export type FlowCall = {
+  contactId: string;
+  phoneNumber: string;
+  queueName: string;
+  agentName: string;
+  initiatedAt: number;
+  enqueuedAt: number;
+  connectedAt: number;
+  disconnectedAt: number;
+};
+
 export type Alert = {
   kind: 'welcome' | 'warning' | 'none';
   message?: string;
@@ -78,8 +91,28 @@ export const $wrapups = atom<WrapupFeed | null>(null);
 // Wrap-ups for the number looked up in the Feed view.
 export const $numberFeed = atom<WrapupFeed | null>(null);
 
+// Inbound calls from the contact flow, newest first; null until loaded.
+export const $flowCalls = atom<FlowCall[] | null>(null);
+
+export type FlowCallBucket = {
+  start: number;
+  total: number;
+  answered: number;
+  abandoned: number;
+  calls: FlowCall[];
+};
+
+export type FlowTimeline = {
+  generatedAt: number;
+  hours: number;
+  bucketMinutes: number;
+  buckets: FlowCallBucket[];
+};
+
+export const $timeline = atom<FlowTimeline | null>(null);
+
 // Which main view the sidebar has selected.
-export type View = 'phone' | 'calls' | 'feed' | 'settings';
+export type View = 'phone' | 'calls' | 'feed' | 'flow' | 'timeline' | 'settings' | 'log';
 export const $view = atom<View>('phone');
 
 export const $alert = atom<Alert>({ kind: 'welcome' });
@@ -142,3 +175,6 @@ export const $quickConnects = atom<QuickConnect[] | null>(null);
 // Last time (ms epoch) a notification tag was shown, so reloading the CCP
 // doesn't immediately repeat or un-snooze notifications.
 export const $notifyTimes = persistentMap<Record<string, string>>('owlchirp:notify:', {});
+
+// Timeline grouping interval in minutes (one of TIMELINE_INTERVALS).
+export const $timelineInterval = persistentAtom<string>('owlchirp:timeline:interval', '15');

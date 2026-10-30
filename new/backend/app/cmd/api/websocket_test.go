@@ -14,6 +14,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/tyler71/owlchirp/app/internal/assert"
 	"github.com/tyler71/owlchirp/app/internal/auth"
+	"github.com/tyler71/owlchirp/app/internal/cache"
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
@@ -55,6 +56,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 		logger: logger,
 	}
 	app.handlers = app.wsHandlers()
+	app.timeline = cache.NewValue(timelineTTL, app.buildTimeline)
 
 	srv := httptest.NewServer(app.routes())
 	t.Cleanup(srv.Close)
@@ -240,6 +242,57 @@ func TestSocketSettings(t *testing.T) {
 	assert.Equal(t, string(reply.Data), `{"theme":"dracula"}`)
 }
 
+func TestSocketCallLogs(t *testing.T) {
+	srv := newTestServer(t)
+	c := dial(t, srv, validToken())
+
+	reply := c.call("syslog.append", map[string]any{
+		"contactId": "c-1", "phoneNumber": "+15550001", "outcome": "failed",
+		"entries": []map[string]any{{"time": 1, "source": "console", "level": "error", "message": strings.Repeat("x", 3000)}},
+	})
+	assert.Equal(t, reply.Type, "result")
+
+	reply = c.call("syslog.list", nil)
+	var list []database.CallLog
+	assert.Nil(t, json.Unmarshal(reply.Data, &list))
+	assert.Equal(t, len(list), 1)
+	assert.Equal(t, list[0].ErrorCount, 1)
+
+	reply = c.call("syslog.get", map[string]any{"contactId": "c-1"})
+	var log database.CallLog
+	assert.Nil(t, json.Unmarshal(reply.Data, &log))
+	assert.Equal(t, len(log.Entries), 1)
+	assert.Equal(t, len(log.Entries[0].Message), 2000)
+}
+
+func TestSocketFlowCalls(t *testing.T) {
+	srv := newTestServer(t)
+	c := dial(t, srv, validToken())
+
+	reply := c.call("flowcalls.list", nil)
+	assert.Equal(t, reply.Type, "result")
+	assert.Equal(t, string(reply.Data), `[]`)
+}
+
+func TestSocketFlowTimeline(t *testing.T) {
+	srv := newTestServer(t)
+	c := dial(t, srv, validToken())
+
+	reply := c.call("flowcalls.timeline", nil)
+	assert.Equal(t, reply.Type, "result")
+	var tl flowTimeline
+	assert.Nil(t, json.Unmarshal(reply.Data, &tl))
+	assert.Equal(t, tl.Hours, 48)
+	assert.Equal(t, tl.BucketMinutes, 15)
+	assert.Equal(t, len(tl.Buckets), 0)
+
+	// Served from cache: the same snapshot comes back.
+	again := c.call("flowcalls.timeline", nil)
+	var tl2 flowTimeline
+	assert.Nil(t, json.Unmarshal(again.Data, &tl2))
+	assert.Equal(t, tl2.GeneratedAt, tl.GeneratedAt)
+}
+
 func TestSocketValidation(t *testing.T) {
 	srv := newTestServer(t)
 	c := dial(t, srv, validToken())
@@ -255,6 +308,9 @@ func TestSocketValidation(t *testing.T) {
 		{"wrapups.save", map[string]any{"phoneNumber": "+1", "mood": "spam"}, "contactId is required"},
 		{"callerid.set", map[string]any{"phoneNumber": "+1"}, "name is required"},
 		{"settings.save", map[string]any{"theme": "Dracula!"}, "theme is invalid"},
+		{"syslog.append", map[string]any{"outcome": "failed"}, "contactId is required"},
+		{"syslog.append", map[string]any{"contactId": "c-1", "outcome": "weird"}, "outcome must be failed or missed"},
+		{"syslog.get", map[string]any{"contactId": "missing"}, "log not found"},
 	}
 	for _, tt := range tests {
 		reply := c.call(tt.typ, tt.data)

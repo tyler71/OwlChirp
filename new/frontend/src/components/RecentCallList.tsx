@@ -61,7 +61,7 @@ function useDetail(call: Call): Detail | undefined {
 }
 
 const ACTION_CLASS =
-  'inline-flex items-center gap-1.5 rounded-lg border border-secondary-200 px-2.5 py-1.5 text-xs font-medium text-secondary-700 hover:border-secondary-300 hover:text-secondary-900 dark:border-secondary-700 dark:text-secondary-300 dark:hover:border-secondary-600 dark:hover:text-white';
+  'inline-flex items-center gap-1.5 rounded-lg border border-secondary-200 px-2.5 py-1.5 text-xs font-medium text-base-content hover:border-secondary-300 dark:border-secondary-700 dark:hover:border-secondary-600';
 
 function CallCard({ call }: { call: Call }) {
   const config = useStore($config);

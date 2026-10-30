@@ -13,6 +13,7 @@ import {
   type ConnectionSnapshot,
   type QuickConnect,
 } from './stores';
+import { beginCall, callStatus, endCall, logEvent } from './systemLog';
 
 let muted = false;
 
@@ -42,6 +43,7 @@ function connectionLabel(conn: connect.BaseConnection): string {
 
 function snapshotContact(contact: connect.Contact): void {
   const initial = contact.getInitialConnection();
+  callStatus(contact.getContactId(), contact.getStatus().type);
   const connections: ConnectionSnapshot[] = contact
     .getConnections()
     .filter((c) => c.getType() !== connect.ConnectionType.AGENT)
@@ -66,11 +68,20 @@ function snapshotContact(contact: connect.Contact): void {
 export function trackAgent(agent: connect.Agent): void {
   snapshotAgent(agent);
   agent.onRefresh(snapshotAgent);
-  agent.onStateChange(() => snapshotAgent(agent));
+  agent.onStateChange(({ oldState, newState }) => {
+    logEvent('info', `Agent ${oldState} → ${newState}`);
+    snapshotAgent(agent);
+  });
   agent.onMuteToggle(({ muted: m }) => {
     muted = m;
     snapshotAgent(agent);
   });
+  // The CCP iframe only logs "Contact onError"; these carry the actual reason.
+  agent.onSoftphoneError((e) => {
+    console.error('softphone error', { type: e.errorType, message: e.errorMessage, endpoint: e.endPointUrl });
+    $alert.set({ kind: 'warning', message: `Softphone error: ${e.errorType}${e.errorMessage ? ` (${e.errorMessage})` : ''}` });
+  });
+  agent.onError((a) => console.error('agent error state', a.getState()));
   void loadQuickConnects();
 }
 
@@ -79,6 +90,7 @@ export function trackContact(contact: connect.Contact): void {
     return;
   }
   const update = () => snapshotContact(contact);
+  beginCall(contact.getContactId(), contact.getInitialConnection()?.getEndpoint().phoneNumber ?? '', contact.isInbound());
   update();
   contact.onRefresh(update);
   contact.onIncoming(update);
@@ -88,8 +100,26 @@ export function trackContact(contact: connect.Contact): void {
   contact.onMissed(update);
   contact.onEnded(update);
   contact.onACW(update);
+  contact.onError((c) => {
+    console.error('contact error', {
+      contactId: c.getContactId(),
+      inbound: c.isInbound(),
+      status: c.getStatus(),
+      agentConnection: c.getAgentConnection()?.getStatus(),
+      agentState: $agent.get()?.getState(),
+    });
+    update();
+  });
   contact.onDestroy(() => {
-    if ($contactSnapshot.get()?.contactId === contact.getContactId()) $contactSnapshot.set(null);
+    endCall(contact.getContactId());
+    const snap = $contactSnapshot.get();
+    if (snap?.contactId !== contact.getContactId()) return;
+    // Connect destroys a failed dial or missed call almost immediately; keep
+    // "Call failed" / "Missed call" on screen until the agent clears it.
+    if (snap.status === connect.ContactStateType.ERROR || snap.status === connect.ContactStateType.MISSED) {
+      $contactSnapshot.set({ ...snap, connections: [] });
+    }
+    else $contactSnapshot.set(null);
   });
 }
 
@@ -149,7 +179,22 @@ export const rejectContact = () => run('Decline', (cb) => currentContact().rejec
 // Leaving with other parties still connected completes a warm transfer.
 export const hangUp = () => run('End call', (cb) => currentContact().getAgentConnection().destroy(cb));
 
-export const clearContact = () => run('Clear', (cb) => currentContact().clear(cb));
+// A failed dial may already be gone from Connect (see trackContact); then just
+// drop the card and leave the error state, like the native CCP's "Close".
+export function clearContact(): Promise<void> {
+  const id = $contactSnapshot.get()?.contactId;
+  const agent = requireAgent();
+  if (agent.getContacts().some((c) => c.getContactId() === id)) {
+    // onDestroy keeps missed/failed cards around, so drop it explicitly.
+    return run('Clear', (cb) => currentContact().clear(cb)).then(() => {
+      if ($contactSnapshot.get()?.contactId === id) $contactSnapshot.set(null);
+    });
+  }
+  $contactSnapshot.set(null);
+  const available = agent.getAgentStates().find((s) => s.type === connect.AgentStateType.ROUTABLE);
+  if (agent.getState().type === connect.AgentStateType.ERROR && available) return setAgentState(available);
+  return Promise.resolve();
+}
 
 export const holdConnection = (id: string) => run('Hold', (cb) => findConnection(id).hold(cb));
 

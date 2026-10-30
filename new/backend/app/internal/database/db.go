@@ -297,3 +297,248 @@ func (db *DB) SaveSettings(ctx context.Context, username string, s Settings) (Se
 		userID, string(data), ts, ts)
 	return s, err
 }
+
+// Call logs are capped so a noisy call cannot grow a row without limit, and
+// pruned after callLogRetention.
+const (
+	MaxCallLogEntries = 2000
+	callLogRetention  = 30 * 24 * time.Hour
+)
+
+type LogEntry struct {
+	Time    int64  `json:"time"`
+	Source  string `json:"source"`
+	Level   string `json:"level"`
+	Message string `json:"message"`
+	Detail  string `json:"detail,omitempty"`
+}
+
+// CallLog is the diagnostic log for one contact. Entries is omitted from
+// listings.
+type CallLog struct {
+	ContactID   string     `db:"contact_id" json:"contactId"`
+	Agent       string     `db:"agent" json:"agent"`
+	PhoneNumber string     `db:"phone_number" json:"phoneNumber"`
+	Inbound     bool       `db:"inbound" json:"inbound"`
+	Outcome     string     `db:"outcome" json:"outcome"`
+	StartedAt   int64      `db:"started_at" json:"startedAt"`
+	EndedAt     int64      `db:"ended_at" json:"endedAt"`
+	EntryCount  int        `db:"entry_count" json:"entryCount"`
+	ErrorCount  int        `db:"error_count" json:"errorCount"`
+	Entries     []LogEntry `db:"-" json:"entries,omitempty"`
+}
+
+const callLogSelect = `SELECT l.contact_id, COALESCE(u.username, '') AS agent,
+	COALESCE(l.phone_number, '') AS phone_number, COALESCE(l.inbound, 0) AS inbound,
+	COALESCE(l.outcome, '') AS outcome, COALESCE(l.started_at, 0) AS started_at,
+	COALESCE(l.ended_at, 0) AS ended_at, l.entry_count, l.error_count
+	FROM call_logs l LEFT JOIN users u ON u.id = l.agent_id`
+
+// AppendCallLog adds entries to the log for c.ContactID, creating it if
+// needed. Non-empty Outcome and non-zero EndedAt replace the stored values;
+// once the cap is reached the oldest entries are dropped.
+func (db *DB) AppendCallLog(ctx context.Context, username string, c CallLog) (CallLog, error) {
+	agentID, err := db.GetOrCreateUser(ctx, username)
+	if err != nil {
+		return CallLog{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return CallLog{}, err
+	}
+	defer tx.Rollback()
+
+	var stored string
+	err = tx.GetContext(ctx, &stored, `SELECT entries FROM call_logs WHERE contact_id = ?`, c.ContactID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return CallLog{}, err
+	}
+	entries := []LogEntry{}
+	if stored != "" {
+		if err := json.Unmarshal([]byte(stored), &entries); err != nil {
+			return CallLog{}, err
+		}
+	}
+	entries = append(entries, c.Entries...)
+	if len(entries) > MaxCallLogEntries {
+		entries = entries[len(entries)-MaxCallLogEntries:]
+	}
+	errorCount := 0
+	for _, e := range entries {
+		if e.Level == "error" {
+			errorCount++
+		}
+	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return CallLog{}, err
+	}
+
+	if c.StartedAt == 0 {
+		c.StartedAt = time.Now().UnixMilli()
+	}
+	ts := now()
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO call_logs (contact_id, agent_id, phone_number, inbound, outcome, started_at, ended_at,
+		   entry_count, error_count, entries, created_on, updated_on)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (contact_id) DO UPDATE SET
+		   phone_number = COALESCE(NULLIF(excluded.phone_number, ''), call_logs.phone_number),
+		   outcome = COALESCE(NULLIF(excluded.outcome, ''), call_logs.outcome),
+		   ended_at = COALESCE(NULLIF(excluded.ended_at, 0), call_logs.ended_at),
+		   entry_count = excluded.entry_count, error_count = excluded.error_count,
+		   entries = excluded.entries, updated_on = excluded.updated_on`,
+		c.ContactID, agentID, c.PhoneNumber, c.Inbound, c.Outcome, c.StartedAt, c.EndedAt,
+		len(entries), errorCount, string(data), ts, ts)
+	if err != nil {
+		return CallLog{}, err
+	}
+
+	cutoff := time.Now().Add(-callLogRetention).UnixMilli()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM call_logs WHERE started_at < ?`, cutoff); err != nil {
+		return CallLog{}, err
+	}
+
+	var saved CallLog
+	if err := tx.GetContext(ctx, &saved, callLogSelect+` WHERE l.contact_id = ?`, c.ContactID); err != nil {
+		return CallLog{}, err
+	}
+	return saved, tx.Commit()
+}
+
+// ListCallLogs returns the user's call logs, newest first, without entries.
+func (db *DB) ListCallLogs(ctx context.Context, username string, maxRecords int) ([]CallLog, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	logs := []CallLog{}
+	err := db.SelectContext(ctx, &logs,
+		callLogSelect+` WHERE u.username = ? ORDER BY l.started_at DESC, l.id DESC LIMIT ?`,
+		username, limit(maxRecords))
+	return logs, err
+}
+
+// GetCallLog returns the full log for contactID, if the user owns it.
+func (db *DB) GetCallLog(ctx context.Context, username, contactID string) (CallLog, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var row struct {
+		CallLog
+		Entries string `db:"entries"`
+	}
+	err := db.GetContext(ctx, &row,
+		strings.Replace(callLogSelect, "SELECT ", "SELECT l.entries, ", 1)+` WHERE l.contact_id = ? AND u.username = ?`,
+		contactID, username)
+	if errors.Is(err, sql.ErrNoRows) {
+		return CallLog{}, false, nil
+	}
+	if err != nil {
+		return CallLog{}, false, err
+	}
+
+	c := row.CallLog
+	err = json.Unmarshal([]byte(row.Entries), &c.Entries)
+	return c, true, err
+}
+
+// FlowCall is an inbound call as seen in the Connect contact flow. Times are
+// unix ms; 0 means the call hasn't reached that stage.
+type FlowCall struct {
+	ContactID      string `db:"contact_id" json:"contactId"`
+	PhoneNumber    string `db:"phone_number" json:"phoneNumber"`
+	QueueName      string `db:"queue_name" json:"queueName"`
+	AgentName      string `db:"agent_name" json:"agentName"`
+	InitiatedAt    int64  `db:"initiated_at" json:"initiatedAt"`
+	EnqueuedAt     int64  `db:"enqueued_at" json:"enqueuedAt"`
+	ConnectedAt    int64  `db:"connected_at" json:"connectedAt"`
+	DisconnectedAt int64  `db:"disconnected_at" json:"disconnectedAt"`
+}
+
+const flowCallSelect = `SELECT contact_id, COALESCE(phone_number, '') AS phone_number,
+	COALESCE(queue_name, '') AS queue_name, COALESCE(agent_name, '') AS agent_name,
+	initiated_at, enqueued_at, connected_at, disconnected_at
+	FROM flow_calls`
+
+// UpsertFlowCall stores the latest state of c, keyed by contact id.
+func (db *DB) UpsertFlowCall(ctx context.Context, c FlowCall) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	ts := now()
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO flow_calls (contact_id, phone_number, queue_name, agent_name,
+		   initiated_at, enqueued_at, connected_at, disconnected_at, created_on, updated_on)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (contact_id) DO UPDATE SET
+		   phone_number = excluded.phone_number, queue_name = excluded.queue_name,
+		   agent_name = excluded.agent_name, initiated_at = excluded.initiated_at,
+		   enqueued_at = excluded.enqueued_at, connected_at = excluded.connected_at,
+		   disconnected_at = excluded.disconnected_at, updated_on = excluded.updated_on`,
+		c.ContactID, c.PhoneNumber, c.QueueName, c.AgentName,
+		c.InitiatedAt, c.EnqueuedAt, c.ConnectedAt, c.DisconnectedAt, ts, ts)
+	return err
+}
+
+// ListFlowCalls returns calls initiated at or after since (unix ms), newest first.
+func (db *DB) ListFlowCalls(ctx context.Context, since int64, maxRecords int) ([]FlowCall, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	calls := []FlowCall{}
+	err := db.SelectContext(ctx, &calls,
+		flowCallSelect+` WHERE initiated_at >= ? ORDER BY initiated_at DESC, id DESC LIMIT ?`,
+		since, limit(maxRecords))
+	return calls, err
+}
+
+// FlowCallBucket holds the calls initiated in [Start, Start+bucket). Start is
+// unix ms; Calls are newest first.
+type FlowCallBucket struct {
+	Start     int64      `json:"start"`
+	Total     int        `json:"total"`
+	Answered  int        `json:"answered"`
+	Abandoned int        `json:"abandoned"`
+	Calls     []FlowCall `json:"calls"`
+}
+
+// FlowCallTimeline groups calls initiated at or after since (unix ms) into
+// bucket-wide slots aligned to the epoch, newest first. Empty slots are omitted.
+func (db *DB) FlowCallTimeline(ctx context.Context, since int64, bucket time.Duration) ([]FlowCallBucket, error) {
+	calls, err := db.ListFlowCalls(ctx, since, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	width := bucket.Milliseconds()
+	buckets := []FlowCallBucket{}
+	for _, c := range calls {
+		start := c.InitiatedAt - c.InitiatedAt%width
+		if n := len(buckets); n == 0 || buckets[n-1].Start != start {
+			buckets = append(buckets, FlowCallBucket{Start: start})
+		}
+		b := &buckets[len(buckets)-1]
+		b.Total++
+		switch {
+		case c.ConnectedAt != 0:
+			b.Answered++
+		case c.DisconnectedAt != 0:
+			b.Abandoned++
+		}
+		b.Calls = append(b.Calls, c)
+	}
+	return buckets, nil
+}
+
+// PruneFlowCalls deletes calls initiated before before (unix ms).
+func (db *DB) PruneFlowCalls(ctx context.Context, before int64) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	_, err := db.ExecContext(ctx, `DELETE FROM flow_calls WHERE initiated_at < ?`, before)
+	return err
+}

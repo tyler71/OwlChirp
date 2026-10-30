@@ -8,7 +8,7 @@ export default function HandledIncoming() {
 
   return (
     <div
-      className={`flex min-w-10 flex-none cursor-help items-center justify-center rounded-lg bg-base-100 px-2.5 py-1 text-sm font-bold tabular-nums select-none ring-1 ring-secondary-200 dark:bg-secondary-800 dark:ring-secondary-700 ${
+      className={`flex min-w-10 flex-none cursor-help items-center justify-center rounded-lg bg-base-100 px-2.5 py-1 text-sm font-bold text-base-content tabular-nums select-none ring-1 ring-secondary-200 dark:bg-secondary-800 dark:ring-secondary-700 ${
         handled === undefined ? `h-7 ${LOADING_CLASS}` : ''
       }`}
       title="Call count"

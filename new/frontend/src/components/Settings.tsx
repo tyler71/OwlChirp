@@ -1,8 +1,10 @@
 import { useStore } from '@nanostores/react';
 import { useState } from 'react';
 
+import { downloadCcpLog } from '../lib/ccp';
+import { $view } from '../lib/stores';
 import { $theme, setTheme, THEMES, type ThemeChoice } from '../lib/theme';
-import { Card, Icon } from './ui';
+import { Button, Card, Icon } from './ui';
 
 function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolean }) {
   // Each tile carries its own data-theme so it previews that theme's colors.
@@ -40,6 +42,7 @@ export default function Settings() {
   const theme = useStore($theme);
   const [showThemes, setShowThemes] = useState(false)
   return (
+    <>
     <Card title="Appearance">
       <div className="flex flex-col gap-3 p-4">
         <div className={"cursor-pointer hover:text-primary"} onClick={() => setShowThemes(!showThemes)}>
@@ -55,5 +58,15 @@ export default function Settings() {
         }
       </div>
     </Card>
+    <Card title="Troubleshooting">
+      <div className="flex flex-col items-start gap-2 p-4">
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" icon="clock" onClick={() => $view.set('log')}>
+            System log
+          </Button>
+        </div>
+      </div>
+    </Card>
+    </>
   );
 }

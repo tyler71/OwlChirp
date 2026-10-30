@@ -59,7 +59,7 @@ export default function CallerId() {
     <div className="min-w-0 flex-none basis-48">
       <div
         ref={ref}
-        className="cursor-text truncate rounded-md px-2 py-1 text-sm font-semibold outline-none empty:before:font-normal empty:before:text-secondary-400 empty:before:content-['No_caller'] hover:bg-base-100 dark:hover:bg-secondary-800"
+        className="cursor-text truncate rounded-md px-2 py-1 text-sm font-semibold text-base-content outline-none empty:before:font-normal empty:before:text-secondary-400 empty:before:content-['No_caller'] hover:bg-base-100 dark:hover:bg-secondary-800"
         contentEditable={false}
         suppressContentEditableWarning
         spellCheck={false}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/tyler71/owlchirp/app/internal/auth"
+	"github.com/tyler71/owlchirp/app/internal/cache"
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
 	"github.com/tyler71/owlchirp/app/internal/env"
@@ -64,6 +65,10 @@ type config struct {
 		endpoint string
 		apiKey   string
 	}
+	flowCalls struct {
+		interval  time.Duration
+		retention time.Duration
+	}
 }
 
 type flagEvaluator interface {
@@ -78,6 +83,7 @@ type application struct {
 	hub      *realtime.Hub
 	flags    flagEvaluator
 	handlers map[string]wsHandler
+	timeline *cache.Value[flowTimeline]
 	logger   *slog.Logger
 	wg       sync.WaitGroup
 }
@@ -101,6 +107,9 @@ func run(logger *slog.Logger) error {
 
 	cfg.flags.endpoint = env.GetString("GOFF_ENDPOINT", "https://flag.sandcatdev.com")
 	cfg.flags.apiKey = env.GetString("GOFF_API_KEY", "")
+
+	cfg.flowCalls.interval = time.Duration(env.GetInt("FLOW_POLL_INTERVAL", 5)) * time.Second
+	cfg.flowCalls.retention = time.Duration(env.GetInt("FLOW_RETENTION_DAYS", 7)) * 24 * time.Hour
 
 	showVersion := flag.Bool("version", false, "display version and exit")
 	flag.Parse()
@@ -146,8 +155,10 @@ func run(logger *slog.Logger) error {
 	}
 
 	app.handlers = app.wsHandlers()
+	app.timeline = cache.NewValue(timelineTTL, app.buildTimeline)
 
 	go app.hub.Run(ctx)
+	go app.pollFlowCalls(ctx)
 
 	return app.serveHTTP(ctx)
 }

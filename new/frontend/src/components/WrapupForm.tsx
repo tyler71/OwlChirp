@@ -16,7 +16,7 @@ import {
 import { Button } from './ui';
 
 const INPUT_CLASS =
-  'block w-full rounded-lg border border-secondary-200 bg-base-100 px-3 py-2 text-sm leading-5 placeholder-secondary-400 focus:border-primary-500 focus:ring-3 focus:ring-primary-500/50 focus:outline-none dark:border-secondary-700 dark:bg-secondary-900 dark:placeholder-secondary-500 dark:focus:border-primary-500';
+  'block w-full rounded-lg border border-secondary-200 bg-base-100 px-3 py-2 text-sm leading-5 text-base-content placeholder-secondary-400 focus:border-primary-500 focus:ring-3 focus:ring-primary-500/50 focus:outline-none dark:border-secondary-700 dark:bg-secondary-900 dark:placeholder-secondary-500 dark:focus:border-primary-500';
 
 const LABEL_CLASS = 'mb-1 block text-xs font-semibold text-secondary-600 dark:text-secondary-400';
 
@@ -76,7 +76,7 @@ export default function WrapupForm({ contactId, phoneNumber }: { contactId: stri
                 className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg border px-2 py-2 text-xs font-semibold transition ${
                   active
                     ? 'border-primary-300 bg-primary-50 text-primary-800 dark:border-primary-600 dark:bg-primary-500/15 dark:text-primary-200'
-                    : 'border-secondary-200 bg-base-100 text-secondary-600 hover:border-secondary-300 dark:border-secondary-700 dark:bg-secondary-800 dark:text-secondary-300 dark:hover:border-secondary-600'
+                    : 'border-secondary-200 bg-base-100 text-base-content hover:border-secondary-300 dark:border-secondary-700 dark:bg-secondary-800 dark:hover:border-secondary-600'
                 }`}
               >
                 <span className={`text-2xl leading-none transition ${active ? '' : 'opacity-70 grayscale-[40%]'}`} aria-hidden>

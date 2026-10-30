@@ -53,3 +53,42 @@ CREATE TABLE IF NOT EXISTS user_settings (
 	created_on DATETIME,
 	updated_on DATETIME
 );
+
+-- Diagnostic log the browser captures for each contact (app events, console
+-- errors and Amazon Connect Streams entries); one row per contact.
+CREATE TABLE IF NOT EXISTS call_logs (
+	id INTEGER NOT NULL PRIMARY KEY,
+	contact_id VARCHAR(36) NOT NULL,
+	agent_id INTEGER REFERENCES users (id),
+	phone_number VARCHAR(20),
+	inbound BOOLEAN,
+	outcome VARCHAR(10),
+	started_at INTEGER,
+	ended_at INTEGER,
+	entry_count INTEGER NOT NULL DEFAULT 0,
+	error_count INTEGER NOT NULL DEFAULT 0,
+	entries TEXT NOT NULL,
+	created_on DATETIME,
+	updated_on DATETIME
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_call_logs_contact_id ON call_logs (contact_id);
+CREATE INDEX IF NOT EXISTS ix_call_logs_agent ON call_logs (agent_id, started_at);
+
+-- Inbound calls seen in the Connect contact flow, polled from SearchContacts
+-- so agents can see calls before they are routed; one row per contact.
+-- Timestamps are unix ms, 0 when the call hasn't reached that stage.
+CREATE TABLE IF NOT EXISTS flow_calls (
+	id INTEGER NOT NULL PRIMARY KEY,
+	contact_id VARCHAR(36) NOT NULL,
+	phone_number VARCHAR(20),
+	queue_name VARCHAR(100),
+	agent_name VARCHAR(100),
+	initiated_at INTEGER NOT NULL DEFAULT 0,
+	enqueued_at INTEGER NOT NULL DEFAULT 0,
+	connected_at INTEGER NOT NULL DEFAULT 0,
+	disconnected_at INTEGER NOT NULL DEFAULT 0,
+	created_on DATETIME,
+	updated_on DATETIME
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_flow_calls_contact_id ON flow_calls (contact_id);
+CREATE INDEX IF NOT EXISTS ix_flow_calls_initiated_at ON flow_calls (initiated_at);

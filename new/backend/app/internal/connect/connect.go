@@ -52,6 +52,18 @@ type ContactDetail struct {
 	CallToQueueTime   int       `json:"call_to_queue_time"`
 }
 
+// FlowContact is an inbound voice contact found by SearchFlowContacts. Zero
+// times mean the contact hasn't reached that stage.
+type FlowContact struct {
+	ID             string
+	QueueName      string
+	AgentName      string
+	InitiatedAt    time.Time
+	EnqueuedAt     time.Time
+	ConnectedAt    time.Time
+	DisconnectedAt time.Time
+}
+
 type currentMetrics struct {
 	AgentsAvailable int
 	AgentsStaffed   int
@@ -69,6 +81,7 @@ type Client struct {
 	currentUsers    *cache.Value[[]types.UserData]
 	contacts        *cache.Map[string, *types.Contact]
 	users           *cache.Map[string, UserDetail]
+	queueNames      *cache.Map[string, string]
 	snapshot        *cache.Value[map[string]any]
 }
 
@@ -93,6 +106,7 @@ func New(ctx context.Context, instance string, snapshotTTL time.Duration) (*Clie
 	c.currentUsers = cache.NewValue(4*time.Second, c.fetchCurrentUsers)
 	c.contacts = cache.NewMap(time.Hour, 64, c.fetchContact)
 	c.users = cache.NewMap(time.Hour, 256, c.fetchUser)
+	c.queueNames = cache.NewMap(6*time.Hour, 256, c.fetchQueueName)
 	c.snapshot = cache.NewValue(snapshotTTL, c.fetchSnapshot)
 
 	return c, nil
@@ -378,4 +392,87 @@ func (c *Client) fetchSnapshot(ctx context.Context) (map[string]any, error) {
 		"user_list":          users,
 		"handled_incoming":   handled,
 	}, nil
+}
+
+func (c *Client) fetchQueueName(ctx context.Context, queueID string) (string, error) {
+	out, err := c.api.DescribeQueue(ctx, &awsconnect.DescribeQueueInput{
+		InstanceId: aws.String(c.instance),
+		QueueId:    aws.String(queueID),
+	})
+	if err != nil {
+		return "", fmt.Errorf("describe queue: %w", err)
+	}
+	return aws.ToString(out.Queue.Name), nil
+}
+
+// SearchFlowContacts returns the inbound voice contacts initiated since since,
+// including ones still in the contact flow or queue. Search results can lag
+// real time by a few seconds.
+func (c *Client) SearchFlowContacts(ctx context.Context, since time.Time) ([]FlowContact, error) {
+	p := awsconnect.NewSearchContactsPaginator(c.api, &awsconnect.SearchContactsInput{
+		InstanceId: aws.String(c.instance),
+		TimeRange: &types.SearchContactsTimeRange{
+			Type:      types.SearchContactsTimeRangeTypeInitiationTimestamp,
+			StartTime: aws.Time(since),
+			EndTime:   aws.Time(time.Now()),
+		},
+		SearchCriteria: &types.SearchCriteria{
+			Channels: []types.Channel{types.ChannelVoice},
+			InitiationMethods: []types.ContactInitiationMethod{
+				types.ContactInitiationMethodInbound,
+				types.ContactInitiationMethodTransfer,
+				types.ContactInitiationMethodQueueTransfer,
+			},
+		},
+		MaxResults: aws.Int32(100),
+	})
+
+	var contacts []FlowContact
+	for p.HasMorePages() {
+		page, err := p.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("search contacts: %w", err)
+		}
+		for _, s := range page.Contacts {
+			fc := FlowContact{
+				ID:             aws.ToString(s.Id),
+				InitiatedAt:    aws.ToTime(s.InitiationTimestamp),
+				DisconnectedAt: aws.ToTime(s.DisconnectTimestamp),
+			}
+			if s.QueueInfo != nil {
+				fc.EnqueuedAt = aws.ToTime(s.QueueInfo.EnqueueTimestamp)
+				if id := aws.ToString(s.QueueInfo.Id); id != "" {
+					// A missing name shouldn't hide the call.
+					fc.QueueName, _ = c.queueNames.Get(ctx, id)
+				}
+			}
+			if s.AgentInfo != nil {
+				fc.ConnectedAt = aws.ToTime(s.AgentInfo.ConnectedToAgentTimestamp)
+				if id := aws.ToString(s.AgentInfo.Id); id != "" {
+					if agent, err := c.users.Get(ctx, id); err == nil {
+						fc.AgentName = strings.TrimSpace(agent.FirstName + " " + agent.LastName)
+					}
+				}
+			}
+			contacts = append(contacts, fc)
+		}
+	}
+	return contacts, nil
+}
+
+// CustomerNumber returns the caller's phone number for contactID. Unlike
+// DescribeContact it isn't cached, so a contact looked up mid-flow doesn't
+// leave a stale entry behind.
+func (c *Client) CustomerNumber(ctx context.Context, contactID string) (string, error) {
+	out, err := c.api.DescribeContact(ctx, &awsconnect.DescribeContactInput{
+		InstanceId: aws.String(c.instance),
+		ContactId:  aws.String(contactID),
+	})
+	if err != nil {
+		return "", fmt.Errorf("describe contact: %w", err)
+	}
+	if out.Contact.CustomerEndpoint == nil {
+		return "", nil
+	}
+	return aws.ToString(out.Contact.CustomerEndpoint.Address), nil
 }

@@ -51,7 +51,7 @@ export default function QuickConnects() {
           aria-label="Refresh quick connects"
           title="Refresh"
           onClick={() => void refresh()}
-          className="rounded-lg p-1 text-secondary-400 hover:bg-secondary-100 hover:text-secondary-700 dark:hover:bg-secondary-800 dark:hover:text-secondary-200"
+          className="rounded-lg p-1 text-secondary-400 hover:bg-secondary-100 hover:text-base-content dark:hover:bg-secondary-800"
         >
           <Icon name="refresh" className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
         </button>
@@ -78,8 +78,8 @@ export default function QuickConnects() {
               onClick={() => setFilter(f.type)}
               className={`grow rounded-md px-2 py-1 text-xs font-semibold transition ${
                 filter === f.type
-                  ? 'bg-base-100 text-secondary-900 shadow-xs dark:bg-secondary-700 dark:text-white'
-                  : 'text-secondary-500 hover:text-secondary-800 dark:text-secondary-400 dark:hover:text-secondary-200'
+                  ? 'bg-base-100 text-base-content shadow-xs dark:bg-secondary-700'
+                  : 'text-secondary-500 hover:text-base-content dark:text-secondary-400'
               }`}
             >
               {f.label}

@@ -18,7 +18,7 @@ function Entry({ wrapup }: { wrapup: Wrapup }) {
           <time dateTime={new Date(wrapup.timestamp).toISOString()}>{formatCallTime(wrapup.timestamp)}</time>
           <span>· {agentName(wrapup.agent)}</span>
           {wrapup.incident && (
-            <span className="rounded-md bg-secondary-100 px-1.5 py-0.5 font-mono font-medium text-secondary-700 dark:bg-secondary-800 dark:text-secondary-300">
+            <span className="rounded-md bg-secondary-100 px-1.5 py-0.5 font-mono font-medium text-base-content dark:bg-secondary-800">
               {wrapup.incident}
             </span>
           )}

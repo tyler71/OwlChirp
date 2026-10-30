@@ -21,6 +21,7 @@ import {
 import { agentSideline, formatPhoneNumber, telemetry } from './helpers';
 import { authorize, notify, snooze } from './notifier';
 import { startRealtime } from './realtime';
+import { installConsoleCapture } from './systemLog';
 import { trackAgent, trackContact } from './softphone';
 import { $agent, $alert, $config, $metrics, $storageAccess, type AppConfig } from './stores';
 
@@ -40,6 +41,7 @@ let initialised = false;
 export async function initCcp(container: HTMLElement): Promise<void> {
   if (initialised) return;
   initialised = true;
+  installConsoleCapture();
 
   const config = await loadConfig();
 
@@ -107,11 +109,14 @@ async function onAgent(agent: connect.Agent): Promise<void> {
   });
 }
 
+// Runs for outbound dials too: caller ID, notes and history apply either way,
+// but the notification and call-count telemetry are inbound-only.
 async function onIncomingCall(contact: connect.Contact): Promise<void> {
   const phoneNumber = contact.getActiveInitialConnection()?.getEndpoint().phoneNumber ?? '';
   const contactId = contact.getContactId();
+  const inbound = contact.isInbound();
 
-  notify(`Incoming Call from ${formatPhoneNumber(phoneNumber)}`, 'Incoming Call', 'incomingCall');
+  if (inbound) notify(`Incoming Call from ${formatPhoneNumber(phoneNumber)}`, 'Incoming Call', 'incomingCall');
 
   await Promise.all([
     loadCallerId(phoneNumber).catch((e) => console.error('loadCallerId', e)),
@@ -120,7 +125,12 @@ async function onIncomingCall(contact: connect.Contact): Promise<void> {
   ]);
 
   const agent = $agent.get();
-  if (agent) void telemetry(agent);
+  if (agent && inbound) void telemetry(agent);
+}
+
+// Full Streams log, including the CCP iframe's softphone/WebRTC detail.
+export function downloadCcpLog(): void {
+  connect.getLog().download();
 }
 
 // Remind agents who have been in a break-like status too long.
