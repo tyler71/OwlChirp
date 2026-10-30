@@ -52,9 +52,9 @@ func (app *application) wsHandlers() map[string]wsHandler {
 var ungatedRequests = map[string]bool{"settings.get": true, "settings.save": true}
 
 func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, enabled bool, req wsRequest) wsReply {
-	if !enabled && !ungatedRequests[req.Type] {
-		return wsReply{ID: req.ID, Type: "error", Error: "owlchirp is not enabled for this user"}
-	}
+	//if !enabled && !ungatedRequests[req.Type] {
+	//	return wsReply{ID: req.ID, Type: "error", Error: "owlchirp is not enabled for this user"}
+	//}
 
 	handler, ok := app.handlers[req.Type]
 	if !ok {

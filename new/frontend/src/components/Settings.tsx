@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react';
+import { useState } from 'react';
 
 import { $theme, setTheme, THEMES, type ThemeChoice } from '../lib/theme';
 import { Card, Icon } from './ui';
@@ -37,18 +38,21 @@ function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolea
 
 export default function Settings() {
   const theme = useStore($theme);
+  const [showThemes, setShowThemes] = useState(false)
   return (
     <Card title="Appearance">
       <div className="flex flex-col gap-3 p-4">
-        <div>
-          <h3 className="text-sm font-semibold">Theme</h3>
-          <p className="text-xs text-secondary-500 dark:text-secondary-400">Saved to your account.</p>
+        <div className={"cursor-pointer hover:text-primary"} onClick={() => setShowThemes(!showThemes)}>
+          <h3 className="text-sm font-semibold">{`${theme.slice(0, 1).toUpperCase()}${theme.slice(1)}`} Theme</h3>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {(['system', ...THEMES] as ThemeChoice[]).map((t) => (
-            <ThemeTile key={t} choice={t} selected={t === theme} />
-          ))}
-        </div>
+        {
+          showThemes &&
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {(['system', ...THEMES] as ThemeChoice[]).map((t) => (
+                <ThemeTile key={t} choice={t} selected={t === theme} />
+            ))}
+          </div>
+        }
       </div>
     </Card>
   );

@@ -13,8 +13,7 @@ const notBuiltPage = `<!doctype html>
 <html lang="en"><head><meta charset="UTF-8"><title>OwlChirp</title></head>
 <body><p>The frontend has not been built into this binary. Run <code>just build</code>, or use <code>just dev</code> during development.</p></body></html>`
 
-// static serves the embedded Astro build. Astro is configured with
-// build.format "file", so /ccp resolves to ccp.html.
+// static serves the embedded Astro build.
 func (app *application) static() http.Handler {
 	web, err := fs.Sub(assets.Web, "web")
 	if err != nil {

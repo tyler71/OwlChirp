@@ -1,5 +1,5 @@
 import { atom, map } from 'nanostores';
-import { persistentAtom, persistentMap } from '@nanostores/persistent';
+import { persistentMap } from '@nanostores/persistent';
 import type { STATUS } from './const';
 
 export type AppConfig = {
@@ -79,7 +79,7 @@ export const $wrapups = atom<WrapupFeed | null>(null);
 export const $numberFeed = atom<WrapupFeed | null>(null);
 
 // Which main view the sidebar has selected.
-export type View = 'phone' | 'feed' | 'settings';
+export type View = 'phone' | 'calls' | 'feed' | 'settings';
 export const $view = atom<View>('phone');
 
 export const $alert = atom<Alert>({ kind: 'welcome' });
@@ -142,8 +142,3 @@ export const $quickConnects = atom<QuickConnect[] | null>(null);
 // Last time (ms epoch) a notification tag was shown, so reloading the CCP
 // doesn't immediately repeat or un-snooze notifications.
 export const $notifyTimes = persistentMap<Record<string, string>>('owlchirp:notify:', {});
-
-export const $recentCallsExpanded = persistentAtom<boolean>('owlchirp:recentCallsExpanded', false, {
-  encode: JSON.stringify,
-  decode: JSON.parse,
-});

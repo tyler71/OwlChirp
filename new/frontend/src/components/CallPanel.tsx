@@ -44,7 +44,7 @@ function ConnectionRow({ conn, canDrop }: { conn: ConnectionSnapshot; canDrop: b
       <div className="min-w-0 grow">
         <p className="truncate text-sm font-semibold">{conn.label}</p>
         <p className="text-xs text-secondary-500 dark:text-secondary-400">
-          {conn.isInitial ? 'Customer' : 'Third party'} · {connecting ? 'Dialing' : onHold ? 'On hold' : 'Connected'}{' '}
+          {conn.isInitial ? 'User' : 'Third party'} · {connecting ? 'Dialing' : onHold ? 'On hold' : 'Connected'}{' '}
           · <Timer since={conn.statusStartedAt} />
         </p>
       </div>

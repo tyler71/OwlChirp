@@ -13,6 +13,7 @@ import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
 import Feed from './Feed';
+import RecentCallList from './RecentCallList';
 import Settings from './Settings';
 import StatusBar from './StatusBar';
 import { Icon, type IconName, stateDotClass } from './ui';
@@ -32,6 +33,7 @@ function Brand() {
 const NAV: { view: View; label: string; icon: IconName }[] = [
   { view: 'phone', label: 'Phone', icon: 'phone' },
   { view: 'feed', label: 'Feed', icon: 'chat' },
+  { view: 'calls', label: 'Recent Calls', icon: 'clock' },
   { view: 'settings', label: 'Settings', icon: 'cog' },
 ];
 
@@ -247,6 +249,7 @@ export default function App() {
           <Ccp />
 
           {view === 'settings' && <Settings />}
+          {view === 'calls' && agent && <RecentCallList />}
           {view === 'feed' && agent && <Feed />}
 
           {/* Owlchirp features are gated per agent by the owlchirp feature flag. */}

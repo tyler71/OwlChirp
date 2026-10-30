@@ -110,7 +110,7 @@ func run(logger *slog.Logger) error {
 		return nil
 	}
 
-	logger.Info("starting owlchirp", "version", version.Get())
+	logger.Info("starting OwlChirp", "version", version.Get())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

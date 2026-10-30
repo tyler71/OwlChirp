@@ -1,12 +1,13 @@
 import { useStore } from '@nanostores/react';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 import { getCallerIdName } from '../lib/callerId';
+import { loadNumberFeed } from '../lib/wrapups';
 import { CURSOR_HELP_CLASS, LOADING_CLASS } from '../lib/const';
-import { formatCallTime, formatPhoneNumber, formatSecondsToTime } from '../lib/helpers';
+import { formatCallTime, formatPhoneNumber, formatSecondsToTime, normalizePhoneNumber } from '../lib/helpers';
 import { request } from '../lib/realtime';
-import { $calls, $config, $recentCallsExpanded, type Call } from '../lib/stores';
-import { Button, Card, Icon } from './ui';
+import { $calls, $config, $view, type Call } from '../lib/stores';
+import { Card, Icon } from './ui';
 
 const TITLE = 'Recent Calls';
 
@@ -20,57 +21,8 @@ type ContactDetail = {
 
 type Detail = { status: 'loading' } | { status: 'error' } | { status: 'ready'; contact: ContactDetail; callerId: string | null };
 
-function DetailTable({ detail }: { detail: Detail }) {
-  const config = useStore($config);
-
-  if (detail.status === 'loading') {
-    return <div className={`h-16 ${LOADING_CLASS}`} />;
-  }
-  if (detail.status === 'error') {
-    return <p className="text-xs text-secondary-500 dark:text-secondary-400">Details unavailable</p>;
-  }
-
-  const { contact, callerId } = detail;
-  const rows: { key: string; value: React.ReactNode; tooltip?: string }[] = [];
-
-  if (callerId) rows.push({ key: 'CallerId', value: callerId });
-  rows.push({ key: 'Name', value: contact.agent_name });
-  rows.push({ key: 'Answered', value: formatCallTime(contact.answered_timestamp), tooltip: contact.answered_timestamp });
-  rows.push({
-    key: 'Answer Time',
-    value: formatSecondsToTime(contact.call_to_queue_time + contact.queue_time),
-    tooltip: `${formatSecondsToTime(contact.call_to_queue_time)} spent in menu + ${formatSecondsToTime(contact.queue_time)} spent in queue`,
-  });
-  rows.push({
-    key: 'Id',
-    value: config ? (
-      <a
-        href={`${config.connectDomain}/contact-trace-records/details/${contact.id}?tx=${encodeURIComponent(config.timeZone)}`}
-        target="_blank"
-        rel="noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="font-medium text-primary-600 hover:underline dark:text-primary-400"
-      >
-        {contact.id.split('-')[0]}
-      </a>
-    ) : (
-      contact.id.split('-')[0]
-    ),
-  });
-
-  return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-lg bg-secondary-50 p-3 text-xs dark:bg-secondary-950/40">
-      {rows.map((row) => (
-        <Fragment key={row.key}>
-          <dt className="text-secondary-500 dark:text-secondary-400">{row.key}</dt>
-          <dd className={`font-medium ${row.tooltip ? CURSOR_HELP_CLASS : ''}`} title={row.tooltip}>
-            {row.value}
-          </dd>
-        </Fragment>
-      ))}
-    </dl>
-  );
-}
+// Contact details don't change once a call is over, so keep them across view switches.
+const detailCache = new Map<string, Detail>();
 
 async function loadDetail(call: Call): Promise<Detail> {
   const [contact, callerId] = await Promise.all([
@@ -80,86 +32,127 @@ async function loadDetail(call: Call): Promise<Detail> {
   return { status: 'ready', contact, callerId };
 }
 
-export default function RecentCallList() {
-  const calls = useStore($calls);
-  const expanded = useStore($recentCallsExpanded);
-  const [details, setDetails] = useState<Record<string, Detail>>({});
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+function useDetail(call: Call): Detail | undefined {
+  const key = call.contactId;
+  const [detail, setDetail] = useState<Detail | undefined>(() => (key ? detailCache.get(key) : undefined));
 
-  if (calls === null) {
-    return (
-      <Card title={TITLE}>
-        <div id="recentCallList" className="p-4">
-          <div className={`h-10 ${LOADING_CLASS}`} />
-        </div>
-      </Card>
-    );
-  }
-
-  const toggleDetail = async (call: Call) => {
-    const key = call.contactId;
-    setOpen((o) => ({ ...o, [key]: !o[key] }));
-    if (details[key] && details[key].status !== 'error') return;
-
-    setDetails((d) => ({ ...d, [key]: { status: 'loading' } }));
-    let detail: Detail;
-    try {
-      detail = await loadDetail(call);
-    } catch {
-      detail = { status: 'error' };
+  useEffect(() => {
+    if (!key) return;
+    const cached = detailCache.get(key);
+    if (cached && cached.status !== 'error') {
+      setDetail(cached);
+      return;
     }
-    setDetails((d) => ({ ...d, [key]: detail }));
+    let cancelled = false;
+    setDetail({ status: 'loading' });
+    loadDetail(call)
+      .catch((): Detail => ({ status: 'error' }))
+      .then((d) => {
+        detailCache.set(key, d);
+        if (!cancelled) setDetail(d);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return detail;
+}
+
+const ACTION_CLASS =
+  'inline-flex items-center gap-1.5 rounded-lg border border-secondary-200 px-2.5 py-1.5 text-xs font-medium text-secondary-700 hover:border-secondary-300 hover:text-secondary-900 dark:border-secondary-700 dark:text-secondary-300 dark:hover:border-secondary-600 dark:hover:text-white';
+
+function CallCard({ call }: { call: Call }) {
+  const config = useStore($config);
+  const detail = useDetail(call);
+
+  const jumpToFeed = () => {
+    void loadNumberFeed(normalizePhoneNumber(call.phoneNumber));
+    $view.set('feed');
   };
 
-  const visible = expanded ? calls : calls.slice(0, 5);
+  const rows: { key: string; value: React.ReactNode; tooltip?: string }[] = [
+    { key: 'Time', value: formatCallTime(call.timestamp) },
+  ];
+  if (detail?.status === 'ready') {
+    const { contact, callerId } = detail;
+    if (callerId) rows.push({ key: 'Caller ID', value: callerId });
+    rows.push({ key: 'Agent', value: contact.agent_name });
+    rows.push({ key: 'Answered', value: formatCallTime(contact.answered_timestamp), tooltip: contact.answered_timestamp });
+    rows.push({
+      key: 'Answer Time',
+      value: formatSecondsToTime(contact.call_to_queue_time + contact.queue_time),
+      tooltip: `${formatSecondsToTime(contact.call_to_queue_time)} spent in menu + ${formatSecondsToTime(contact.queue_time)} spent in queue`,
+    });
+  }
+  if (call.contactId) rows.push({ key: 'Contact Id', value: call.contactId.split('-')[0], tooltip: call.contactId });
 
   return (
     <Card
-      title={calls.length > 0 ? `${TITLE} (${calls.length})` : TITLE}
+      title={<span className="tabular-nums">{formatPhoneNumber(call.phoneNumber)}</span>}
       actions={
-        calls.length > 5 && (
-          <Button size="sm" onClick={() => $recentCallsExpanded.set(!expanded)} aria-expanded={expanded}>
-            {expanded ? 'Show less' : 'Show all'}
-            <Icon name="chevronDown" className={`size-4 transition ${expanded ? 'rotate-180' : ''}`} />
-          </Button>
-        )
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={jumpToFeed} title="Open feed" className={ACTION_CLASS}>
+            <Icon name="chat" className="size-4" />
+            <span className="hidden sm:inline">Feed</span>
+          </button>
+          {config && call.contactId && (
+            <a
+              href={`${config.connectDomain}/contact-trace-records/details/${call.contactId}?tx=${encodeURIComponent(config.timeZone)}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Open in Amazon Connect"
+              className={ACTION_CLASS}
+            >
+              <Icon name="externalLink" className="size-4" />
+              <span className="hidden sm:inline">Connect</span>
+            </a>
+          )}
+        </div>
       }
     >
-      <div id="recentCallList">
-        {calls.length === 0 ? (
-          <p className="px-4 py-3 text-sm text-secondary-500 dark:text-secondary-400">No calls yet</p>
-        ) : (
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-secondary-100 dark:divide-secondary-800">
-              {visible.map((call) => {
-                const key = call.contactId;
-                const detail = open[key] ? details[key] : undefined;
-                return (
-                  <Fragment key={`${key}-${call.timestamp}`}>
-                    <tr
-                      className={key ? 'cursor-pointer hover:bg-secondary-50 dark:hover:bg-secondary-800/50' : undefined}
-                      onClick={() => key && toggleDetail(call)}
-                      title={key ? 'Show details' : undefined}
-                    >
-                      <td className="px-4 py-2.5 text-secondary-500 tabular-nums dark:text-secondary-400">
-                        {formatCallTime(call.timestamp)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-medium tabular-nums">{formatPhoneNumber(call.phoneNumber)}</td>
-                    </tr>
-                    {detail && (
-                      <tr>
-                        <td colSpan={2} className="px-4 pb-3">
-                          <DetailTable detail={detail} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+      <div className="p-4">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+          {rows.map((row) => (
+            <Fragment key={row.key}>
+              <dt className="text-secondary-500 dark:text-secondary-400">{row.key}</dt>
+              <dd className={`font-medium ${row.tooltip ? CURSOR_HELP_CLASS : ''}`} title={row.tooltip}>
+                {row.value}
+              </dd>
+            </Fragment>
+          ))}
+        </dl>
+        {detail?.status === 'loading' && <div className={`mt-2 h-16 ${LOADING_CLASS}`} />}
+        {detail?.status === 'error' && (
+          <p className="mt-2 text-xs text-secondary-500 dark:text-secondary-400">Details unavailable</p>
         )}
       </div>
     </Card>
+  );
+}
+
+export default function RecentCallList() {
+  const calls = useStore($calls);
+
+  return (
+    <section className="flex flex-col gap-4 py-4">
+      <h2 className="text-lg font-semibold">{calls?.length ? `${TITLE} (${calls.length})` : TITLE}</h2>
+      {calls === null ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className={`h-40 ${LOADING_CLASS}`} />
+          ))}
+        </div>
+      ) : calls.length === 0 ? (
+        <p className="text-sm text-secondary-500 dark:text-secondary-400">No calls yet</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {calls.map((call) => (
+            <CallCard key={`${call.contactId}-${call.timestamp}`} call={call} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

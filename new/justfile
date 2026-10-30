@@ -21,12 +21,7 @@ dev:
 
 # Go backend with live reload on file changes
 dev-backend:
-    cd backend && DEV_MODE=true DB_STRING=./_data/owlchirp.sqlite3 go run github.com/air-verse/air@latest \
-        --build.cmd "go build -o ./tmp/owlchirp ./app/cmd/api" --build.bin "./tmp/owlchirp" \
-        --build.delay "100" \
-        --build.include_ext "go,sql" \
-        --build.exclude_dir "app/assets/web,tmp,build,_data" \
-        --misc.clean_on_exit "true"
+    cd backend && DEV_MODE=true DB_STRING=./_data/owlchirp.sqlite3 go run ./app/cmd/api
 
 # Astro dev server; proxies /api (including the WebSocket) to the backend
 dev-frontend:

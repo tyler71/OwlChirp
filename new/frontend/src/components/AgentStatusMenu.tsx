@@ -1,6 +1,8 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import { useStore } from '@nanostores/react';
 
+import { statusClass } from './VisualAgentList';
+
 import { setAgentState } from '../lib/softphone';
 import { $agentSnapshot } from '../lib/stores';
 import { Icon, formatElapsed, stateDotClass, useNow } from './ui';
@@ -15,7 +17,7 @@ export default function AgentStatusMenu() {
   return (
     <Menu as="div" className="relative">
       <MenuButton className="inline-flex items-center gap-2 rounded-lg border border-secondary-200 bg-base-100 px-3 py-2 text-sm leading-5 font-semibold text-secondary-800 hover:border-secondary-300 hover:shadow-xs dark:border-secondary-700 dark:bg-secondary-800 dark:text-secondary-200 dark:hover:border-secondary-600">
-        <span className={`size-2.5 rounded-full ${stateDotClass(agent.stateType)}`} />
+        <span className={`size-2.5 rounded-full ${statusClass(agent.stateName)}`} />
         <span>{agent.stateName}</span>
         <span className="font-mono text-xs font-medium text-secondary-500 tabular-nums dark:text-secondary-400">
           {formatElapsed(now - agent.stateStartedAt)}
@@ -34,6 +36,7 @@ export default function AgentStatusMenu() {
       >
         {agent.states.map((state) => {
           const current = state.name === agent.stateName || state.name === agent.nextStateName;
+
           return (
             <MenuItem key={state.agentStateARN}>
               <button
@@ -41,7 +44,7 @@ export default function AgentStatusMenu() {
                 onClick={() => void setAgentState(state)}
                 className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium data-focus:bg-secondary-100/60 dark:data-focus:bg-secondary-700/50"
               >
-                <span className={`size-2 rounded-full ${stateDotClass(state.type)}`} />
+                <span className={`size-2 rounded-full ${statusClass(state.name)}`} />
                 <span className="grow">{state.name}</span>
                 {current && <Icon name="check" className="size-4 text-primary-600 dark:text-primary-400" />}
               </button>

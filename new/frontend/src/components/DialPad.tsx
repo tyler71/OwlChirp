@@ -5,20 +5,20 @@ import { dialNumber, sendDigits } from '../lib/softphone';
 import { $contactSnapshot } from '../lib/stores';
 import { Button, Card, Icon } from './ui';
 
-// const KEYS: [string, string][] = [
-//   ['1', ''],
-//   ['2', 'ABC'],
-//   ['3', 'DEF'],
-//   ['4', 'GHI'],
-//   ['5', 'JKL'],
-//   ['6', 'MNO'],
-//   ['7', 'PQRS'],
-//   ['8', 'TUV'],
-//   ['9', 'WXYZ'],
-//   ['*', ''],
-//   ['0', '+'],
-//   ['#', ''],
-// ];
+const KEYS: [string, string][] = [
+  ['1', ''],
+  ['2', 'ABC'],
+  ['3', 'DEF'],
+  ['4', 'GHI'],
+  ['5', 'JKL'],
+  ['6', 'MNO'],
+  ['7', 'PQRS'],
+  ['8', 'TUV'],
+  ['9', 'WXYZ'],
+  ['*', ''],
+  ['0', '+'],
+  ['#', ''],
+];
 
 const DIGIT = /^[0-9*#+]$/;
 
@@ -63,7 +63,7 @@ export default function DialPad() {
             type="tel"
             inputMode="tel"
             value={value}
-            placeholder={onCall ? 'Tones sent' : 'Enter a number'}
+            placeholder={onCall ? 'Tone sent' : 'Enter a number'}
             readOnly={onCall}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
@@ -88,20 +88,24 @@ export default function DialPad() {
           )}
         </div>
 
-        {/*<div className="grid grid-cols-3 gap-2">*/}
-        {/*  {KEYS.map(([key, letters]) => (*/}
-        {/*    <button*/}
-        {/*      key={key}*/}
-        {/*      type="button"*/}
-        {/*      disabled={busy}*/}
-        {/*      onClick={() => press(key)}*/}
-        {/*      className="flex flex-col items-center justify-center rounded-lg border border-secondary-200 bg-base-100 py-2.5 transition hover:border-secondary-300 hover:bg-secondary-50 active:bg-secondary-100 disabled:opacity-50 dark:border-secondary-700 dark:bg-secondary-800 dark:hover:border-secondary-600 dark:hover:bg-secondary-700/60"*/}
-        {/*    >*/}
-        {/*      <span className="text-lg leading-6 font-semibold">{key}</span>*/}
-        {/*      <span className="h-3.5 text-[10px] leading-3.5 font-medium tracking-widest text-secondary-400">{letters}</span>*/}
-        {/*    </button>*/}
-        {/*  ))}*/}
-        {/*</div>*/}
+        {/* DialPad */}
+        {
+          onCall &&
+            <div className="grid grid-cols-3 gap-2">
+              {KEYS.map(([key, letters]) => (
+                  <button
+                      key={key}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => press(key)}
+                      className="flex flex-col items-center justify-center rounded-lg border border-secondary-200 bg-base-100 py-2.5 transition hover:border-secondary-300 hover:bg-secondary-50 active:bg-secondary-100 disabled:opacity-50 dark:border-secondary-700 dark:bg-secondary-800 dark:hover:border-secondary-600 dark:hover:bg-secondary-700/60"
+                  >
+                    <span className="text-lg leading-6 font-semibold">{key}</span>
+                    <span className="h-3.5 text-[10px] leading-3.5 font-medium tracking-widest text-secondary-400">{letters}</span>
+                  </button>
+              ))}
+            </div>
+        }
 
         {!onCall && (
           <Button variant="success" size="lg" icon="phone" disabled={busy || !value.trim()} onClick={call}>

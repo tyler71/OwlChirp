@@ -2,7 +2,6 @@ import { Fragment, useState } from "react";
 
 import DialPad from './DialPad';
 import QuickConnects from './QuickConnects';
-import RecentCallList from './RecentCallList';
 
 // Headless UI 2.x for React, for more info and examples you can check out https://github.com/tailwindlabs/headlessui
 import { Tab, TabGroup, TabList, TabPanels, TabPanel } from "@headlessui/react";
@@ -15,10 +14,6 @@ const tabs = [
     {
         name: "Transfers",
         icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="hi-micro hi-arrow-right inline-block size-5"> <path fill-rule="evenodd" d="M2 8a.75.75 0 0 1 .75-.75h8.69L8.22 4.03a.75.75 0 0 1 1.06-1.06l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 0 1-1.06-1.06l3.22-3.22H2.75A.75.75 0 0 1 2 8Z" clip-rule="evenodd"/></svg>,
-    },
-    {
-        name: "Recent Calls",
-        icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="hi-micro hi-clock inline-block size-5"> <path fill-rule="evenodd" d="M1 8a7 7 0 1 1 14 0A7 7 0 0 1 1 8Zm7.75-4.25a.75.75 0 0 0-1.5 0V8c0 .414.336.75.75.75h3.25a.75.75 0 0 0 0-1.5h-2.5v-3.5Z" clip-rule="evenodd"/></svg>
     },
 ]
 
@@ -69,9 +64,6 @@ export default function TabbedFunctions() {
                             </TabPanel>
                             <TabPanel>
                                 <QuickConnects />
-                            </TabPanel>
-                            <TabPanel>
-                                <RecentCallList />
                             </TabPanel>
                         </TabPanels>
                     )
