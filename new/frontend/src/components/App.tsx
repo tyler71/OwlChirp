@@ -12,6 +12,7 @@ import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
 import AskForHelpButton from './AskForHelpButton';
 import CallerIds from './CallerIds';
+import CallerTimeline from './CallerTimeline';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
@@ -296,6 +297,9 @@ export default function App() {
                 <div className="flex flex-col gap-6 lg:col-span-3">
                   <CallPanel />
                   <TabbedFunctions />
+                </div>
+                <div className="hidden lg:col-span-2 lg:block">
+                  <CallerTimeline />
                 </div>
               </div>
               <DataPanel />

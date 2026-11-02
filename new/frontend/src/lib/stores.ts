@@ -99,6 +99,8 @@ export const $callerId = atom<CallerId | null>(null);
 
 // Past wrap-ups for the number of the current (or last) contact.
 export const $wrapups = atom<WrapupFeed | null>(null);
+/** Inbound calls from the current contact's number (Phone tab call history). */
+export const $numberCalls = atom<{ phoneNumber: string; calls: FlowCall[]; loading: boolean } | null>(null);
 
 // Wrap-ups for the number looked up in the Feed view.
 export const $numberFeed = atom<WrapupFeed | null>(null);

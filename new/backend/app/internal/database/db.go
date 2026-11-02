@@ -59,6 +59,11 @@ func migrate(ctx context.Context, db *sqlx.DB) error {
 	}
 	_, err := db.ExecContext(ctx,
 		`CREATE INDEX IF NOT EXISTS ix_flow_calls_agent ON flow_calls (agent_username, connected_at)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx,
+		`CREATE INDEX IF NOT EXISTS ix_flow_calls_phone ON flow_calls (phone_number, initiated_at)`)
 	return err
 }
 
@@ -665,6 +670,19 @@ func (db *DB) ListFlowCalls(ctx context.Context, since int64, maxRecords int) ([
 	err := db.SelectContext(ctx, &calls,
 		flowCallSelect+` WHERE initiated_at >= ? ORDER BY initiated_at DESC, id DESC LIMIT ?`,
 		since, limit(maxRecords))
+	return calls, err
+}
+
+// ListFlowCallsByNumber returns calls from phoneNumber initiated at or after
+// since (unix ms), newest first.
+func (db *DB) ListFlowCallsByNumber(ctx context.Context, phoneNumber string, since int64, maxRecords int) ([]FlowCall, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	calls := []FlowCall{}
+	err := db.SelectContext(ctx, &calls,
+		flowCallSelect+` WHERE phone_number = ? AND initiated_at >= ? ORDER BY initiated_at DESC, id DESC LIMIT ?`,
+		phoneNumber, since, limit(maxRecords))
 	return calls, err
 }
 

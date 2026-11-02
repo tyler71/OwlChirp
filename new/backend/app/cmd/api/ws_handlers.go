@@ -65,6 +65,7 @@ func (app *application) wsHandlers() map[string]wsHandler {
 		"syslog.get":            app.wsGetCallLog,
 		"flowcalls.list":        app.wsListFlowCalls,
 		"flowcalls.timeline":    app.wsFlowTimeline,
+		"flowcalls.number":      app.wsFlowCallsByNumber,
 		"help.request":          app.wsRequestHelp,
 		"users.list":            app.wsListUsers,
 		"users.setPermission":   app.wsSetPermission,
@@ -74,8 +75,9 @@ func (app *application) wsHandlers() map[string]wsHandler {
 
 // requestPermission lists requests that need more than flags.Standard.
 var requestPermission = map[string]int{
-	"calls.all":     flags.Admin,
-	"callerid.list": flags.Admin, "callerid.delete": flags.Admin,
+	"calls.all":        flags.Admin,
+	"flowcalls.number": flags.Power,
+	"callerid.list":    flags.Admin, "callerid.delete": flags.Admin,
 	"users.list": flags.Admin, "users.setPermission": flags.Admin, "users.resetPermission": flags.Admin,
 }
 
@@ -452,6 +454,26 @@ func (app *application) wsListFlowCalls(ctx context.Context, _ connect.Registere
 // 15-minute buckets. The result is shared by all agents and cached 30 minutes.
 func (app *application) wsFlowTimeline(ctx context.Context, _ connect.RegisteredUser, _ json.RawMessage) (any, error) {
 	return app.timeline.Get(ctx)
+}
+
+// wsFlowCallsByNumber returns inbound calls from input.PhoneNumber over the
+// timeline window, newest first.
+func (app *application) wsFlowCallsByNumber(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		PhoneNumber string `json:"phoneNumber"`
+		MaxRecords  int    `json:"maxRecords"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if input.PhoneNumber == "" {
+		return nil, clientError("phoneNumber is required")
+	}
+	if input.MaxRecords <= 0 {
+		input.MaxRecords = 100
+	}
+	since := time.Now().Add(-timelineWindow).UnixMilli()
+	return app.db.ListFlowCallsByNumber(ctx, input.PhoneNumber, since, input.MaxRecords)
 }
 
 // helpLimiter remembers when each agent last asked for help so one agent

@@ -300,6 +300,22 @@ func TestSocketFlowTimeline(t *testing.T) {
 	assert.Equal(t, tl2.GeneratedAt, tl.GeneratedAt)
 }
 
+func TestSocketFlowCallsByNumber(t *testing.T) {
+	srv := newTestServer(t)
+	c := dial(t, srv, validToken())
+
+	reply := c.call("flowcalls.number", map[string]any{"phoneNumber": "+15550001"})
+	assert.Equal(t, reply.Type, "result")
+	assert.Equal(t, string(reply.Data), `[]`)
+
+	reply = c.call("flowcalls.number", map[string]any{})
+	assert.Equal(t, reply.Error, "phoneNumber is required")
+
+	standard := dial(t, srv, tokenFor(standardUser))
+	reply = standard.call("flowcalls.number", map[string]any{"phoneNumber": "+15550001"})
+	assert.Equal(t, reply.Error, "permission denied")
+}
+
 func TestSocketValidation(t *testing.T) {
 	srv := newTestServer(t)
 	c := dial(t, srv, validToken())

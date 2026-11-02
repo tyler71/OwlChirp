@@ -15,10 +15,10 @@ import {
 import { Caller, ConnectLink, StageBadge } from './FlowCalls';
 import { Button, Icon, Pagination } from './ui';
 
-const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+export const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
 const dayFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
-function dayLabel(ms: number): string {
+export function dayLabel(ms: number): string {
   const day = new Date(ms).setHours(0, 0, 0, 0);
   const today = new Date().setHours(0, 0, 0, 0);
   if (day === today) return 'Current';

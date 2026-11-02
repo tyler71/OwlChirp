@@ -277,15 +277,26 @@ func TestFlowCalls(t *testing.T) {
 	assert.Equal(t, calls[1].QueueName, "Support")
 	assert.Equal(t, calls[1].EnqueuedAt, int64(1500))
 
-	calls, err = db.ListFlowCalls(ctx, 1500, 0)
+	assert.Nil(t, db.UpsertFlowCall(ctx, FlowCall{ContactID: "c-3", PhoneNumber: "+15550001", InitiatedAt: 3000}))
+	calls, err = db.ListFlowCallsByNumber(ctx, "+15550001", 0, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 2)
+	assert.Equal(t, calls[0].ContactID, "c-3")
+	assert.Equal(t, calls[1].ContactID, "c-1")
+	calls, err = db.ListFlowCallsByNumber(ctx, "+15550001", 2000, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 1)
+
+	calls, err = db.ListFlowCalls(ctx, 1500, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 2)
 
 	assert.Nil(t, db.PruneFlowCalls(ctx, 1500))
 	calls, err = db.ListFlowCalls(ctx, 0, 0)
 	assert.Nil(t, err)
-	assert.Equal(t, len(calls), 1)
-	assert.Equal(t, calls[0].ContactID, "c-2")
+	assert.Equal(t, len(calls), 2)
+	assert.Equal(t, calls[0].ContactID, "c-3")
+	assert.Equal(t, calls[1].ContactID, "c-2")
 }
 
 func TestFlowCallTimeline(t *testing.T) {
