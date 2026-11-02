@@ -48,6 +48,7 @@ type wsHandler func(ctx context.Context, user connect.RegisteredUser, data json.
 func (app *application) wsHandlers() map[string]wsHandler {
 	return map[string]wsHandler{
 		"calls.agent":           app.wsAgentCalls,
+		"calls.all":             app.wsAllCalls,
 		"calls.log":             app.wsLogCall,
 		"calls.number":          app.wsNumberCalls,
 		"calls.detail":          app.wsCallDetail,
@@ -73,6 +74,7 @@ func (app *application) wsHandlers() map[string]wsHandler {
 
 // requestPermission lists requests that need more than flags.Standard.
 var requestPermission = map[string]int{
+	"calls.all":     flags.Admin,
 	"callerid.list": flags.Admin, "callerid.delete": flags.Admin,
 	"users.list": flags.Admin, "users.setPermission": flags.Admin, "users.resetPermission": flags.Admin,
 }
@@ -126,10 +128,20 @@ func requireField(name, value string) error {
 	return nil
 }
 
+// callPage is one page of calls plus the total across all pages.
+type callPage struct {
+	Calls []database.Call `json:"calls"`
+	Total int             `json:"total"`
+}
+
+type callPageInput struct {
+	MaxRecords int `json:"maxRecords"`
+	Offset     int `json:"offset"`
+}
+
+// wsAgentCalls returns one page of the requesting agent's calls.
 func (app *application) wsAgentCalls(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
-	var input struct {
-		MaxRecords int `json:"maxRecords"`
-	}
+	var input callPageInput
 	if err := decode(data, &input); err != nil {
 		return nil, err
 	}
@@ -137,7 +149,32 @@ func (app *application) wsAgentCalls(ctx context.Context, user connect.Registere
 	if _, err := app.db.GetOrCreateUser(ctx, user.Username); err != nil {
 		return nil, err
 	}
-	return app.db.GetAgentCalls(ctx, user.Username, input.MaxRecords)
+	calls, err := app.db.GetAgentCalls(ctx, user.Username, input.MaxRecords, input.Offset)
+	if err != nil {
+		return nil, err
+	}
+	total, err := app.db.CountAgentCalls(ctx, user.Username)
+	if err != nil {
+		return nil, err
+	}
+	return callPage{Calls: calls, Total: total}, nil
+}
+
+// wsAllCalls returns one page of calls from every agent.
+func (app *application) wsAllCalls(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input callPageInput
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	calls, err := app.db.GetRecentCalls(ctx, input.MaxRecords, input.Offset)
+	if err != nil {
+		return nil, err
+	}
+	total, err := app.db.CountRecentCalls(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return callPage{Calls: calls, Total: total}, nil
 }
 
 func (app *application) wsLogCall(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {

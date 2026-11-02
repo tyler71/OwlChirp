@@ -83,6 +83,9 @@ export const $metrics = map<Metrics>({});
 
 export const $calls = atom<Call[] | null>(null);
 
+// Current Recent Calls page (1-based) and the total number of calls in scope.
+export const $callsPage = atom<{ page: number; total: number }>({ page: 1, total: 0 });
+
 export const $callerId = atom<CallerId | null>(null);
 
 // Past wrap-ups for the number of the current (or last) contact.

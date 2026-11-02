@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react';
 
+import { openLogin } from '../lib/ccp';
 import { $alert, $config } from '../lib/stores';
 import { Button, Icon } from './ui';
 
@@ -17,10 +18,7 @@ export default function AlertSection() {
         <div className="flex gap-2">
           {config && (
             // A popup (not noopener) lets Firefox grant the CCP frame storage access.
-            <Button
-              variant="primary"
-              onClick={() => window.open(`${config.connectDomain}/login`, 'connect-login', 'width=500,height=700')}
-            >
+            <Button variant="primary" onClick={openLogin}>
               Login
             </Button>
           )}

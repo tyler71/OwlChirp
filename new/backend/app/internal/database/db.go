@@ -141,7 +141,16 @@ func (db *DB) AddPhoneLog(ctx context.Context, username, phoneNumber string, tim
 	return err
 }
 
-func (db *DB) GetAgentCalls(ctx context.Context, username string, maxRecords int) ([]Call, error) {
+// offset clamps a negative OFFSET to zero.
+func offset(n int) int {
+	if n < 0 {
+		return 0
+	}
+	return n
+}
+
+// GetAgentCalls returns one page of an agent's calls, newest first.
+func (db *DB) GetAgentCalls(ctx context.Context, username string, maxRecords, skip int) ([]Call, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
@@ -152,8 +161,44 @@ func (db *DB) GetAgentCalls(ctx context.Context, username string, maxRecords int
 		 FROM calls c JOIN users u ON u.id = c.agent_id
 		 WHERE u.username = ?
 		 ORDER BY c.created_on DESC, c.id DESC
-		 LIMIT ?`, username, limit(maxRecords))
+		 LIMIT ? OFFSET ?`, username, limit(maxRecords), offset(skip))
 	return calls, err
+}
+
+// CountAgentCalls returns how many calls an agent has logged.
+func (db *DB) CountAgentCalls(ctx context.Context, username string) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var n int
+	err := db.GetContext(ctx, &n,
+		`SELECT COUNT(*) FROM calls c JOIN users u ON u.id = c.agent_id WHERE u.username = ?`, username)
+	return n, err
+}
+
+// GetRecentCalls returns one page of calls across all agents, newest first.
+func (db *DB) GetRecentCalls(ctx context.Context, maxRecords, skip int) ([]Call, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	calls := []Call{}
+	err := db.SelectContext(ctx, &calls,
+		`SELECT u.username AS agent, COALESCE(c.phone_number, '') AS phone_number,
+		        COALESCE(c.timestamp, 0) AS timestamp, COALESCE(c.contact_id, '') AS contact_id
+		 FROM calls c JOIN users u ON u.id = c.agent_id
+		 ORDER BY c.created_on DESC, c.id DESC
+		 LIMIT ? OFFSET ?`, limit(maxRecords), offset(skip))
+	return calls, err
+}
+
+// CountRecentCalls returns how many calls all agents have logged.
+func (db *DB) CountRecentCalls(ctx context.Context) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var n int
+	err := db.GetContext(ctx, &n, `SELECT COUNT(*) FROM calls c JOIN users u ON u.id = c.agent_id`)
+	return n, err
 }
 
 func (db *DB) GetPhoneCalls(ctx context.Context, phoneNumber string, maxRecords int) ([]Call, error) {
@@ -334,6 +379,9 @@ const wrapupSelect = `SELECT w.contact_id, w.phone_number, COALESCE(u.username, 
 // schema change.
 type Settings struct {
 	Theme string `json:"theme"`
+	// FollowTeamMeeting switches the agent to "In a meeting" when most of the
+	// team is in one.
+	FollowTeamMeeting bool `json:"followTeamMeeting"`
 }
 
 // GetSettings returns zero Settings when the user has saved none.

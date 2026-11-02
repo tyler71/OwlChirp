@@ -3,13 +3,41 @@ import { defineConfig } from 'astro/config';
 
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
+import { AstroPWAIntegration } from '@vite-pwa/astro';
 
 // The Go backend (just dev-backend) listens here during development.
 const backend = process.env.BACKEND_URL ?? 'http://127.0.0.1:4444';
 
 // https://astro.build/config
 export default defineConfig({
-  integrations: [react()],
+  integrations: [
+    react(),
+    AstroPWAIntegration({
+      // Never swap versions under an agent mid-call: the app shows an "Update" button instead (lib/pwa.ts).
+      registerType: 'prompt',
+      injectRegister: false,
+      // Icons are generated from public/logo.svg at build time.
+      pwaAssets: { image: 'public/logo.svg', preset: 'minimal-2023' },
+      manifest: {
+        name: 'OwlChirp',
+        short_name: 'OwlChirp',
+        description: 'OwlChirp contact center softphone',
+        start_url: '/ccp',
+        scope: '/',
+        display: 'standalone',
+        theme_color: '#4f46e5',
+        background_color: '#ffffff',
+      },
+      // amazon-connect-streams alone is ~600 kB.
+      maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      generateSW: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // The app needs the backend and Connect to do anything, so no offline navigation fallback.
+        // /api, /ws and /ping are not precached and stay network-only.
+        navigateFallback: null,
+      },
+    }),
+  ],
   output: 'static',
   outDir: './dist',
 

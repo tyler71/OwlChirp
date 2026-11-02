@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { $agent, $agentSnapshot, $config, $permission, $view, PERMISSION, type View } from '../lib/stores';
 import '../lib/theme';
+import '../lib/pwa';
 import Admin from './Admin';
 import AgentStatusMenu from './AgentStatusMenu';
 import AlertSection from './AlertSection';
@@ -24,6 +25,7 @@ import Settings from './Settings';
 import StatusBar from './StatusBar';
 import SystemLog from './SystemLog';
 import Timeline from './Timeline';
+import UpdateButton from './UpdateButton';
 import { Icon, type IconName, stateDotClass } from './ui';
 
 function Brand() {
@@ -236,8 +238,9 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex flex-none items-center border-t border-secondary-200/75 p-4 dark:border-secondary-800/75">
+        <div className="flex flex-none items-center gap-2 border-t border-secondary-200/75 p-4 dark:border-secondary-800/75">
           <UserMenu />
+          <UpdateButton />
         </div>
       </aside>
 
@@ -257,7 +260,9 @@ export default function App() {
             <svg className="relative inline-block size-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden> <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
           </button>
           <Brand />
-          <span className="size-9" />
+          <span className="flex min-w-9 justify-end">
+            <UpdateButton />
+          </span>
         </div>
       </header>
 

@@ -76,7 +76,7 @@ export default function VisualAgentList() {
           key={u.user_id}
           className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1 text-md font-bold after:ml-0.5 after:inline-block after:text-[10px] after:content-[attr(data-emoji)] ${CURSOR_HELP_CLASS} ${statusClass(u.status.name)}`}
           data-emoji={STATUS_EMOJI[u.status.name.toLowerCase()] ?? ''}
-          title={`${u.user.first_name} ${u.user.last_name}`}
+          title={`${u.user.first_name} ${u.user.last_name} - ${u.status.name}`}
         >
           {letters[i]}
         </span>

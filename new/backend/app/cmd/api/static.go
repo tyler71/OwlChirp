@@ -2,6 +2,7 @@ package main
 
 import (
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
@@ -13,7 +14,13 @@ const notBuiltPage = `<!doctype html>
 <html lang="en"><head><meta charset="UTF-8"><title>OwlChirp</title></head>
 <body><p>The frontend has not been built into this binary. Run <code>just build</code>, or use <code>just dev</code> during development.</p></body></html>`
 
-// static serves the embedded Astro build.
+func init() {
+	// Go's built-in table lacks the PWA manifest type.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
+
+// static serves the embedded Astro build. sw.js and manifest.webmanifest fall
+// under no-cache so browsers always revalidate them and notice new deploys.
 func (app *application) static() http.Handler {
 	web, err := fs.Sub(assets.Web, "web")
 	if err != nil {

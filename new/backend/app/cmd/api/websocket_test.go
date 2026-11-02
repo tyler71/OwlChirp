@@ -238,15 +238,15 @@ func TestSocketSettings(t *testing.T) {
 
 	reply := c.call("settings.get", nil)
 	assert.Equal(t, reply.Type, "result")
-	assert.Equal(t, string(reply.Data), `{"theme":""}`)
+	assert.Equal(t, string(reply.Data), `{"theme":"","followTeamMeeting":false}`)
 
-	reply = c.call("settings.save", map[string]any{"theme": "dracula"})
+	reply = c.call("settings.save", map[string]any{"theme": "dracula", "followTeamMeeting": true})
 	assert.Equal(t, reply.Type, "result")
 
 	// A second connection for the same user sees the saved settings.
 	other := dial(t, srv, validToken())
 	reply = other.call("settings.get", nil)
-	assert.Equal(t, string(reply.Data), `{"theme":"dracula"}`)
+	assert.Equal(t, string(reply.Data), `{"theme":"dracula","followTeamMeeting":true}`)
 }
 
 func TestSocketCallLogs(t *testing.T) {
@@ -338,10 +338,35 @@ func TestSocketCallsAndCallerID(t *testing.T) {
 	c.readUntil(func(m testMessage) bool { return m.Type == "call.logged" })
 
 	reply = c.call("calls.agent", map[string]any{"maxRecords": 5})
-	var calls []database.Call
-	assert.Nil(t, json.Unmarshal(reply.Data, &calls))
-	assert.Equal(t, len(calls), 1)
-	assert.Equal(t, calls[0].Agent, testAgent.Username)
+	var page callPage
+	assert.Nil(t, json.Unmarshal(reply.Data, &page))
+	assert.Equal(t, len(page.Calls), 1)
+	assert.Equal(t, page.Total, 1)
+	assert.Equal(t, page.Calls[0].Agent, testAgent.Username)
+
+	standard := dial(t, srv, tokenFor(standardUser))
+	reply = standard.call("calls.log", map[string]any{"phoneNumber": "+15550002", "contactId": "c-2"})
+	assert.Equal(t, reply.Type, "result")
+
+	reply = standard.call("calls.agent", map[string]any{"maxRecords": 5})
+	assert.Nil(t, json.Unmarshal(reply.Data, &page))
+	assert.Equal(t, len(page.Calls), 1)
+	assert.Equal(t, page.Calls[0].Agent, standardUser.Username)
+
+	reply = standard.call("calls.all", map[string]any{"maxRecords": 5})
+	assert.Equal(t, reply.Error, "permission denied")
+
+	reply = c.call("calls.all", map[string]any{"maxRecords": 5})
+	assert.Nil(t, json.Unmarshal(reply.Data, &page))
+	assert.Equal(t, len(page.Calls), 2)
+	assert.Equal(t, page.Total, 2)
+
+	reply = c.call("calls.all", map[string]any{"maxRecords": 1, "offset": 1})
+	page = callPage{}
+	assert.Nil(t, json.Unmarshal(reply.Data, &page))
+	assert.Equal(t, len(page.Calls), 1)
+	assert.Equal(t, page.Total, 2)
+	assert.Equal(t, page.Calls[0].ContactID, "c-1")
 
 	reply = c.call("callerid.get", map[string]any{"phoneNumber": "+15550001"})
 	assert.Equal(t, string(reply.Data), "")

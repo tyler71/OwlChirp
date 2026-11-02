@@ -1,13 +1,14 @@
 import { useStore } from '@nanostores/react';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 
 import { getCallerIdName } from '../lib/callerId';
 import { loadNumberFeed } from '../lib/wrapups';
 import { CURSOR_HELP_CLASS, LOADING_CLASS } from '../lib/const';
 import { formatCallTime, formatPhoneNumber, formatSecondsToTime, normalizePhoneNumber } from '../lib/helpers';
 import { request } from '../lib/realtime';
-import { $calls, $config, $isAdmin, $isPower, $view, type Call } from '../lib/stores';
-import { Card, Icon } from './ui';
+import { loadCallsPage, totalPages } from '../lib/callHistory';
+import { $calls, $callsPage, $config, $isAdmin, $isPower, $view, type Call } from '../lib/stores';
+import { Card, Icon, Pagination } from './ui';
 
 const TITLE = 'Recent Calls';
 
@@ -138,10 +139,17 @@ function CallCard({ call }: { call: Call }) {
 
 export default function RecentCallList() {
   const calls = useStore($calls);
+  const { page, total } = useStore($callsPage);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  const goToPage = (p: number) => {
+    sectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    void loadCallsPage(p);
+  };
 
   return (
-    <section className="flex flex-col gap-4 py-4">
-      <h2 className="text-lg font-semibold">{calls?.length ? `${TITLE} (${calls.length})` : TITLE}</h2>
+    <section ref={sectionRef} className="flex flex-col gap-4 py-4">
+      <h2 className="text-lg font-semibold">{total ? `${TITLE} (${total})` : TITLE}</h2>
       {calls === null ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((i) => (
@@ -157,6 +165,7 @@ export default function RecentCallList() {
           ))}
         </div>
       )}
+      <Pagination page={page} totalPages={totalPages(total)} onChange={goToPage} />
     </section>
   );
 }

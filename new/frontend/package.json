@@ -28,6 +28,13 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "typescript": "^6"
+    "@vite-pwa/assets-generator": "^2.0.0",
+    "@vite-pwa/astro": "^2.0.0",
+    "@vite-pwa/workbox-swkit": "^8.0.13",
+    "@vite-pwa/workbox-window": "^8.0.13",
+    "magicast": "^0.5.5",
+    "rolldown": "^1.2.16",
+    "typescript": "^6",
+    "vite-plugin-pwa": "^2.0.0"
   }
 }

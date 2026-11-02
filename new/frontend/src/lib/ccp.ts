@@ -20,6 +20,7 @@ import {
 } from './const';
 import { agentSideline, formatPhoneNumber, telemetry } from './helpers';
 import './help';
+import './teamMeeting';
 import { authorize, notify, snooze } from './notifier';
 import { startRealtime } from './realtime';
 import { installConsoleCapture } from './systemLog';
@@ -35,6 +36,24 @@ export async function loadConfig(): Promise<AppConfig> {
   const config: AppConfig = await res.json();
   $config.set(config);
   return config;
+}
+
+const loginUrl = (config: AppConfig) => `${config.connectDomain}/login`;
+
+// Streams internals not in its typings. Opening through its PopupManager under
+// the same window name/URL means Streams reuses (and auto-closes) our window
+// instead of opening a second login popup.
+type StreamsLogin = {
+  loginWindow: Window | null;
+  getPopupManager(): { open(url: string, name: string, options?: { width?: number; height?: number }): Window | null };
+};
+
+export function openLogin(): void {
+  const config = $config.get();
+  if (!config) return;
+  const core = connect.core as unknown as StreamsLogin;
+  const topics = (connect as unknown as { MasterTopics: { LOGIN_POPUP: string } }).MasterTopics;
+  core.loginWindow = core.getPopupManager().open(loginUrl(config), topics.LOGIN_POPUP, { width: 500, height: 700 });
 }
 
 let initialised = false;
@@ -54,7 +73,7 @@ export async function initCcp(container: HTMLElement): Promise<void> {
     // grant the CCP frame storage access once the agent signs in.
     loginPopup: true,
     loginPopupAutoClose: true,
-    loginUrl: `${config.connectDomain}/login`,
+    loginUrl: loginUrl(config),
     loginOptions: { autoClose: true },
     softphone: {
       allowFramedSoftphone: true,

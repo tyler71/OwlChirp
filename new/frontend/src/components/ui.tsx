@@ -41,6 +41,10 @@ const ICONS = {
   clock: 'M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z',
   timeline:
     'M15.5 2A1.5 1.5 0 0 0 14 3.5v13a1.5 1.5 0 0 0 1.5 1.5h1a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 16.5 2h-1ZM9.5 6A1.5 1.5 0 0 0 8 7.5v9A1.5 1.5 0 0 0 9.5 18h1a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 10.5 6h-1ZM3.5 10A1.5 1.5 0 0 0 2 11.5v5A1.5 1.5 0 0 0 3.5 18h1A1.5 1.5 0 0 0 6 16.5v-5A1.5 1.5 0 0 0 4.5 10h-1Z',
+  chevronLeft:
+    'M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z',
+  chevronRight:
+    'M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z',
   externalLink:
     'M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z',
 } as const;
@@ -120,6 +124,83 @@ export function Card({ title, actions, children, className = '' }: { title?: Rea
       )}
       {children}
     </section>
+  );
+}
+
+// Pagination: Simple (Tailkit a-c-pagination-01), with buttons instead of links.
+const PAGE_CLASS =
+  'inline-flex items-center justify-center gap-2 border border-secondary-200 px-4 py-2 leading-6 font-semibold text-secondary-800 hover:z-1 hover:border-secondary-300 hover:text-secondary-900 hover:shadow-xs focus:z-1 focus:ring-3 focus:ring-secondary-300/25 active:z-1 active:border-secondary-200 active:shadow-none disabled:pointer-events-none disabled:opacity-50 dark:border-secondary-700 dark:text-secondary-300 dark:hover:border-secondary-600 dark:hover:text-secondary-200 dark:focus:ring-secondary-600/40 dark:active:border-secondary-700';
+const PAGE_IDLE_CLASS = 'bg-base-100 dark:bg-secondary-800';
+const PAGE_CURRENT_CLASS = 'bg-secondary-100 dark:bg-secondary-700/75';
+
+// First, last and the current page ±1, with 'gap' where pages are skipped.
+export function pageItems(page: number, totalPages: number): (number | 'gap')[] {
+  const pages = [...new Set([1, page - 1, page, page + 1, totalPages])]
+    .filter((p) => p >= 1 && p <= totalPages)
+    .sort((a, b) => a - b);
+  const items: (number | 'gap')[] = [];
+  pages.forEach((p, i) => {
+    const prev = pages[i - 1];
+    if (prev !== undefined && p - prev === 2) items.push(prev + 1);
+    else if (prev !== undefined && p - prev > 2) items.push('gap');
+    items.push(p);
+  });
+  return items;
+}
+
+export function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (page: number) => void }) {
+  if (totalPages <= 1) return null;
+  const prev = (
+    <Icon name="chevronLeft" className="-mx-1.5 size-5" />
+  );
+  const next = (
+    <Icon name="chevronRight" className="-mx-1.5 size-5" />
+  );
+  return (
+    <div className="text-center dark:text-secondary-100">
+      <nav className="flex sm:hidden" aria-label="Pagination">
+        <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onChange(page - 1)} className={`${PAGE_CLASS} ${PAGE_IDLE_CLASS} rounded-lg`}>
+          {prev}
+        </button>
+        <div className="flex grow items-center justify-center px-2 sm:px-4">
+          <span>
+            Page <span className="font-semibold">{page}</span> of <span className="font-semibold">{totalPages}</span>
+          </span>
+        </div>
+        <button type="button" aria-label="Next page" disabled={page >= totalPages} onClick={() => onChange(page + 1)} className={`${PAGE_CLASS} ${PAGE_IDLE_CLASS} rounded-lg`}>
+          {next}
+        </button>
+      </nav>
+
+      <nav className="hidden sm:inline-flex" aria-label="Pagination">
+        <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onChange(page - 1)} className={`${PAGE_CLASS} ${PAGE_IDLE_CLASS} -mr-px rounded-l-lg`}>
+          {prev}
+        </button>
+        {pageItems(page, totalPages).map((item, i) =>
+          item === 'gap' ? (
+            <div
+              key={`gap-${i}`}
+              className="-mr-px flex items-center justify-center border border-secondary-200 bg-base-100 px-4 text-secondary-800 dark:border-secondary-700 dark:bg-secondary-800 dark:text-secondary-300"
+            >
+              ...
+            </div>
+          ) : (
+            <button
+              key={item}
+              type="button"
+              aria-current={item === page ? 'page' : undefined}
+              onClick={() => item !== page && onChange(item)}
+              className={`${PAGE_CLASS} ${item === page ? PAGE_CURRENT_CLASS : PAGE_IDLE_CLASS} -mr-px tabular-nums`}
+            >
+              {item}
+            </button>
+          ),
+        )}
+        <button type="button" aria-label="Next page" disabled={page >= totalPages} onClick={() => onChange(page + 1)} className={`${PAGE_CLASS} ${PAGE_IDLE_CLASS} rounded-r-lg`}>
+          {next}
+        </button>
+      </nav>
+    </div>
   );
 }
 

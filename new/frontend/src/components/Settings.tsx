@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { downloadCcpLog } from '../lib/ccp';
 import { $view } from '../lib/stores';
-import { $theme, setTheme, THEMES, type ThemeChoice } from '../lib/theme';
+import { $followTeamMeeting, $theme, setFollowTeamMeeting, setTheme, THEMES, type ThemeChoice } from '../lib/theme';
 import { Button, Card, Icon } from './ui';
 
 function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolean }) {
@@ -40,6 +40,7 @@ function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolea
 
 export default function Settings() {
   const theme = useStore($theme);
+  const followTeamMeeting = useStore($followTeamMeeting);
   const [showThemes, setShowThemes] = useState(false)
   return (
     <>
@@ -57,6 +58,23 @@ export default function Settings() {
           </div>
         }
       </div>
+    </Card>
+    <Card title="Status">
+      <label className="flex cursor-pointer items-start gap-3 p-4">
+        <input
+          type="checkbox"
+          className="toggle toggle-primary mt-0.5"
+          checked={followTeamMeeting}
+          onChange={(e) => void setFollowTeamMeeting(e.target.checked)}
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold">Follow team into meetings</span>
+          <span className="text-xs text-secondary-500 dark:text-secondary-400">
+            When 75% of your teammates are In a meeting, switch to it too: right away if you're available, or after your
+            current call.
+          </span>
+        </span>
+      </label>
     </Card>
     <Card title="Troubleshooting">
       <div className="flex flex-col items-start gap-2 p-4">

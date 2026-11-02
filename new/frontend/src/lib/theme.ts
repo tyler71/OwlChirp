@@ -25,30 +25,50 @@ export const DARK_THEMES: ReadonlySet<string> = new Set([
 // can apply the theme before first paint.
 export const $theme = persistentAtom<ThemeChoice>('owlchirp:theme', 'system');
 
-type Settings = { theme: string };
+// Switch to "In a meeting" when most of the team is in one (see teamMeeting.ts).
+export const $followTeamMeeting = persistentAtom<boolean>('owlchirp:followTeamMeeting', false, {
+  encode: JSON.stringify,
+  decode: (v) => v === 'true',
+});
+
+type Settings = { theme: string; followTeamMeeting?: boolean };
 
 function isThemeChoice(name: string): name is ThemeChoice {
   return name === 'system' || (THEMES as readonly string[]).includes(name);
 }
 
-export async function setTheme(choice: ThemeChoice): Promise<void> {
-  $theme.set(choice);
+// settings.save replaces the whole record, so always send every field.
+async function saveSettings(what: string): Promise<void> {
   try {
-    await request('settings.save', { theme: choice });
+    await request('settings.save', { theme: $theme.get(), followTeamMeeting: $followTeamMeeting.get() });
   } catch (e) {
     console.error('save settings', e);
-    $alert.set({ kind: 'warning', message: 'Theme could not be saved to your account.' });
+    $alert.set({ kind: 'warning', message: `${what} could not be saved to your account.` });
   }
 }
 
+export function setTheme(choice: ThemeChoice): Promise<void> {
+  $theme.set(choice);
+  return saveSettings('Theme');
+}
+
+export function setFollowTeamMeeting(enabled: boolean): Promise<void> {
+  $followTeamMeeting.set(enabled);
+  return saveSettings('Meeting setting');
+}
+
 // On each (re)connect the server's settings win. An account with none saved
-// adopts this browser's choice, carrying over themes picked before settings
+// adopts this browser's choices, carrying over themes picked before settings
 // moved to the server.
 async function syncSettings(): Promise<void> {
   try {
     const settings = await request<Settings>('settings.get');
-    if (isThemeChoice(settings.theme)) $theme.set(settings.theme);
-    else if ($theme.get() !== 'system') await request('settings.save', { theme: $theme.get() });
+    if (isThemeChoice(settings.theme)) {
+      $theme.set(settings.theme);
+      $followTeamMeeting.set(settings.followTeamMeeting ?? false);
+    } else if ($theme.get() !== 'system' || $followTeamMeeting.get()) {
+      await saveSettings('Settings');
+    }
   } catch {
     // Not enabled for this user, or the connection dropped; retried on reconnect.
   }

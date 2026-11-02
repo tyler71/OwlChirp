@@ -23,7 +23,7 @@ func TestCalls(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 
-	calls, err := db.GetAgentCalls(ctx, "agent@example.com", 10)
+	calls, err := db.GetAgentCalls(ctx, "agent@example.com", 10, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 0)
 
@@ -31,14 +31,42 @@ func TestCalls(t *testing.T) {
 	assert.Nil(t, db.AddPhoneLog(ctx, "agent@example.com", "+15550002", 2000, "c-2"))
 	assert.Nil(t, db.AddPhoneLog(ctx, "other@example.com", "+15550001", 3000, "c-3"))
 
-	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 0)
+	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 0, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 2)
 	assert.Equal(t, calls[0].ContactID, "c-2")
 
-	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 1)
+	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 1, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 1)
+	assert.Equal(t, calls[0].ContactID, "c-2")
+
+	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 1, 1)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 1)
+	assert.Equal(t, calls[0].ContactID, "c-1")
+
+	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 1, 2)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 0)
+
+	n, err := db.CountAgentCalls(ctx, "agent@example.com")
+	assert.Nil(t, err)
+	assert.Equal(t, n, 2)
+
+	calls, err = db.GetRecentCalls(ctx, 10, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 3)
+	assert.Equal(t, calls[0].Agent, "other@example.com")
+
+	calls, err = db.GetRecentCalls(ctx, 2, 2)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 1)
+	assert.Equal(t, calls[0].ContactID, "c-1")
+
+	n, err = db.CountRecentCalls(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, n, 3)
 
 	calls, err = db.GetPhoneCalls(ctx, "+15550001", 10)
 	assert.Nil(t, err)
@@ -170,12 +198,13 @@ func TestSettings(t *testing.T) {
 
 	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "dracula"})
 	assert.Nil(t, err)
-	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "nord"})
+	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "nord", FollowTeamMeeting: true})
 	assert.Nil(t, err)
 
 	s, err = db.GetSettings(ctx, "alice")
 	assert.Nil(t, err)
 	assert.Equal(t, s.Theme, "nord")
+	assert.Equal(t, s.FollowTeamMeeting, true)
 
 	s, err = db.GetSettings(ctx, "bob")
 	assert.Nil(t, err)
