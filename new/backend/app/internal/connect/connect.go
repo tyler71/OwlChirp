@@ -58,6 +58,7 @@ type FlowContact struct {
 	ID             string
 	QueueName      string
 	AgentName      string
+	AgentUsername  string
 	InitiatedAt    time.Time
 	EnqueuedAt     time.Time
 	ConnectedAt    time.Time
@@ -405,16 +406,17 @@ func (c *Client) fetchQueueName(ctx context.Context, queueID string) (string, er
 	return aws.ToString(out.Queue.Name), nil
 }
 
-// SearchFlowContacts returns the inbound voice contacts initiated since since,
-// including ones still in the contact flow or queue. Search results can lag
-// real time by a few seconds.
-func (c *Client) SearchFlowContacts(ctx context.Context, since time.Time) ([]FlowContact, error) {
+// SearchFlowContacts returns the inbound voice contacts initiated between
+// start and end, including ones still in the contact flow or queue. Search
+// results can lag real time by a few seconds. Connect caps the range at
+// 8 weeks and throttles ranges over 2 weeks to 1 request per second.
+func (c *Client) SearchFlowContacts(ctx context.Context, start, end time.Time) ([]FlowContact, error) {
 	p := awsconnect.NewSearchContactsPaginator(c.api, &awsconnect.SearchContactsInput{
 		InstanceId: aws.String(c.instance),
 		TimeRange: &types.SearchContactsTimeRange{
 			Type:      types.SearchContactsTimeRangeTypeInitiationTimestamp,
-			StartTime: aws.Time(since),
-			EndTime:   aws.Time(time.Now()),
+			StartTime: aws.Time(start),
+			EndTime:   aws.Time(end),
 		},
 		SearchCriteria: &types.SearchCriteria{
 			Channels: []types.Channel{types.ChannelVoice},
@@ -451,6 +453,7 @@ func (c *Client) SearchFlowContacts(ctx context.Context, since time.Time) ([]Flo
 				if id := aws.ToString(s.AgentInfo.Id); id != "" {
 					if agent, err := c.users.Get(ctx, id); err == nil {
 						fc.AgentName = strings.TrimSpace(agent.FirstName + " " + agent.LastName)
+						fc.AgentUsername = agent.Username
 					}
 				}
 			}

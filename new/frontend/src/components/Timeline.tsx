@@ -1,11 +1,19 @@
 import { useStore } from '@nanostores/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { flowStage } from '../lib/flowCalls';
 import { $isAdmin, $timeline, $timelineInterval, type FlowCallBucket } from '../lib/stores';
-import { groupBuckets, intervalLabel, intervalPhrase, loadTimeline, TIMELINE_INTERVALS } from '../lib/timeline';
+import {
+  groupBuckets,
+  intervalLabel,
+  intervalPhrase,
+  loadTimeline,
+  TIMELINE_INTERVALS,
+  TIMELINE_PAGE_SIZE,
+  windowPhrase,
+} from '../lib/timeline';
 import { Caller, ConnectLink, StageBadge } from './FlowCalls';
-import { Button, Icon } from './ui';
+import { Button, Icon, Pagination } from './ui';
 
 const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
 const dayFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -13,7 +21,7 @@ const dayFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'sh
 function dayLabel(ms: number): string {
   const day = new Date(ms).setHours(0, 0, 0, 0);
   const today = new Date().setHours(0, 0, 0, 0);
-  if (day === today) return 'Today';
+  if (day === today) return 'Current';
   if (day === today - 86_400_000) return 'Yesterday';
   return dayFormat.format(ms);
 }
@@ -115,14 +123,27 @@ export default function Timeline() {
   const peak = Math.max(1, ...buckets.map((b) => b.total));
   const total = buckets.reduce((n, b) => n + b.total, 0);
 
+  // Start at the first page whenever the grouping or data changes.
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [minutes, timeline]);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const totalPages = Math.max(1, Math.ceil(buckets.length / TIMELINE_PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const pageBuckets = buckets.slice((current - 1) * TIMELINE_PAGE_SIZE, current * TIMELINE_PAGE_SIZE);
+
+  const goToPage = (p: number) => {
+    sectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setPage(p);
+  };
+
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={sectionRef} className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="grow">
           <h1 className="text-lg font-semibold">Timeline</h1>
           {timeline && (
             <p className="text-sm text-secondary-500 dark:text-secondary-400">
-              {total} {total === 1 ? 'call' : 'calls'} in the last {timeline.hours} hours · {intervalPhrase(width / 60_000)}
+              {total} {total === 1 ? 'call' : 'calls'} in the last {windowPhrase(timeline.hours)} · {intervalPhrase(width / 60_000)}
               intervals · updated {timeFormat.format(timeline.generatedAt)}
             </p>
           )}
@@ -154,7 +175,7 @@ export default function Timeline() {
       {timeline !== null && !buckets.length && (
         <p className="flex items-center gap-2 text-sm text-secondary-500">
           <Icon name="timeline" className="size-4" />
-          No calls in the last {timeline.hours} hours.
+          No calls in the last {windowPhrase(timeline.hours)}.
         </p>
       )}
 
@@ -168,14 +189,15 @@ export default function Timeline() {
           </div>
 
           <ul className="relative space-y-4 pl-10 md:pl-12 lg:ml-40">
-            {buckets.map((b, i) => {
+            {pageBuckets.map((b, i) => {
               const day = dayLabel(b.start);
-              const newDay = i === 0 || dayLabel(buckets[i - 1].start) !== day;
+              const newDay = i === 0 || dayLabel(pageBuckets[i - 1].start) !== day;
               return <Entry key={b.start} bucket={b} width={width} peak={peak} day={newDay ? day : undefined} />;
             })}
           </ul>
         </div>
       )}
+      <Pagination page={current} totalPages={totalPages} onChange={goToPage} />
     </div>
   );
 }

@@ -130,8 +130,8 @@ func requireField(name, value string) error {
 
 // callPage is one page of calls plus the total across all pages.
 type callPage struct {
-	Calls []database.Call `json:"calls"`
-	Total int             `json:"total"`
+	Calls []database.RecentCall `json:"calls"`
+	Total int                   `json:"total"`
 }
 
 type callPageInput struct {
@@ -141,36 +141,29 @@ type callPageInput struct {
 
 // wsAgentCalls returns one page of the requesting agent's calls.
 func (app *application) wsAgentCalls(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
-	var input callPageInput
-	if err := decode(data, &input); err != nil {
-		return nil, err
-	}
-
 	if _, err := app.db.GetOrCreateUser(ctx, user.Username); err != nil {
 		return nil, err
 	}
-	calls, err := app.db.GetAgentCalls(ctx, user.Username, input.MaxRecords, input.Offset)
-	if err != nil {
-		return nil, err
-	}
-	total, err := app.db.CountAgentCalls(ctx, user.Username)
-	if err != nil {
-		return nil, err
-	}
-	return callPage{Calls: calls, Total: total}, nil
+	return app.recentCallPage(ctx, user.Username, data)
 }
 
 // wsAllCalls returns one page of calls from every agent.
 func (app *application) wsAllCalls(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	return app.recentCallPage(ctx, "", data)
+}
+
+// recentCallPage serves both call lists from the shared flow_calls store,
+// merged with calls only a browser logged. An empty username means all agents.
+func (app *application) recentCallPage(ctx context.Context, username string, data json.RawMessage) (any, error) {
 	var input callPageInput
 	if err := decode(data, &input); err != nil {
 		return nil, err
 	}
-	calls, err := app.db.GetRecentCalls(ctx, input.MaxRecords, input.Offset)
+	calls, err := app.db.ListRecentCalls(ctx, username, input.MaxRecords, input.Offset)
 	if err != nil {
 		return nil, err
 	}
-	total, err := app.db.CountRecentCalls(ctx)
+	total, err := app.db.CountRecentCalls(ctx, username)
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +448,7 @@ func (app *application) wsListFlowCalls(ctx context.Context, _ connect.Registere
 	return app.db.ListFlowCalls(ctx, since, input.MaxRecords)
 }
 
-// wsFlowTimeline returns inbound calls from the last 48 hours grouped into
+// wsFlowTimeline returns inbound calls from the last 8 weeks grouped into
 // 15-minute buckets. The result is shared by all agents and cached 30 minutes.
 func (app *application) wsFlowTimeline(ctx context.Context, _ connect.RegisteredUser, _ json.RawMessage) (any, error) {
 	return app.timeline.Get(ctx)

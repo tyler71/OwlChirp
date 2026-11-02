@@ -23,11 +23,19 @@ export type Metrics = {
   handled_incoming?: number;
 };
 
+// A Recent Calls entry. Inbound calls the flow poller saw carry their Connect
+// details (ms epoch); calls only a browser logged (e.g. outbound) don't.
 export type Call = {
   agent: string;
   phoneNumber: string;
   timestamp: number;
   contactId: string;
+  agentName?: string;
+  queueName?: string;
+  initiatedAt?: number;
+  enqueuedAt?: number;
+  connectedAt?: number;
+  disconnectedAt?: number;
 };
 
 export type CallerId = {
@@ -60,6 +68,7 @@ export type FlowCall = {
   phoneNumber: string;
   queueName: string;
   agentName: string;
+  agentUsername: string;
   initiatedAt: number;
   enqueuedAt: number;
   connectedAt: number;

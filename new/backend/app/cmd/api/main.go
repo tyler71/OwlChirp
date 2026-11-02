@@ -112,7 +112,8 @@ func run(logger *slog.Logger) error {
 	cfg.flags.apiKey = env.GetString("GOFF_API_KEY", "")
 
 	cfg.flowCalls.interval = time.Duration(env.GetInt("FLOW_POLL_INTERVAL", 5)) * time.Second
-	cfg.flowCalls.retention = time.Duration(env.GetInt("FLOW_RETENTION_DAYS", 7)) * 24 * time.Hour
+	// Keep at least the timeline's window so it never shows pruned gaps.
+	cfg.flowCalls.retention = max(time.Duration(env.GetInt("FLOW_RETENTION_DAYS", 56))*24*time.Hour, timelineWindow)
 
 	showVersion := flag.Bool("version", false, "display version and exit")
 	flag.Parse()

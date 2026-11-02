@@ -289,7 +289,7 @@ func TestSocketFlowTimeline(t *testing.T) {
 	assert.Equal(t, reply.Type, "result")
 	var tl flowTimeline
 	assert.Nil(t, json.Unmarshal(reply.Data, &tl))
-	assert.Equal(t, tl.Hours, 48)
+	assert.Equal(t, tl.Hours, 8*7*24)
 	assert.Equal(t, tl.BucketMinutes, 15)
 	assert.Equal(t, len(tl.Buckets), 0)
 

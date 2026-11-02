@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS flow_calls (
 	phone_number VARCHAR(20),
 	queue_name VARCHAR(100),
 	agent_name VARCHAR(100),
+	agent_username VARCHAR(100),
 	initiated_at INTEGER NOT NULL DEFAULT 0,
 	enqueued_at INTEGER NOT NULL DEFAULT 0,
 	connected_at INTEGER NOT NULL DEFAULT 0,

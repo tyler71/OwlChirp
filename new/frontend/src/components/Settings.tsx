@@ -68,11 +68,10 @@ export default function Settings() {
           onChange={(e) => void setFollowTeamMeeting(e.target.checked)}
         />
         <span className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold">Follow team into meetings</span>
-          <span className="text-xs text-secondary-500 dark:text-secondary-400">
-            When 75% of your teammates are In a meeting, switch to it too: right away if you're available, or after your
-            current call.
-          </span>
+          <span className="text-sm font-semibold">Auto switch to in a meeting</span>
+          {/*<span className="text-xs text-secondary-500 dark:text-secondary-400">*/}
+          {/*  @ Switch when 75% switch*/}
+          {/*</span>*/}
         </span>
       </label>
     </Card>

@@ -23,7 +23,7 @@ func TestCalls(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 
-	calls, err := db.GetAgentCalls(ctx, "agent@example.com", 10, 0)
+	calls, err := db.ListRecentCalls(ctx, "agent@example.com", 10, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 0)
 
@@ -31,47 +31,47 @@ func TestCalls(t *testing.T) {
 	assert.Nil(t, db.AddPhoneLog(ctx, "agent@example.com", "+15550002", 2000, "c-2"))
 	assert.Nil(t, db.AddPhoneLog(ctx, "other@example.com", "+15550001", 3000, "c-3"))
 
-	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 0, 0)
+	calls, err = db.ListRecentCalls(ctx, "agent@example.com", 0, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 2)
 	assert.Equal(t, calls[0].ContactID, "c-2")
 
-	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 1, 0)
+	calls, err = db.ListRecentCalls(ctx, "agent@example.com", 1, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 1)
 	assert.Equal(t, calls[0].ContactID, "c-2")
 
-	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 1, 1)
+	calls, err = db.ListRecentCalls(ctx, "agent@example.com", 1, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 1)
 	assert.Equal(t, calls[0].ContactID, "c-1")
 
-	calls, err = db.GetAgentCalls(ctx, "agent@example.com", 1, 2)
+	calls, err = db.ListRecentCalls(ctx, "agent@example.com", 1, 2)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 0)
 
-	n, err := db.CountAgentCalls(ctx, "agent@example.com")
+	n, err := db.CountRecentCalls(ctx, "agent@example.com")
 	assert.Nil(t, err)
 	assert.Equal(t, n, 2)
 
-	calls, err = db.GetRecentCalls(ctx, 10, 0)
+	calls, err = db.ListRecentCalls(ctx, "", 10, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 3)
 	assert.Equal(t, calls[0].Agent, "other@example.com")
 
-	calls, err = db.GetRecentCalls(ctx, 2, 2)
+	calls, err = db.ListRecentCalls(ctx, "", 2, 2)
 	assert.Nil(t, err)
 	assert.Equal(t, len(calls), 1)
 	assert.Equal(t, calls[0].ContactID, "c-1")
 
-	n, err = db.CountRecentCalls(ctx)
+	n, err = db.CountRecentCalls(ctx, "")
 	assert.Nil(t, err)
 	assert.Equal(t, n, 3)
 
-	calls, err = db.GetPhoneCalls(ctx, "+15550001", 10)
+	phoneCalls, err := db.GetPhoneCalls(ctx, "+15550001", 10)
 	assert.Nil(t, err)
-	assert.Equal(t, len(calls), 2)
-	assert.Equal(t, calls[0].Agent, "other@example.com")
+	assert.Equal(t, len(phoneCalls), 2)
+	assert.Equal(t, phoneCalls[0].Agent, "other@example.com")
 
 	id1, err := db.GetOrCreateUser(ctx, "agent@example.com")
 	assert.Nil(t, err)
@@ -316,4 +316,75 @@ func TestFlowCallTimeline(t *testing.T) {
 	assert.Equal(t, buckets[1].Answered, 1)
 	assert.Equal(t, buckets[1].Abandoned, 1)
 	assert.Equal(t, buckets[1].Calls[0].ContactID, "b")
+}
+
+func TestRecentCallsMergeFlowCalls(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	// c-1 was logged by the browser and also seen by the poller; c-2 is an
+	// outbound call only the browser logged; c-3 was answered by another agent
+	// whose browser never logged it; c-4 was abandoned in queue.
+	assert.Nil(t, db.AddPhoneLog(ctx, "agent@example.com", "+15550001", 1000, "c-1"))
+	assert.Nil(t, db.AddPhoneLog(ctx, "agent@example.com", "+15550002", 2000, "c-2"))
+	assert.Nil(t, db.UpsertFlowCall(ctx, FlowCall{
+		ContactID: "c-1", PhoneNumber: "+15550001", QueueName: "Support", AgentName: "Ann Agent",
+		AgentUsername: "Agent@example.com", InitiatedAt: 900, EnqueuedAt: 950, ConnectedAt: 1100,
+	}))
+	assert.Nil(t, db.UpsertFlowCall(ctx, FlowCall{
+		ContactID: "c-3", PhoneNumber: "+15550003", AgentName: "Oz Other",
+		AgentUsername: "other@example.com", InitiatedAt: 2900, EnqueuedAt: 2950, ConnectedAt: 3000,
+	}))
+	assert.Nil(t, db.UpsertFlowCall(ctx, FlowCall{
+		ContactID: "c-4", PhoneNumber: "+15550004", InitiatedAt: 3500, EnqueuedAt: 3600, DisconnectedAt: 3700,
+	}))
+
+	calls, err := db.ListRecentCalls(ctx, "agent@example.com", 0, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 2)
+	assert.Equal(t, calls[0].ContactID, "c-2")
+	assert.Equal(t, calls[0].ConnectedAt, int64(0))
+	assert.Equal(t, calls[1].ContactID, "c-1")
+	assert.Equal(t, calls[1].Timestamp, int64(1100))
+	assert.Equal(t, calls[1].QueueName, "Support")
+	assert.Equal(t, calls[1].AgentName, "Ann Agent")
+	assert.Equal(t, calls[1].EnqueuedAt, int64(950))
+
+	n, err := db.CountRecentCalls(ctx, "agent@example.com")
+	assert.Nil(t, err)
+	assert.Equal(t, n, 2)
+
+	calls, err = db.ListRecentCalls(ctx, "", 0, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 3)
+	assert.Equal(t, calls[0].ContactID, "c-3")
+	assert.Equal(t, calls[0].Agent, "other@example.com")
+
+	calls, err = db.ListRecentCalls(ctx, "", 1, 2)
+	assert.Nil(t, err)
+	assert.Equal(t, len(calls), 1)
+	assert.Equal(t, calls[0].ContactID, "c-1")
+
+	n, err = db.CountRecentCalls(ctx, "")
+	assert.Nil(t, err)
+	assert.Equal(t, n, 3)
+}
+
+func TestMigrateAddsAgentUsername(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	// Simulate a database created before agent_username existed.
+	_, err := db.ExecContext(ctx, `DROP INDEX ix_flow_calls_agent`)
+	assert.Nil(t, err)
+	_, err = db.ExecContext(ctx, `ALTER TABLE flow_calls DROP COLUMN agent_username`)
+	assert.Nil(t, err)
+
+	assert.Nil(t, migrate(ctx, db.DB))
+	assert.Nil(t, migrate(ctx, db.DB))
+	assert.Nil(t, db.UpsertFlowCall(ctx, FlowCall{ContactID: "c-1", AgentUsername: "agent@example.com", ConnectedAt: 1}))
+
+	calls, err := db.ListFlowCalls(ctx, 0, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, calls[0].AgentUsername, "agent@example.com")
 }

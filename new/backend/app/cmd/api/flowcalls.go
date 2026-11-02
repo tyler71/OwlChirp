@@ -20,9 +20,15 @@ const (
 
 	// The timeline groups the last timelineWindow of calls into
 	// timelineBucket slots and is rebuilt at most once per timelineTTL.
-	timelineWindow = 48 * time.Hour
+	// 8 weeks is the widest range SearchContacts accepts in one query.
+	timelineWindow = 8 * 7 * 24 * time.Hour
 	timelineBucket = 15 * time.Minute
 	timelineTTL    = 30 * time.Minute
+
+	// The startup backfill searches in chunks of at most 2 weeks (wider
+	// ranges are throttled to 1 request/s) and paces caller-number lookups.
+	flowBackfillChunk = 14 * 24 * time.Hour
+	flowBackfillPace  = 500 * time.Millisecond
 )
 
 // flowTimeline is the cached reply to "flowcalls.timeline".
@@ -48,7 +54,7 @@ func (app *application) buildTimeline(ctx context.Context) (flowTimeline, error)
 }
 
 type flowContactSource interface {
-	SearchFlowContacts(ctx context.Context, since time.Time) ([]connect.FlowContact, error)
+	SearchFlowContacts(ctx context.Context, start, end time.Time) ([]connect.FlowContact, error)
 	CustomerNumber(ctx context.Context, contactID string) (string, error)
 }
 
@@ -71,6 +77,8 @@ func (app *application) pollFlowCalls(ctx context.Context) {
 		app.logger.Info("flow calls polling disabled")
 		return
 	}
+
+	go backfillFlowCalls(ctx, app.connect, app.db, app.logger, flowBackfillPace)
 
 	p := &flowPoller{
 		source:    app.connect,
@@ -134,21 +142,13 @@ func (p *flowPoller) sync(ctx context.Context) error {
 		}
 	}
 
-	contacts, err := p.source.SearchFlowContacts(ctx, since)
+	contacts, err := p.source.SearchFlowContacts(ctx, since, now)
 	if err != nil {
 		return err
 	}
 
 	for _, fc := range contacts {
-		call := database.FlowCall{
-			ContactID:      fc.ID,
-			QueueName:      fc.QueueName,
-			AgentName:      fc.AgentName,
-			InitiatedAt:    unixMilli(fc.InitiatedAt),
-			EnqueuedAt:     unixMilli(fc.EnqueuedAt),
-			ConnectedAt:    unixMilli(fc.ConnectedAt),
-			DisconnectedAt: unixMilli(fc.DisconnectedAt),
-		}
+		call := flowCallFrom(fc, "")
 
 		prev, seen := p.known[fc.ID]
 		if seen {
@@ -174,6 +174,21 @@ func (p *flowPoller) sync(ctx context.Context) error {
 	return nil
 }
 
+// flowCallFrom converts a searched contact into its stored form.
+func flowCallFrom(fc connect.FlowContact, phoneNumber string) database.FlowCall {
+	return database.FlowCall{
+		ContactID:      fc.ID,
+		PhoneNumber:    phoneNumber,
+		QueueName:      fc.QueueName,
+		AgentName:      fc.AgentName,
+		AgentUsername:  fc.AgentUsername,
+		InitiatedAt:    unixMilli(fc.InitiatedAt),
+		EnqueuedAt:     unixMilli(fc.EnqueuedAt),
+		ConnectedAt:    unixMilli(fc.ConnectedAt),
+		DisconnectedAt: unixMilli(fc.DisconnectedAt),
+	}
+}
+
 // flowCallOpen reports whether c is still in the flow or queue.
 func flowCallOpen(c database.FlowCall) bool {
 	return c.DisconnectedAt == 0 && c.ConnectedAt == 0
@@ -184,4 +199,78 @@ func unixMilli(t time.Time) int64 {
 		return 0
 	}
 	return t.UnixMilli()
+}
+
+// backfillFlowCalls fills flow_calls with the timelineWindow of history
+// that predates the live poller, so the timeline isn't empty after a fresh
+// start. Contacts already stored are skipped, which makes restarts cheap.
+func backfillFlowCalls(ctx context.Context, src flowContactSource, db *database.DB, logger *slog.Logger, pace time.Duration) {
+	now := time.Now()
+	end := now.Add(-flowWindow) // the poller covers the rest
+	tick := time.NewTicker(pace)
+	defer tick.Stop()
+
+	added := 0
+	for start := now.Add(-timelineWindow); start.Before(end); start = start.Add(flowBackfillChunk) {
+		chunkEnd := start.Add(flowBackfillChunk)
+		if chunkEnd.After(end) {
+			chunkEnd = end
+		}
+		n, err := backfillChunk(ctx, src, db, logger, tick.C, start, chunkEnd)
+		added += n
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
+			logger.Warn("flow calls: backfill chunk", "start", start, "end", chunkEnd, "error", err)
+		}
+	}
+	logger.Info("flow calls: backfill done", "added", added)
+}
+
+func backfillChunk(ctx context.Context, src flowContactSource, db *database.DB, logger *slog.Logger,
+	tick <-chan time.Time, start, end time.Time) (int, error) {
+	stored, err := db.ListFlowCalls(ctx, start.UnixMilli(), 0)
+	if err != nil {
+		return 0, err
+	}
+	have := make(map[string]database.FlowCall, len(stored))
+	for _, c := range stored {
+		have[c.ContactID] = c
+	}
+
+	contacts, err := src.SearchFlowContacts(ctx, start, end)
+	if err != nil {
+		return 0, err
+	}
+
+	added := 0
+	for _, fc := range contacts {
+		if prev, ok := have[fc.ID]; ok {
+			// Rows stored before agent usernames were recorded get filled in;
+			// the number is already known, so no extra lookup is needed.
+			if prev.AgentUsername == "" && fc.AgentUsername != "" {
+				if err := db.UpsertFlowCall(ctx, flowCallFrom(fc, prev.PhoneNumber)); err != nil {
+					return added, err
+				}
+			}
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return added, ctx.Err()
+		case <-tick:
+		}
+		number, err := src.CustomerNumber(ctx, fc.ID)
+		if err != nil {
+			logger.Warn("flow calls: customer number", "contact_id", fc.ID, "error", err)
+		}
+		call := flowCallFrom(fc, number)
+		if err := db.UpsertFlowCall(ctx, call); err != nil {
+			return added, err
+		}
+		have[fc.ID] = call
+		added++
+	}
+	return added, nil
 }

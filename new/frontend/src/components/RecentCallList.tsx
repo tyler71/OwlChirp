@@ -25,9 +25,25 @@ type Detail = { status: 'loading' } | { status: 'error' } | { status: 'ready'; c
 // Contact details don't change once a call is over, so keep them across view switches.
 const detailCache = new Map<string, Detail>();
 
+// Details for a call the flow poller already recorded (shared with the
+// Timeline), so no Connect lookup is needed: menu time runs from initiation to
+// enqueue, queue time from enqueue to answer.
+function flowDetail(call: Call): ContactDetail | null {
+  if (!call.connectedAt) return null;
+  const initiated = call.initiatedAt || call.connectedAt;
+  return {
+    id: call.contactId,
+    agent_name: call.agentName ?? '',
+    answered_timestamp: new Date(initiated).toISOString(),
+    queue_time: call.enqueuedAt ? Math.floor((call.connectedAt - call.enqueuedAt) / 1000) : 0,
+    call_to_queue_time: Math.floor(((call.enqueuedAt || call.connectedAt) - initiated) / 1000),
+  };
+}
+
 async function loadDetail(call: Call): Promise<Detail> {
+  const local = flowDetail(call);
   const [contact, callerId] = await Promise.all([
-    request<ContactDetail>('calls.detail', { contactId: call.contactId }),
+    local ?? request<ContactDetail>('calls.detail', { contactId: call.contactId }),
     getCallerIdName(call.phoneNumber).catch(() => null),
   ]);
   return { status: 'ready', contact, callerId };
@@ -82,6 +98,7 @@ function CallCard({ call }: { call: Call }) {
     const { contact, callerId } = detail;
     if (callerId) rows.push({ key: 'Caller ID', value: callerId });
     if (isAdmin) rows.push({ key: 'Agent', value: contact.agent_name });
+    if (call.queueName) rows.push({ key: 'Queue', value: call.queueName });
     rows.push({ key: 'Answered', value: formatCallTime(contact.answered_timestamp), tooltip: contact.answered_timestamp });
     rows.push({
       key: 'Answer Time',

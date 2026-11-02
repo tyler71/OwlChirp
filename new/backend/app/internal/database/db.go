@@ -43,8 +43,40 @@ func New(dsn string) (*DB, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := migrate(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
 
 	return &DB{DB: db}, nil
+}
+
+// migrate brings databases created by an older schema up to date. The schema
+// file only creates missing tables, so added columns are applied here.
+func migrate(ctx context.Context, db *sqlx.DB) error {
+	if err := ensureColumn(ctx, db, "flow_calls", "agent_username", "VARCHAR(100)"); err != nil {
+		return err
+	}
+	_, err := db.ExecContext(ctx,
+		`CREATE INDEX IF NOT EXISTS ix_flow_calls_agent ON flow_calls (agent_username, connected_at)`)
+	return err
+}
+
+// ensureColumn adds column to table unless it already exists.
+func ensureColumn(ctx context.Context, db *sqlx.DB, table, column, typ string) error {
+	var cols []struct {
+		Name string `db:"name"`
+	}
+	if err := db.SelectContext(ctx, &cols, `SELECT name FROM pragma_table_info(?)`, table); err != nil {
+		return err
+	}
+	for _, c := range cols {
+		if strings.EqualFold(c.Name, column) {
+			return nil
+		}
+	}
+	_, err := db.ExecContext(ctx, `ALTER TABLE `+table+` ADD COLUMN `+column+` `+typ)
+	return err
 }
 
 func normalizeDSN(dsn string) string {
@@ -149,55 +181,65 @@ func offset(n int) int {
 	return n
 }
 
-// GetAgentCalls returns one page of an agent's calls, newest first.
-func (db *DB) GetAgentCalls(ctx context.Context, username string, maxRecords, skip int) ([]Call, error) {
+// RecentCall is a call for the Recent Calls list. Inbound calls come from
+// flow_calls with their Connect details; calls only an agent's browser logged
+// (outbound, or older than flow_calls retention) have zero detail fields.
+type RecentCall struct {
+	Call
+	AgentName      string `db:"agent_name" json:"agentName"`
+	QueueName      string `db:"queue_name" json:"queueName"`
+	InitiatedAt    int64  `db:"initiated_at" json:"initiatedAt"`
+	EnqueuedAt     int64  `db:"enqueued_at" json:"enqueuedAt"`
+	ConnectedAt    int64  `db:"connected_at" json:"connectedAt"`
+	DisconnectedAt int64  `db:"disconnected_at" json:"disconnectedAt"`
+}
+
+// recentCallsUnion merges answered flow calls with logged calls that aren't
+// already covered by one. Each half takes the username filter twice (empty
+// means every agent), so its arguments are (u, u, u, u, u, u).
+const recentCallsUnion = `
+	SELECT f.agent_username AS agent, COALESCE(f.phone_number, '') AS phone_number,
+	       f.connected_at AS timestamp, f.contact_id,
+	       COALESCE(f.agent_name, '') AS agent_name, COALESCE(f.queue_name, '') AS queue_name,
+	       f.initiated_at, f.enqueued_at, f.connected_at, f.disconnected_at
+	FROM flow_calls f
+	WHERE f.connected_at != 0 AND COALESCE(f.agent_username, '') != ''
+	  AND (? = '' OR lower(f.agent_username) = lower(?))
+	UNION ALL
+	SELECT u.username, COALESCE(c.phone_number, ''), COALESCE(c.timestamp, 0),
+	       COALESCE(c.contact_id, ''), '', '', 0, 0, 0, 0
+	FROM calls c JOIN users u ON u.id = c.agent_id
+	WHERE (? = '' OR lower(u.username) = lower(?))
+	  AND (COALESCE(c.contact_id, '') = '' OR c.contact_id NOT IN (
+	    SELECT contact_id FROM flow_calls
+	    WHERE connected_at != 0 AND COALESCE(agent_username, '') != ''
+	      AND (? = '' OR lower(agent_username) = lower(?))))`
+
+func recentCallsArgs(username string) []any {
+	return []any{username, username, username, username, username, username}
+}
+
+// ListRecentCalls returns one page of recent calls, newest first: username's
+// calls, or every agent's when username is empty.
+func (db *DB) ListRecentCalls(ctx context.Context, username string, maxRecords, skip int) ([]RecentCall, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	calls := []Call{}
+	calls := []RecentCall{}
+	args := append(recentCallsArgs(username), limit(maxRecords), offset(skip))
 	err := db.SelectContext(ctx, &calls,
-		`SELECT u.username AS agent, COALESCE(c.phone_number, '') AS phone_number,
-		        COALESCE(c.timestamp, 0) AS timestamp, COALESCE(c.contact_id, '') AS contact_id
-		 FROM calls c JOIN users u ON u.id = c.agent_id
-		 WHERE u.username = ?
-		 ORDER BY c.created_on DESC, c.id DESC
-		 LIMIT ? OFFSET ?`, username, limit(maxRecords), offset(skip))
+		`SELECT * FROM (`+recentCallsUnion+`) ORDER BY timestamp DESC, contact_id DESC LIMIT ? OFFSET ?`,
+		args...)
 	return calls, err
 }
 
-// CountAgentCalls returns how many calls an agent has logged.
-func (db *DB) CountAgentCalls(ctx context.Context, username string) (int, error) {
+// CountRecentCalls returns how many calls ListRecentCalls can page through.
+func (db *DB) CountRecentCalls(ctx context.Context, username string) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	var n int
-	err := db.GetContext(ctx, &n,
-		`SELECT COUNT(*) FROM calls c JOIN users u ON u.id = c.agent_id WHERE u.username = ?`, username)
-	return n, err
-}
-
-// GetRecentCalls returns one page of calls across all agents, newest first.
-func (db *DB) GetRecentCalls(ctx context.Context, maxRecords, skip int) ([]Call, error) {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-
-	calls := []Call{}
-	err := db.SelectContext(ctx, &calls,
-		`SELECT u.username AS agent, COALESCE(c.phone_number, '') AS phone_number,
-		        COALESCE(c.timestamp, 0) AS timestamp, COALESCE(c.contact_id, '') AS contact_id
-		 FROM calls c JOIN users u ON u.id = c.agent_id
-		 ORDER BY c.created_on DESC, c.id DESC
-		 LIMIT ? OFFSET ?`, limit(maxRecords), offset(skip))
-	return calls, err
-}
-
-// CountRecentCalls returns how many calls all agents have logged.
-func (db *DB) CountRecentCalls(ctx context.Context) (int, error) {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-
-	var n int
-	err := db.GetContext(ctx, &n, `SELECT COUNT(*) FROM calls c JOIN users u ON u.id = c.agent_id`)
+	err := db.GetContext(ctx, &n, `SELECT COUNT(*) FROM (`+recentCallsUnion+`)`, recentCallsArgs(username)...)
 	return n, err
 }
 
@@ -581,6 +623,7 @@ type FlowCall struct {
 	PhoneNumber    string `db:"phone_number" json:"phoneNumber"`
 	QueueName      string `db:"queue_name" json:"queueName"`
 	AgentName      string `db:"agent_name" json:"agentName"`
+	AgentUsername  string `db:"agent_username" json:"agentUsername"`
 	InitiatedAt    int64  `db:"initiated_at" json:"initiatedAt"`
 	EnqueuedAt     int64  `db:"enqueued_at" json:"enqueuedAt"`
 	ConnectedAt    int64  `db:"connected_at" json:"connectedAt"`
@@ -589,7 +632,7 @@ type FlowCall struct {
 
 const flowCallSelect = `SELECT contact_id, COALESCE(phone_number, '') AS phone_number,
 	COALESCE(queue_name, '') AS queue_name, COALESCE(agent_name, '') AS agent_name,
-	initiated_at, enqueued_at, connected_at, disconnected_at
+	COALESCE(agent_username, '') AS agent_username, initiated_at, enqueued_at, connected_at, disconnected_at
 	FROM flow_calls`
 
 // UpsertFlowCall stores the latest state of c, keyed by contact id.
@@ -599,15 +642,16 @@ func (db *DB) UpsertFlowCall(ctx context.Context, c FlowCall) error {
 
 	ts := now()
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO flow_calls (contact_id, phone_number, queue_name, agent_name,
+		`INSERT INTO flow_calls (contact_id, phone_number, queue_name, agent_name, agent_username,
 		   initiated_at, enqueued_at, connected_at, disconnected_at, created_on, updated_on)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (contact_id) DO UPDATE SET
 		   phone_number = excluded.phone_number, queue_name = excluded.queue_name,
-		   agent_name = excluded.agent_name, initiated_at = excluded.initiated_at,
+		   agent_name = excluded.agent_name, agent_username = excluded.agent_username,
+		   initiated_at = excluded.initiated_at,
 		   enqueued_at = excluded.enqueued_at, connected_at = excluded.connected_at,
 		   disconnected_at = excluded.disconnected_at, updated_on = excluded.updated_on`,
-		c.ContactID, c.PhoneNumber, c.QueueName, c.AgentName,
+		c.ContactID, c.PhoneNumber, c.QueueName, c.AgentName, c.AgentUsername,
 		c.InitiatedAt, c.EnqueuedAt, c.ConnectedAt, c.DisconnectedAt, ts, ts)
 	return err
 }
