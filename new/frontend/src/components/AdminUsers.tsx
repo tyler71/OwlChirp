@@ -100,7 +100,7 @@ export default function AdminUsers() {
       <div className="bg-secondary-50 px-5 py-4 dark:bg-secondary-800/50">
         <h3 className="mb-1 font-semibold">Users</h3>
         <h4 className="text-sm font-medium text-secondary-500 dark:text-secondary-400">
-          Power unlocks the feed, flow calls, timeline and recent calls; admin also shows agent names and this page.
+          Set each user's level. See Permission levels above for what each one unlocks.
         </h4>
       </div>
 

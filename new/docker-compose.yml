@@ -10,6 +10,8 @@ services:
       HOST: "${HOST:-0.0.0.0}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       DEV_MODE: "${DEV_MODE:-false}"
+      # Subdirectory the browser sees, e.g. /owlchirp (reverse proxy must strip it).
+      BASE_PATH: "${BASE_PATH:-}"
       DB_DSN: "${DB_DSN:-/data/owlchirp.sqlite3}"
       CONNECT_INSTANCE: "${CONNECT_INSTANCE}"
       CONNECT_DOMAIN: "${CONNECT_DOMAIN}"

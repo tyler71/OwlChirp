@@ -1,3 +1,5 @@
+import { computed } from 'nanostores';
+
 import { onEvent, request } from './realtime';
 import { normalizePhoneNumber } from './helpers';
 import { $flowCalls, $numberCalls, $wsStatus, type FlowCall } from './stores';
@@ -17,6 +19,9 @@ export function flowStage(call: FlowCall): FlowStage {
 export function isLive(call: FlowCall): boolean {
   return !call.connectedAt && !call.disconnectedAt;
 }
+
+/** Calls currently waiting in a queue, for the sidebar badge. */
+export const $queuedCount = computed($flowCalls, (calls) => (calls ?? []).filter((c) => flowStage(c) === 'queued').length);
 
 onEvent<FlowCall>('flowcall.updated', (call) => {
   const calls = $flowCalls.get();

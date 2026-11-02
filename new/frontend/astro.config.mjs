@@ -8,6 +8,10 @@ import { AstroPWAIntegration } from '@vite-pwa/astro';
 // The Go backend (just dev-backend) listens here during development.
 const backend = process.env.BACKEND_URL ?? 'http://127.0.0.1:4444';
 
+// Production builds use a placeholder base that the Go server swaps for
+// BASE_PATH at startup (cmd/api/static.go), so one build serves any subdirectory.
+const BASE = process.argv.includes('build') ? '/__OWLCHIRP_BASE__/' : '/';
+
 // https://astro.build/config
 export default defineConfig({
   integrations: [
@@ -22,8 +26,8 @@ export default defineConfig({
         name: 'OwlChirp',
         short_name: 'OwlChirp',
         description: 'OwlChirp contact center softphone',
-        start_url: '/ccp',
-        scope: '/',
+        start_url: `${BASE}ccp`,
+        scope: BASE,
         display: 'standalone',
         theme_color: '#4f46e5',
         background_color: '#ffffff',
@@ -38,6 +42,7 @@ export default defineConfig({
       },
     }),
   ],
+  base: BASE,
   output: 'static',
   outDir: './dist',
 

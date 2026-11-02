@@ -1,4 +1,4 @@
-FROM webdevops/base:ubuntu-22.04 AS init
+FROM webdevops/base-app:ubuntu-22.04 AS init
 LABEL authors="Tyler Yeager"
 
 FROM node:24-slim AS frontend

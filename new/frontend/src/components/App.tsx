@@ -2,9 +2,22 @@ import 'amazon-connect-streams';
 
 import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { useStore } from '@nanostores/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { $agent, $agentSnapshot, $config, $permission, $view, PERMISSION, type View } from '../lib/stores';
+import { BASE } from '../lib/const';
+import { $queuedCount, loadFlowCalls } from '../lib/flowCalls';
+import {
+  $agent,
+  $agentSnapshot,
+  $config,
+  $flowCalls,
+  $isPower,
+  $permission,
+  $view,
+  $wsStatus,
+  PERMISSION,
+  type View,
+} from '../lib/stores';
 import '../lib/theme';
 import '../lib/pwa';
 import Admin from './Admin';
@@ -32,10 +45,10 @@ import { Icon, type IconName, stateDotClass } from './ui';
 function Brand() {
   return (
     <a
-      href="/ccp"
+      href={`${BASE}ccp`}
       className="group inline-flex items-center gap-1 px-2 font-bold text-base-content hover:text-secondary-600 dark:hover:text-secondary-300"
     >
-      <img src="/favicon.ico" alt="" className="size-6" />
+      <img src={`${BASE}favicon.ico`} alt="" className="size-6" />
       <span>OwlChirp</span>
     </a>
   );
@@ -138,6 +151,30 @@ function UserMenu() {
   );
 }
 
+// Count of calls waiting in queue, shown on the Flow Calls nav item.
+function FlowQueueBadge() {
+  const count = useStore($queuedCount);
+  const isPower = useStore($isPower);
+  const wsStatus = useStore($wsStatus);
+
+  // Seed the store so live flowcall.updated pushes are tracked without opening the view.
+  useEffect(() => {
+    if (isPower && wsStatus === 'open' && $flowCalls.get() === null) {
+      loadFlowCalls().catch((e) => console.error('loadFlowCalls', e));
+    }
+  }, [isPower, wsStatus]);
+
+  if (!count) return null;
+  return (
+    <span
+      className="inline-flex rounded-full border border-primary-200 bg-primary-100 px-1.5 py-0.5 text-xs leading-4 font-semibold text-primary-700 dark:border-primary-700 dark:bg-primary-700 dark:text-primary-50"
+      aria-label={`${count} in queue`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 // Views that need more than standard permission.
 const VIEW_PERMISSION: Partial<Record<View, number>> = {
   calls: PERMISSION.power,
@@ -232,6 +269,7 @@ export default function App() {
                       className={`size-5 ${active ? 'text-primary-600 dark:text-primary-400' : 'text-secondary-400 group-hover:text-secondary-600 dark:text-secondary-500 dark:group-hover:text-secondary-300'}`}
                     />
                     <span className="grow py-2">{item.label}</span>
+                    {item.view === 'flow' && <FlowQueueBadge />}
                   </button>
                 );
               })}

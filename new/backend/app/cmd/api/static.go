@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"io/fs"
 	"mime"
 	"net/http"
 	"path"
 	"strings"
+	"testing/fstest"
+	"time"
 
 	"github.com/tyler71/owlchirp/app/assets"
 )
@@ -14,15 +18,65 @@ const notBuiltPage = `<!doctype html>
 <html lang="en"><head><meta charset="UTF-8"><title>OwlChirp</title></head>
 <body><p>The frontend has not been built into this binary. Run <code>just build</code>, or use <code>just dev</code> during development.</p></body></html>`
 
+// basePlaceholder is the Astro build's base (astro.config.mjs). It is swapped
+// for BASE_PATH at startup so one build can be served from any subdirectory.
+const basePlaceholder = "/__OWLCHIRP_BASE__"
+
+// Extensions of built files that can contain the base placeholder.
+var rewriteExts = map[string]bool{
+	".html": true, ".js": true, ".mjs": true, ".css": true, ".json": true,
+	".webmanifest": true, ".svg": true, ".txt": true, ".xml": true,
+}
+
 func init() {
 	// Go's built-in table lacks the PWA manifest type.
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 }
 
+// normalizeBasePath turns BASE_PATH into "" (root) or "/a/b" form.
+func normalizeBasePath(p string) string {
+	p = strings.Trim(strings.TrimSpace(p), "/")
+	if p == "" {
+		return ""
+	}
+	return "/" + p
+}
+
+// rebase returns a copy of fsys with basePlaceholder replaced by basePath in
+// every text asset. Other files are copied unchanged.
+func rebase(fsys fs.FS, basePath string) (fs.FS, error) {
+	out := fstest.MapFS{}
+	modTime := time.Now()
+	err := fs.WalkDir(fsys, ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		f, err := fsys.Open(name)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		data, err := io.ReadAll(f)
+		if err != nil {
+			return err
+		}
+		if rewriteExts[path.Ext(name)] {
+			data = bytes.ReplaceAll(data, []byte(basePlaceholder), []byte(basePath))
+		}
+		out[name] = &fstest.MapFile{Data: data, Mode: 0o444, ModTime: modTime}
+		return nil
+	})
+	return out, err
+}
+
 // static serves the embedded Astro build. sw.js and manifest.webmanifest fall
 // under no-cache so browsers always revalidate them and notice new deploys.
 func (app *application) static() http.Handler {
-	web, err := fs.Sub(assets.Web, "web")
+	embedded, err := fs.Sub(assets.Web, "web")
+	if err != nil {
+		panic(err)
+	}
+	web, err := rebase(embedded, app.config.basePath)
 	if err != nil {
 		panic(err)
 	}

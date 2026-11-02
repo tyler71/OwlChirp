@@ -48,6 +48,9 @@ type config struct {
 	host     string
 	httpPort int
 	devMode  bool
+	// Browser-facing subdirectory, e.g. "/owlchirp"; "" at the root. The
+	// proxy strips it, so routes are unaffected; see static.go.
+	basePath string
 
 	db struct {
 		dsn string
@@ -97,6 +100,7 @@ func run(logger *slog.Logger) error {
 	cfg.host = env.GetString("HOST", "0.0.0.0")
 	cfg.httpPort = env.GetInt("APP_PORT", 4444)
 	cfg.devMode = env.GetBool("DEV_MODE", false)
+	cfg.basePath = normalizeBasePath(env.GetString("BASE_PATH", ""))
 
 	// DB_STRING is the variable used by the Python version; DB_DSN takes precedence.
 	cfg.db.dsn = env.GetString("DB_DSN", env.GetString("DB_STRING", "./_data/owlchirp.sqlite3"))

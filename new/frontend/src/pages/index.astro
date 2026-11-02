@@ -1,4 +1,5 @@
 ---
+const base = import.meta.env.BASE_URL;
 ---
 
 <!doctype html>
@@ -6,14 +7,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" href={`${base}favicon.ico`} />
     <title>OwlChirp</title>
   </head>
   <body>
-    <p>Opening OwlChirp&hellip; If nothing happens, allow popups or <a href="/ccp">open it here</a>.</p>
+    <p>Opening OwlChirp&hellip; If nothing happens, allow popups or <a href={`${base}ccp`}>open it here</a>.</p>
     <script>
       const options = ['width=1100', 'height=760', 'scrollbars=no', 'location=no', 'status=no', 'toolbar=no'];
-      const popup = window.open('/ccp', 'owlchirp', options.join(','));
+      const popup = window.open(`${import.meta.env.BASE_URL}ccp`, 'owlchirp', options.join(','));
       if (popup) window.close();
     </script>
   </body>
