@@ -11,6 +11,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY frontend/ ./
 
+ARG VERSION=unknown
 RUN pnpm build
 
 

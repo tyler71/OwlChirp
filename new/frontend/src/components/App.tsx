@@ -3,6 +3,7 @@ import 'amazon-connect-streams';
 import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { useStore } from '@nanostores/react';
 import { useEffect, useState } from 'react';
+import { VERSION } from 'astro:env/client';
 
 import { BASE } from '../lib/const';
 import { $queuedCount, loadFlowCalls } from '../lib/flowCalls';
@@ -112,6 +113,7 @@ function UserMenu() {
             <span className="w-40 truncate text-xs font-medium text-secondary-500 dark:text-secondary-400">
               {agent.stateName}
             </span>
+            <span className="w-40 truncate text-xs text-secondary-400 dark:text-secondary-500">{VERSION}</span>
           </span>
         </span>
       </MenuButton>

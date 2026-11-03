@@ -34,7 +34,7 @@ dev-frontend:
 # Build the static Astro site into frontend/dist
 [working-directory: 'frontend']
 build-frontend:
-    pnpm build
+    VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo dev)" pnpm build
 
 # Copy the Astro build into the Go embed directory
 embed: build-frontend

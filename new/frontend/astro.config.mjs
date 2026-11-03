@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig, envField } from 'astro/config';
 
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
@@ -42,6 +42,12 @@ export default defineConfig({
       },
     }),
   ],
+  // Git commit shown in the user menu; set by just build-frontend / the Dockerfile.
+  env: {
+    schema: {
+      VERSION: envField.string({ context: 'client', access: 'public', default: 'dev' }),
+    },
+  },
   base: BASE,
   output: 'static',
   outDir: './dist',
