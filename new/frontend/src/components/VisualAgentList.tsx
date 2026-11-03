@@ -70,11 +70,11 @@ export default function VisualAgentList() {
   const letters = initials(sorted);
 
   return (
-    <div className="flex min-w-0 grow flex-wrap justify-center gap-2 select-none">
+    <div className="flex min-w-0 grow flex-wrap justify-center gap-1 select-none md:gap-1.5 xl:gap-2">
       {sorted.map((u, i) => (
         <span
           key={u.user_id}
-          className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1 text-md font-bold after:ml-0.5 after:inline-block after:text-[10px] after:content-[attr(data-emoji)] ${CURSOR_HELP_CLASS} ${statusClass(u.status.name)}`}
+          className={`relative inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-xs leading-none font-bold after:absolute after:-top-1.5 after:-right-1.5 after:text-[9px] after:leading-none after:content-[attr(data-emoji)] md:h-7 md:min-w-7 md:text-sm md:after:text-[10px] xl:h-8 xl:min-w-8 xl:rounded-md xl:text-base xl:after:text-xs ${CURSOR_HELP_CLASS} ${statusClass(u.status.name)}`}
           data-emoji={STATUS_EMOJI[u.status.name.toLowerCase()] ?? ''}
           title={`${u.user.first_name} ${u.user.last_name} - ${u.status.name}`}
         >
