@@ -111,7 +111,7 @@ export default function WrapupForm({ contactId, phoneNumber }: { contactId: stri
       )}
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-secondary-500 dark:text-secondary-400">
-          {status.saved ? 'Saved · edits update this entry' : 'Also saved when you finish the call'}
+          {status.saved ? 'Saved · edits update this entry' : 'Auto saves when call is finished'}
         </p>
         <Button size="sm" variant={status.saved ? 'default' : 'primary'} icon={status.saved ? 'check' : undefined} disabled={empty || status.saving || status.saved} onClick={() => void saveDraft()}>
           {status.saving ? 'Saving…' : status.saved ? 'Saved' : 'Save notes'}

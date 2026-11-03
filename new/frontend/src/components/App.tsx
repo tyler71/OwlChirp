@@ -280,9 +280,9 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex flex-none items-center gap-2 border-t border-secondary-200/75 p-4 dark:border-secondary-800/75">
+        <div className="flex flex-none flex-col items-stretch gap-2 border-t border-secondary-200/75 p-4 dark:border-secondary-800/75">
           <UserMenu />
-          <UpdateButton />
+          <UpdateButton className="w-full" />
         </div>
       </aside>
 
