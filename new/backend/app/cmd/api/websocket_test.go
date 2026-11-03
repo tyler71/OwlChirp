@@ -238,15 +238,15 @@ func TestSocketSettings(t *testing.T) {
 
 	reply := c.call("settings.get", nil)
 	assert.Equal(t, reply.Type, "result")
-	assert.Equal(t, string(reply.Data), `{"theme":"","followTeamMeeting":false}`)
+	assert.Equal(t, string(reply.Data), `{"theme":"","followTeamMeeting":false,"hideCallerIds":false}`)
 
-	reply = c.call("settings.save", map[string]any{"theme": "dracula", "followTeamMeeting": true})
+	reply = c.call("settings.save", map[string]any{"theme": "dracula", "followTeamMeeting": true, "hideCallerIds": true})
 	assert.Equal(t, reply.Type, "result")
 
 	// A second connection for the same user sees the saved settings.
 	other := dial(t, srv, validToken())
 	reply = other.call("settings.get", nil)
-	assert.Equal(t, string(reply.Data), `{"theme":"dracula","followTeamMeeting":true}`)
+	assert.Equal(t, string(reply.Data), `{"theme":"dracula","followTeamMeeting":true,"hideCallerIds":true}`)
 }
 
 func TestSocketCallLogs(t *testing.T) {

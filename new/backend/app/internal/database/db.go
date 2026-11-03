@@ -429,6 +429,9 @@ type Settings struct {
 	// FollowTeamMeeting switches the agent to "In a meeting" when most of the
 	// team is in one.
 	FollowTeamMeeting bool `json:"followTeamMeeting"`
+	// HideCallerIDs opts out of showing saved caller ID names in place of
+	// phone numbers.
+	HideCallerIDs bool `json:"hideCallerIds"`
 }
 
 // GetSettings returns zero Settings when the user has saved none.

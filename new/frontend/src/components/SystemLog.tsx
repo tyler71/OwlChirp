@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { useEffect, useRef, useState } from 'react';
 
 import { downloadCcpLog } from '../lib/ccp';
-import { formatCallTime, formatPhoneNumber } from '../lib/helpers';
+import { formatCallTime } from '../lib/helpers';
 import { $view } from '../lib/stores';
 import {
   $callLogs,
@@ -14,7 +14,7 @@ import {
   type CallLog,
   type LogEntry,
 } from '../lib/systemLog';
-import { Button, Card, Icon } from './ui';
+import { Button, Card, Icon, PhoneLabel } from './ui';
 
 type Filters = { errorsOnly: boolean; hideConnectInfo: boolean };
 
@@ -108,7 +108,7 @@ function CallLogRow({ call, focused, filters }: { call: CallLog; focused: boolea
         <Icon name="chevronDown" className={`size-4 text-secondary-400 transition ${open ? '' : '-rotate-90'}`} />
         <span className="w-40 flex-none text-secondary-500">{formatCallTime(call.startedAt)}</span>
         <span className="grow truncate font-medium">
-          {call.phoneNumber ? formatPhoneNumber(call.phoneNumber) : 'Unknown'}
+          {call.phoneNumber ? <PhoneLabel phoneNumber={call.phoneNumber} /> : 'Unknown'}
           <span className="ml-2 text-xs font-normal text-secondary-500">{call.inbound ? 'Inbound' : 'Outbound'}</span>
         </span>
         {call.outcome && (

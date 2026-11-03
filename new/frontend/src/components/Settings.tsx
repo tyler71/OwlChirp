@@ -3,7 +3,16 @@ import { useState } from 'react';
 
 import { downloadCcpLog } from '../lib/ccp';
 import { $view } from '../lib/stores';
-import { $followTeamMeeting, $theme, setFollowTeamMeeting, setTheme, THEMES, type ThemeChoice } from '../lib/theme';
+import {
+  $followTeamMeeting,
+  $hideCallerIds,
+  $theme,
+  setFollowTeamMeeting,
+  setHideCallerIds,
+  setTheme,
+  THEMES,
+  type ThemeChoice,
+} from '../lib/theme';
 import { Button, Card, Icon } from './ui';
 
 function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolean }) {
@@ -41,6 +50,7 @@ function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolea
 export default function Settings() {
   const theme = useStore($theme);
   const followTeamMeeting = useStore($followTeamMeeting);
+  const hideCallerIds = useStore($hideCallerIds);
   const [showThemes, setShowThemes] = useState(false)
   return (
     <>
@@ -69,9 +79,25 @@ export default function Settings() {
         />
         <span className="flex flex-col gap-0.5">
           <span className="text-sm font-semibold">Auto switch to in a meeting</span>
-          {/*<span className="text-xs text-secondary-500 dark:text-secondary-400">*/}
-          {/*  @ Switch when 75% switch*/}
-          {/*</span>*/}
+          <span className="text-xs text-secondary-500 dark:text-secondary-400">
+            Switches when 75% of users are "In a Meeting"
+          </span>
+        </span>
+      </label>
+    </Card>
+    <Card title="Caller ID">
+      <label className="flex cursor-pointer items-start gap-3 p-4">
+        <input
+          type="checkbox"
+          className="toggle toggle-primary mt-0.5"
+          checked={hideCallerIds}
+          onChange={(e) => void setHideCallerIds(e.target.checked)}
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold">Disable caller id</span>
+          <span className="text-xs text-secondary-500 dark:text-secondary-400">
+            Only show phone numbers.
+          </span>
         </span>
       </label>
     </Card>

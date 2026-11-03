@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react';
 
 import { flowStage } from '../lib/flowCalls';
-import { agentName, formatPhoneNumber } from '../lib/helpers';
+import { usePhoneLabel } from '../lib/callerId';
+import { agentName } from '../lib/helpers';
 import { $contactSnapshot, $isPower, $numberCalls } from '../lib/stores';
 import { ConnectLink, StageBadge } from './FlowCalls';
 import { dayLabel, timeFormat } from './Timeline';
@@ -15,6 +16,7 @@ export default function CallerTimeline() {
   const contact = useStore($contactSnapshot);
   const isPower = useStore($isPower);
   const history = useStore($numberCalls);
+  const caller = usePhoneLabel(contact?.phoneNumber ?? '');
 
   if (!isPower || !contact?.phoneNumber || history?.phoneNumber !== contact.phoneNumber) return null;
 
@@ -27,7 +29,7 @@ export default function CallerTimeline() {
         <span className="text-xs text-secondary-500 dark:text-secondary-400">
           {loading
             ? 'Loading…'
-            : `${calls.length} ${calls.length === 1 ? 'call' : 'calls'} from ${formatPhoneNumber(contact.phoneNumber)} · 8 weeks`}
+            : `${calls.length} ${calls.length === 1 ? 'call' : 'calls'} from ${caller} · 8 weeks`}
         </span>
       }
     >

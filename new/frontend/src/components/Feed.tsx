@@ -5,7 +5,7 @@ import { LOADING_CLASS } from '../lib/const';
 import { agentName, formatCallTime, formatPhoneNumber, normalizePhoneNumber } from '../lib/helpers';
 import { $agent, $contactSnapshot, $isAdmin, $numberFeed, $wrapups, type Wrapup } from '../lib/stores';
 import { loadNumberFeed, MOODS } from '../lib/wrapups';
-import { Button, Card } from './ui';
+import { Button, Card, PhoneLabel } from './ui';
 
 // One wrap-up as chat bubbles: a mood card (the emoji stands in for the file
 // icon of the "file content" bubble), a text bubble for thoughts, then meta.
@@ -94,7 +94,7 @@ export default function Feed() {
 
   return (
     <Card
-      title={feed?.phoneNumber ? `Feed · ${formatPhoneNumber(feed.phoneNumber)}` : 'Feed'}
+      title={feed?.phoneNumber ? <>Feed · <PhoneLabel phoneNumber={feed.phoneNumber} /></> : 'Feed'}
       actions={
         <form onSubmit={onSubmit} className="flex items-center gap-2">
           <input

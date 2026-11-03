@@ -31,7 +31,13 @@ export const $followTeamMeeting = persistentAtom<boolean>('owlchirp:followTeamMe
   decode: (v) => v === 'true',
 });
 
-type Settings = { theme: string; followTeamMeeting?: boolean };
+// Opt out of caller ID names replacing phone numbers (see callerId.ts).
+export const $hideCallerIds = persistentAtom<boolean>('owlchirp:hideCallerIds', false, {
+  encode: JSON.stringify,
+  decode: (v) => v === 'true',
+});
+
+type Settings = { theme: string; followTeamMeeting?: boolean; hideCallerIds?: boolean };
 
 function isThemeChoice(name: string): name is ThemeChoice {
   return name === 'system' || (THEMES as readonly string[]).includes(name);
@@ -40,7 +46,11 @@ function isThemeChoice(name: string): name is ThemeChoice {
 // settings.save replaces the whole record, so always send every field.
 async function saveSettings(what: string): Promise<void> {
   try {
-    await request('settings.save', { theme: $theme.get(), followTeamMeeting: $followTeamMeeting.get() });
+    await request('settings.save', {
+      theme: $theme.get(),
+      followTeamMeeting: $followTeamMeeting.get(),
+      hideCallerIds: $hideCallerIds.get(),
+    });
   } catch (e) {
     console.error('save settings', e);
     $alert.set({ kind: 'warning', message: `${what} could not be saved to your account.` });
@@ -57,6 +67,11 @@ export function setFollowTeamMeeting(enabled: boolean): Promise<void> {
   return saveSettings('Meeting setting');
 }
 
+export function setHideCallerIds(hidden: boolean): Promise<void> {
+  $hideCallerIds.set(hidden);
+  return saveSettings('Caller ID setting');
+}
+
 // On each (re)connect the server's settings win. An account with none saved
 // adopts this browser's choices, carrying over themes picked before settings
 // moved to the server.
@@ -66,7 +81,8 @@ async function syncSettings(): Promise<void> {
     if (isThemeChoice(settings.theme)) {
       $theme.set(settings.theme);
       $followTeamMeeting.set(settings.followTeamMeeting ?? false);
-    } else if ($theme.get() !== 'system' || $followTeamMeeting.get()) {
+      $hideCallerIds.set(settings.hideCallerIds ?? false);
+    } else if ($theme.get() !== 'system' || $followTeamMeeting.get() || $hideCallerIds.get()) {
       await saveSettings('Settings');
     }
   } catch {

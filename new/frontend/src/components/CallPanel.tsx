@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react';
 
+import { useDisplayName } from '../lib/callerId';
 import { formatPhoneNumber } from '../lib/helpers';
 import {
   acceptContact,
@@ -13,17 +14,10 @@ import {
   swapConnections,
   toggleMute,
 } from '../lib/softphone';
-import {
-  $agentSnapshot,
-  $callerId,
-  $contactSnapshot,
-  type CallerId,
-  type ConnectionSnapshot,
-  type ContactSnapshot,
-} from '../lib/stores';
+import { $agentSnapshot, $contactSnapshot, type ConnectionSnapshot, type ContactSnapshot } from '../lib/stores';
 import { openCallLog } from '../lib/systemLog';
 import { $wrapupStatus, saveDraft } from '../lib/wrapups';
-import { Button, Card, Icon, formatElapsed, useNow } from './ui';
+import { Button, Card, Icon, PhoneLabel, formatElapsed, useNow } from './ui';
 import WrapupFeed from './WrapupFeed';
 import WrapupForm from './WrapupForm';
 
@@ -35,9 +29,11 @@ export function Timer({ since }: { since: number }) {
   return <span className="font-mono tabular-nums">{formatElapsed(now - since)}</span>;
 }
 
-// Caller ID name when it matches this call, else the formatted number.
-export function contactName(contact: ContactSnapshot, callerId: CallerId | null): string {
-  if (callerId && callerId.phoneNumber === contact.phoneNumber && callerId.name) return callerId.name;
+// Caller ID name for this call (unless opted out), else the formatted number.
+export function useContactName(contact: ContactSnapshot | null): string {
+  const name = useDisplayName(contact?.phoneNumber ?? '');
+  if (!contact) return '';
+  if (name) return name;
   if (contact.phoneNumber) return formatPhoneNumber(contact.phoneNumber);
   return contact.connections[0]?.label ?? 'Unknown';
 }
@@ -57,7 +53,9 @@ function ConnectionRow({ conn, canDrop }: { conn: ConnectionSnapshot; canDrop: b
         <Icon name={conn.isInitial ? 'phone' : 'user'} className="size-4" />
       </span>
       <div className="min-w-0 grow">
-        <p className="truncate text-sm font-semibold">{conn.label}</p>
+        <p className="truncate text-sm font-semibold">
+          {conn.phoneNumber ? <PhoneLabel phoneNumber={conn.phoneNumber} /> : conn.label}
+        </p>
         <p className="text-xs text-secondary-500 dark:text-secondary-400">
           {conn.isInitial ? 'User' : 'Third party'} · {connecting ? 'Dialing' : onHold ? 'On hold' : 'Connected'}{' '}
           · <Timer since={conn.statusStartedAt} />
@@ -114,7 +112,7 @@ function AfterCallWork({ contact, name }: { contact: ContactSnapshot; name: stri
 export default function CallPanel() {
   const contact = useStore($contactSnapshot);
   const agent = useStore($agentSnapshot);
-  const callerId = useStore($callerId);
+  const name = useContactName(contact);
 
   if (!contact) {
     const routable = agent?.stateType === connect.AgentStateType.ROUTABLE;
@@ -140,7 +138,6 @@ export default function CallPanel() {
     );
   }
 
-  const name = contactName(contact, callerId);
   const ringing = contact.isInbound && (contact.status === CS.INCOMING || contact.status === CS.CONNECTING);
 
   if (ringing) {

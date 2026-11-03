@@ -1,12 +1,11 @@
 import { useStore } from '@nanostores/react';
 import { useEffect, useState } from 'react';
 
-import { getCallerIdName } from '../lib/callerId';
 import { flowStage, isLive, loadFlowCalls, type FlowStage } from '../lib/flowCalls';
-import { formatCallTime, formatPhoneNumber, formatSecondsToTime, normalizePhoneNumber } from '../lib/helpers';
+import { formatCallTime, formatSecondsToTime, normalizePhoneNumber } from '../lib/helpers';
 import { $config, $flowCalls, $isAdmin, $view, type FlowCall } from '../lib/stores';
 import { loadNumberFeed } from '../lib/wrapups';
-import { Button, Card, Icon, formatElapsed, useNow } from './ui';
+import { Button, Card, Icon, PhoneLabel, formatElapsed, useNow } from './ui';
 
 const STAGE: Record<FlowStage, { label: string; className: string }> = {
   flow: { label: 'In flow', className: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300' },
@@ -25,27 +24,6 @@ const STAGE: Record<FlowStage, { label: string; className: string }> = {
   },
 };
 
-// Caller ID names rarely change; look each number up once per page load.
-const callerNames = new Map<string, Promise<string | null>>();
-
-function useCallerName(phoneNumber: string): string | null {
-  const [name, setName] = useState<string | null>(null);
-  useEffect(() => {
-    if (!phoneNumber) return;
-    let cancelled = false;
-    let lookup = callerNames.get(phoneNumber);
-    if (!lookup) {
-      lookup = getCallerIdName(phoneNumber).catch(() => null);
-      callerNames.set(phoneNumber, lookup);
-    }
-    lookup.then((n) => !cancelled && setName(n));
-    return () => {
-      cancelled = true;
-    };
-  }, [phoneNumber]);
-  return name;
-}
-
 function seconds(from: number, to: number): number {
   return from && to ? Math.max(0, Math.round((to - from) / 1000)) : 0;
 }
@@ -56,7 +34,6 @@ export function StageBadge({ stage }: { stage: FlowStage }) {
 }
 
 export function Caller({ call }: { call: FlowCall }) {
-  const name = useCallerName(call.phoneNumber);
   if (!call.phoneNumber) return <span className="text-secondary-500">Unknown</span>;
 
   const jumpToFeed = () => {
@@ -66,8 +43,7 @@ export function Caller({ call }: { call: FlowCall }) {
 
   return (
     <button type="button" onClick={jumpToFeed} title="Open feed" className="min-w-0 text-left hover:underline">
-      <span className="font-medium tabular-nums">{formatPhoneNumber(call.phoneNumber)}</span>
-      {name && <span className="ml-2 truncate text-xs text-secondary-500 dark:text-secondary-400">{name}</span>}
+      <PhoneLabel phoneNumber={call.phoneNumber} className="truncate font-medium tabular-nums" />
     </button>
   );
 }

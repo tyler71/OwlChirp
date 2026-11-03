@@ -51,6 +51,7 @@ function snapshotContact(contact: connect.Contact): void {
       id: c.getConnectionId(),
       isInitial: c.getConnectionId() === initial?.getConnectionId(),
       label: connectionLabel(c),
+      phoneNumber: c.getEndpoint().type === connect.EndpointType.PHONE_NUMBER ? c.getEndpoint().phoneNumber || undefined : undefined,
       status: c.getStatus().type,
       statusStartedAt: Date.now() - c.getStatusDuration(),
     }));

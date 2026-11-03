@@ -4,16 +4,18 @@ import { useEffect, useRef } from 'react';
 import { saveCallerId } from '../lib/callerId';
 import { formatPhoneNumber } from '../lib/helpers';
 import { $callerId } from '../lib/stores';
+import { $hideCallerIds } from '../lib/theme';
 
 const EDITING_CLASSES = ['ring-2', 'ring-primary-500', 'bg-base-100', 'dark:bg-secondary-800'];
 
 // Click to rename the current caller; blur saves it.
 export default function CallerId() {
   const callerId = useStore($callerId);
+  const hideNames = useStore($hideCallerIds);
   const ref = useRef<HTMLDivElement>(null);
   const editing = useRef(false);
 
-  const display = callerId ? callerId.name || formatPhoneNumber(callerId.phoneNumber) : '';
+  const display = callerId ? (!hideNames && callerId.name) || formatPhoneNumber(callerId.phoneNumber) : '';
 
   // contentEditable content is managed directly so React doesn't fight the caret.
   useEffect(() => {

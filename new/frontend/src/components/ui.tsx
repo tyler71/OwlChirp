@@ -2,6 +2,9 @@
 // cards and a ticking clock for call/status timers.
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
+import { usePhoneLabel } from '../lib/callerId';
+import { formatPhoneNumber } from '../lib/helpers';
+
 const ICONS = {
   phone:
     'M2 3.5A1.5 1.5 0 0 1 3.5 2h1.148a1.5 1.5 0 0 1 1.465 1.175l.513 2.31a1.5 1.5 0 0 1-1.025 1.75l-.97.324a.75.75 0 0 0-.454.965 11.53 11.53 0 0 0 6.29 6.29.75.75 0 0 0 .965-.454l.324-.97a1.5 1.5 0 0 1 1.75-1.025l2.31.513A1.5 1.5 0 0 1 18 14.352V15.5a1.5 1.5 0 0 1-1.5 1.5H15c-7.18 0-13-5.82-13-13V3.5Z',
@@ -235,4 +238,14 @@ export function stateDotClass(stateType: string): string {
     default:
       return 'bg-primary-500';
   }
+}
+
+/** A phone number shown as its caller ID name when one is saved (and not opted out). */
+export function PhoneLabel({ phoneNumber, className }: { phoneNumber: string; className?: string }) {
+  const label = usePhoneLabel(phoneNumber);
+  return (
+    <span className={className} title={formatPhoneNumber(phoneNumber)}>
+      {label}
+    </span>
+  );
 }

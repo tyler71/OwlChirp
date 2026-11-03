@@ -1,14 +1,14 @@
 import { useStore } from '@nanostores/react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 
-import { getCallerIdName } from '../lib/callerId';
+import { useDisplayName } from '../lib/callerId';
 import { loadNumberFeed } from '../lib/wrapups';
 import { CURSOR_HELP_CLASS, LOADING_CLASS } from '../lib/const';
 import { formatCallTime, formatPhoneNumber, formatSecondsToTime, normalizePhoneNumber } from '../lib/helpers';
 import { request } from '../lib/realtime';
 import { loadCallsPage, totalPages } from '../lib/callHistory';
 import { $calls, $callsPage, $config, $isAdmin, $isPower, $view, type Call } from '../lib/stores';
-import { Card, Icon, Pagination } from './ui';
+import { Card, Icon, Pagination, PhoneLabel } from './ui';
 
 const TITLE = 'Recent Calls';
 
@@ -20,7 +20,7 @@ type ContactDetail = {
   call_to_queue_time: number;
 };
 
-type Detail = { status: 'loading' } | { status: 'error' } | { status: 'ready'; contact: ContactDetail; callerId: string | null };
+type Detail = { status: 'loading' } | { status: 'error' } | { status: 'ready'; contact: ContactDetail };
 
 // Contact details don't change once a call is over, so keep them across view switches.
 const detailCache = new Map<string, Detail>();
@@ -42,11 +42,8 @@ function flowDetail(call: Call): ContactDetail | null {
 
 async function loadDetail(call: Call): Promise<Detail> {
   const local = flowDetail(call);
-  const [contact, callerId] = await Promise.all([
-    local ?? request<ContactDetail>('calls.detail', { contactId: call.contactId }),
-    getCallerIdName(call.phoneNumber).catch(() => null),
-  ]);
-  return { status: 'ready', contact, callerId };
+  const contact = local ?? (await request<ContactDetail>('calls.detail', { contactId: call.contactId }));
+  return { status: 'ready', contact };
 }
 
 function useDetail(call: Call): Detail | undefined {
@@ -85,6 +82,7 @@ function CallCard({ call }: { call: Call }) {
   const detail = useDetail(call);
   const isPower = useStore($isPower);
   const isAdmin = useStore($isAdmin);
+  const displayName = useDisplayName(call.phoneNumber);
 
   const jumpToFeed = () => {
     void loadNumberFeed(normalizePhoneNumber(call.phoneNumber));
@@ -94,9 +92,10 @@ function CallCard({ call }: { call: Call }) {
   const rows: { key: string; value: React.ReactNode; tooltip?: string }[] = [
     { key: 'Time', value: formatCallTime(call.timestamp) },
   ];
+  // The title shows the caller ID name, so keep the number visible here.
+  if (displayName) rows.push({ key: 'Phone', value: formatPhoneNumber(call.phoneNumber) });
   if (detail?.status === 'ready') {
-    const { contact, callerId } = detail;
-    if (callerId) rows.push({ key: 'Caller ID', value: callerId });
+    const { contact } = detail;
     if (isAdmin) rows.push({ key: 'Agent', value: contact.agent_name });
     if (call.queueName) rows.push({ key: 'Queue', value: call.queueName });
     rows.push({ key: 'Answered', value: formatCallTime(contact.answered_timestamp), tooltip: contact.answered_timestamp });
@@ -110,7 +109,7 @@ function CallCard({ call }: { call: Call }) {
 
   return (
     <Card
-      title={<span className="tabular-nums">{formatPhoneNumber(call.phoneNumber)}</span>}
+      title={<PhoneLabel phoneNumber={call.phoneNumber} className="tabular-nums" />}
       actions={
         <div className="flex items-center gap-2">
           {isPower && (

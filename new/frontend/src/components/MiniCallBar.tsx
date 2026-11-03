@@ -3,8 +3,8 @@
 import { useStore } from '@nanostores/react';
 
 import { acceptContact, clearContact, hangUp, rejectContact, toggleMute } from '../lib/softphone';
-import { $agentSnapshot, $callerId, $contactSnapshot, $view } from '../lib/stores';
-import { Timer, contactName } from './CallPanel';
+import { $agentSnapshot, $contactSnapshot, $view } from '../lib/stores';
+import { Timer, useContactName } from './CallPanel';
 import { Button, Icon } from './ui';
 
 const CS = connect.ContactStateType;
@@ -16,12 +16,11 @@ const LABEL = 'hidden sm:inline';
 export default function MiniCallBar() {
   const contact = useStore($contactSnapshot);
   const agent = useStore($agentSnapshot);
-  const callerId = useStore($callerId);
   const view = useStore($view);
+  const name = useContactName(contact);
 
   if (!contact || view === 'phone') return null;
 
-  const name = contactName(contact, callerId);
   const ringing = contact.isInbound && (contact.status === CS.INCOMING || contact.status === CS.CONNECTING);
   const failed = contact.status === CS.MISSED || contact.status === CS.REJECTED || contact.status === CS.ERROR;
   const wrapup = contact.status === CS.ENDED;

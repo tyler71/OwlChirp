@@ -198,13 +198,14 @@ func TestSettings(t *testing.T) {
 
 	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "dracula"})
 	assert.Nil(t, err)
-	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "nord", FollowTeamMeeting: true})
+	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "nord", FollowTeamMeeting: true, HideCallerIDs: true})
 	assert.Nil(t, err)
 
 	s, err = db.GetSettings(ctx, "alice")
 	assert.Nil(t, err)
 	assert.Equal(t, s.Theme, "nord")
 	assert.Equal(t, s.FollowTeamMeeting, true)
+	assert.Equal(t, s.HideCallerIDs, true)
 
 	s, err = db.GetSettings(ctx, "bob")
 	assert.Nil(t, err)

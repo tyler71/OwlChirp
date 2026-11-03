@@ -1,6 +1,6 @@
 services:
   app:
-    image: docker.sandcatdev.com/server/owlchirp
+    image: 559610805985.dkr.ecr.us-west-2.amazonaws.com/owlchirp:v2-11-02-26
     restart: always
     build:
       context: .

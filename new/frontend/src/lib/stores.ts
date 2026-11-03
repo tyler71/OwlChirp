@@ -165,6 +165,8 @@ export type ConnectionSnapshot = {
   id: string;
   isInitial: boolean;
   label: string;
+  // Set for phone number endpoints so the label can show a caller ID name.
+  phoneNumber?: string;
   status: string;
   statusStartedAt: number;
 };
