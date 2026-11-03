@@ -1,4 +1,4 @@
-import { atom, computed, map } from 'nanostores';
+import { atom, computed, map, type ReadableAtom } from 'nanostores';
 import { persistentAtom, persistentMap } from '@nanostores/persistent';
 import { SIDELINE_STATUSES, type STATUS } from './const';
 
@@ -147,15 +147,47 @@ export const $alert = atom<Alert>({ kind: 'welcome' });
 
 export const $wsStatus = atom<'connecting' | 'open' | 'closed'>('connecting');
 
-// Permission levels from the owlchirp feature flag. Each level includes
-// everything below it, so compare with >=.
-export const PERMISSION = { standard: 0, power: 1, admin: 2 } as const;
+// Features an admin can grant each user. Phone and Settings are always
+// available. Mirrors internal/features in the backend; update both together.
+export const FEATURES = [
+  { key: 'feed', label: 'Feed', detail: 'Team call wrapups' },
+  { key: 'flow', label: 'Flow Calls', detail: 'Live calls in flow and queue, queue badge, call flow card' },
+  { key: 'timeline', label: 'Timeline', detail: 'Call volume over time' },
+  { key: 'calls', label: 'Recent Calls', detail: 'Own call history' },
+  { key: 'callsAll', label: 'All calls', detail: "Every agent's calls in Recent Calls" },
+  { key: 'callerHistory', label: 'Caller history', detail: 'Past calls from the active caller' },
+  { key: 'callerIds', label: 'Caller IDs', detail: 'Manage outbound caller IDs' },
+  { key: 'agentNames', label: 'Agent names', detail: 'Agent names in Feed, Flow Calls, Timeline and call details' },
+  { key: 'admin', label: 'Admin', detail: 'Admin page and user permissions' },
+] as const;
 
-// This agent's permission level, sent by the server after socket auth.
-export const $permission = atom<number>(PERMISSION.standard);
-// Power unlocks the timeline, flow calls and feed; admin also shows agent names.
-export const $isPower = computed($permission, (p) => p >= PERMISSION.power);
-export const $isAdmin = computed($permission, (p) => p >= PERMISSION.admin);
+export type Feature = (typeof FEATURES)[number]['key'];
+
+export const ALL_FEATURES: Feature[] = FEATURES.map((f) => f.key);
+
+// Feature sets matching the old permission levels.
+export const PRESETS: { key: string; label: string; features: Feature[] }[] = [
+  { key: 'standard', label: 'Standard', features: [] },
+  { key: 'power', label: 'Power', features: ['feed', 'flow', 'timeline', 'calls', 'callerHistory', 'callerIds'] },
+  { key: 'admin', label: 'Admin', features: ALL_FEATURES },
+];
+
+// This agent's features, sent by the server after socket auth.
+export const $features = atom<Feature[]>([]);
+
+/** Whether this agent has feature right now. */
+export function can(feature: Feature): boolean {
+  return $features.get().includes(feature);
+}
+
+const featureStores = new Map<Feature, ReadableAtom<boolean>>();
+
+/** A store that is true while this agent has feature; use with useStore. */
+export function $can(feature: Feature): ReadableAtom<boolean> {
+  let store = featureStores.get(feature);
+  if (!store) featureStores.set(feature, (store = computed($features, (list) => list.includes(feature))));
+  return store;
+}
 
 // Whether the CCP iframe can read its Connect cookies (blocked by Firefox ETP
 // and other third-party cookie partitioning until the agent allows access).

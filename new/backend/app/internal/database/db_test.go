@@ -3,10 +3,12 @@ package database
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/tyler71/owlchirp/app/internal/assert"
+	"github.com/tyler71/owlchirp/app/internal/features"
 )
 
 func newTestDB(t *testing.T) *DB {
@@ -114,35 +116,65 @@ func TestCallerID(t *testing.T) {
 	assert.Equal(t, len(callerIDs), 1)
 }
 
-func TestPermissions(t *testing.T) {
+func TestFeatures(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 
-	levels, err := db.ListPermissions(ctx)
+	sets, err := db.ListFeatures(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, len(levels), 0)
+	assert.Equal(t, len(sets), 0)
 
-	assert.Nil(t, db.SetPermission(ctx, "agent@example.com", 1))
-	assert.Nil(t, db.SetPermission(ctx, "agent@example.com", 2))
-	assert.Nil(t, db.SetPermission(ctx, "other@example.com", 0))
+	assert.Nil(t, db.SetFeatures(ctx, "agent@example.com", []string{"feed"}))
+	assert.Nil(t, db.SetFeatures(ctx, "agent@example.com", []string{"feed", "admin"}))
+	assert.Nil(t, db.SetFeatures(ctx, "other@example.com", nil))
 
-	levels, err = db.ListPermissions(ctx)
+	sets, err = db.ListFeatures(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, len(levels), 2)
-	assert.Equal(t, levels["agent@example.com"], 2)
-	assert.Equal(t, levels["other@example.com"], 0)
+	assert.Equal(t, len(sets), 2)
+	assert.Equal(t, strings.Join(sets["agent@example.com"], ","), "feed,admin")
+	assert.Equal(t, len(sets["other@example.com"]), 0)
 
-	deleted, err := db.DeletePermission(ctx, "agent@example.com")
+	deleted, err := db.DeleteFeatures(ctx, "agent@example.com")
 	assert.Nil(t, err)
 	assert.True(t, deleted)
 
-	deleted, err = db.DeletePermission(ctx, "agent@example.com")
+	deleted, err = db.DeleteFeatures(ctx, "agent@example.com")
 	assert.Nil(t, err)
 	assert.False(t, deleted)
 
-	levels, err = db.ListPermissions(ctx)
+	sets, err = db.ListFeatures(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, len(levels), 1)
+	assert.Equal(t, len(sets), 1)
+}
+
+func TestMigratePermissionsToFeatures(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	// Simulate a database with the old permission levels.
+	_, err := db.ExecContext(ctx, `CREATE TABLE user_permissions (
+		user_id INTEGER PRIMARY KEY REFERENCES users (id), level INTEGER NULL, created_on DATETIME, updated_on DATETIME)`)
+	assert.Nil(t, err)
+	for username, level := range map[string]int{"power@example.com": 1, "admin@example.com": 2, "standard@example.com": 0} {
+		id, err := db.GetOrCreateUser(ctx, username)
+		assert.Nil(t, err)
+		_, err = db.ExecContext(ctx, `INSERT INTO user_permissions (user_id, level) VALUES (?, ?)`, id, level)
+		assert.Nil(t, err)
+	}
+
+	assert.Nil(t, migrate(ctx, db.DB))
+	assert.Nil(t, migrate(ctx, db.DB))
+
+	sets, err := db.ListFeatures(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(sets), 3)
+	assert.Equal(t, strings.Join(sets["power@example.com"], ","), strings.Join(features.Presets["power"], ","))
+	assert.Equal(t, strings.Join(sets["admin@example.com"], ","), strings.Join(features.All, ","))
+	assert.Equal(t, len(sets["standard@example.com"]), 0)
+
+	var n int
+	assert.Nil(t, db.GetContext(ctx, &n, `SELECT COUNT(*) FROM sqlite_master WHERE name = 'user_permissions'`))
+	assert.Equal(t, n, 0)
 }
 
 func TestWrapups(t *testing.T) {

@@ -1,7 +1,7 @@
 import { RECENT_CALLS_PAGE_SIZE } from './const';
 import { sleep } from './helpers';
 import { onEvent, request } from './realtime';
-import { $agent, $calls, $callsPage, $isAdmin, type Call, type FlowCall } from './stores';
+import { $agent, $calls, $callsPage, $can, can, type Call, type FlowCall } from './stores';
 
 type CallPage = { calls: Call[]; total: number };
 
@@ -57,11 +57,11 @@ function noteFlowCall(call: Call): void {
   }
 }
 
-// A call was logged elsewhere: admins see every agent's calls, everyone else
+// A call was logged elsewhere: agents with All calls see every agent's calls, everyone else
 // only their own (from another tab or device).
 onEvent<Call>('call.logged', (call) => {
   if ($calls.get() === null) return;
-  if ($isAdmin.get() || isMine(call.agent)) {
+  if (can('callsAll') || isMine(call.agent)) {
     noteNewCall(call);
   }
 });
@@ -88,18 +88,18 @@ const isMine = (agent: string) => agent.toLowerCase() === $agent.get()?.getConfi
 // it replaces any bare entry the browser logged for the same contact.
 onEvent<FlowCall>('flowcall.updated', (fc) => {
   if (!fc.connectedAt || !fc.agentUsername) return;
-  if ($isAdmin.get() || isMine(fc.agentUsername)) {
+  if (can('callsAll') || isMine(fc.agentUsername)) {
     noteFlowCall(flowCallToCall(fc));
   }
 });
 
-// Permission can arrive or change after the first load; reload in the new scope.
-$isAdmin.listen(() => {
+// The All calls feature can arrive or change after the first load; reload in the new scope.
+$can('callsAll').listen(() => {
   if ($calls.get() !== null) void loadCallsPage(1);
 });
 
 async function fetchPage(page: number): Promise<CallPage> {
-  const res = await request<CallPage>($isAdmin.get() ? 'calls.all' : 'calls.agent', {
+  const res = await request<CallPage>(can('callsAll') ? 'calls.all' : 'calls.agent', {
     maxRecords: RECENT_CALLS_PAGE_SIZE,
     offset: (page - 1) * RECENT_CALLS_PAGE_SIZE,
   });

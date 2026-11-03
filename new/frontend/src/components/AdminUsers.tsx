@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 
 import { agentName } from '../lib/helpers';
 import { onEvent } from '../lib/realtime';
-import { $agent, PERMISSION } from '../lib/stores';
-import { listUsers, resetPermission, setPermission, type ManagedUser } from '../lib/users';
+import { $agent, FEATURES, PRESETS, type Feature } from '../lib/stores';
+import { listUsers, resetFeatures, setFeatures, type ManagedUser } from '../lib/users';
 import { Button, Icon } from './ui';
 
 const INPUT_CLASS =
@@ -13,11 +13,17 @@ const INPUT_CLASS =
 const TH_CLASS =
   'border-b-2 border-secondary-200/50 px-3 pb-4 text-left font-semibold text-secondary-900 dark:border-secondary-700 dark:text-secondary-50';
 
-const LEVELS = [
-  { level: PERMISSION.standard, label: 'Standard' },
-  { level: PERMISSION.power, label: 'Power' },
-  { level: PERMISSION.admin, label: 'Admin' },
-];
+const CUSTOM = 'custom';
+
+// The preset whose features match list exactly, or CUSTOM.
+function presetOf(list: Feature[]): string {
+  const match = PRESETS.find((p) => p.features.length === list.length && p.features.every((f) => list.includes(f)));
+  return match?.key ?? CUSTOM;
+}
+
+function toggled(list: Feature[], feature: Feature, on: boolean): Feature[] {
+  return on ? [...list, feature] : list.filter((f) => f !== feature);
+}
 
 type Loaded = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready' };
 
@@ -49,8 +55,8 @@ function SourceBadge({ source }: { source: ManagedUser['source'] }) {
   );
 }
 
-// Every Connect user and their permission level. A level set here overrides
-// the owlchirp feature flag ("Default") until it is reset.
+// Every Connect user and the features they have. Users nobody has set up
+// ("Default") get Phone and Settings only.
 export default function AdminUsers() {
   const agent = useStore($agent);
   const me = agent?.getConfiguration().username;
@@ -100,7 +106,7 @@ export default function AdminUsers() {
       <div className="bg-secondary-50 px-5 py-4 dark:bg-secondary-800/50">
         <h3 className="mb-1 font-semibold">Users</h3>
         <h4 className="text-sm font-medium text-secondary-500 dark:text-secondary-400">
-          Set each user's level. See Permission levels above for what each one unlocks.
+          Choose the features each user has. Phone and Settings are always available. Pick a preset to fill in a row, then fine-tune with the checkboxes.
         </h4>
       </div>
 
@@ -135,8 +141,12 @@ export default function AdminUsers() {
               <thead>
                 <tr>
                   <th className={`${TH_CLASS} pl-0`}>Name</th>
-                  <th className={TH_CLASS}>Username</th>
-                  <th className={TH_CLASS}>Permission</th>
+                  <th className={TH_CLASS}>Preset</th>
+                  {FEATURES.map((f) => (
+                    <th key={f.key} className={`${TH_CLASS} text-center`} title={f.detail}>
+                      {f.label}
+                    </th>
+                  ))}
                   <th className={TH_CLASS}>Source</th>
                   <th className={`${TH_CLASS} pr-0 text-right`}>Actions</th>
                 </tr>
@@ -146,35 +156,60 @@ export default function AdminUsers() {
                   const self = u.username === me;
                   const locked = self || u.source === 'hardcoded';
                   const busy = saving === u.username;
+                  const lockedTitle = self
+                    ? "You can't change your own permissions"
+                    : u.source === 'hardcoded'
+                      ? 'This user is always an admin'
+                      : undefined;
+                  const preset = presetOf(u.features);
                   return (
                     <tr key={u.username} className="border-b border-secondary-100 dark:border-secondary-700/50">
-                      <td className="py-3 pr-3 font-medium">
-                        {agentName(u.username)}
-                        {self && <span className="ml-1.5 text-xs text-secondary-500 dark:text-secondary-400">(you)</span>}
+                      <td className="py-3 pr-3">
+                        <div className="font-medium">
+                          {agentName(u.username)}
+                          {self && <span className="ml-1.5 text-xs text-secondary-500 dark:text-secondary-400">(you)</span>}
+                        </div>
+                        <div className="text-xs text-secondary-500 dark:text-secondary-400">{u.username}</div>
                       </td>
-                      <td className="p-3 text-secondary-500 dark:text-secondary-400">{u.username}</td>
                       <td className="p-3">
                         <select
-                          value={u.level}
+                          value={preset}
                           disabled={locked || busy}
-                          title={
-                            self
-                              ? "You can't change your own permission"
-                              : u.source === 'hardcoded'
-                                ? 'This user is always an admin'
-                                : undefined
-                          }
-                          onChange={(e) => void change(u.username, () => setPermission(u.username, Number(e.target.value)))}
-                          aria-label={`Permission for ${u.username}`}
+                          title={lockedTitle}
+                          onChange={(e) => {
+                            const p = PRESETS.find((x) => x.key === e.target.value);
+                            if (p) void change(u.username, () => setFeatures(u.username, p.features));
+                          }}
+                          aria-label={`Preset for ${u.username}`}
                           className={`${INPUT_CLASS} w-32`}
                         >
-                          {LEVELS.map((l) => (
-                            <option key={l.level} value={l.level}>
-                              {l.label}
+                          {PRESETS.map((p) => (
+                            <option key={p.key} value={p.key}>
+                              {p.label}
                             </option>
                           ))}
+                          {preset === CUSTOM && (
+                            <option value={CUSTOM} disabled>
+                              Custom
+                            </option>
+                          )}
                         </select>
                       </td>
+                      {FEATURES.map((f) => (
+                        <td key={f.key} className="p-3 text-center">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm checkbox-primary"
+                            checked={u.features.includes(f.key)}
+                            disabled={locked || busy}
+                            title={lockedTitle ?? f.detail}
+                            aria-label={`${f.label} for ${u.username}`}
+                            onChange={(e) =>
+                              void change(u.username, () => setFeatures(u.username, toggled(u.features, f.key, e.target.checked)))
+                            }
+                          />
+                        </td>
+                      ))}
                       <td className="p-3">
                         <SourceBadge source={u.source} />
                       </td>
@@ -184,8 +219,8 @@ export default function AdminUsers() {
                             size="sm"
                             icon="refresh"
                             disabled={busy}
-                            title="Go back to the feature flag level"
-                            onClick={() => void change(u.username, () => resetPermission(u.username))}
+                            title="Remove all features (Phone and Settings only)"
+                            onClick={() => void change(u.username, () => resetFeatures(u.username))}
                           >
                             Reset
                           </Button>

@@ -7,7 +7,7 @@ import { CURSOR_HELP_CLASS, LOADING_CLASS } from '../lib/const';
 import { formatCallTime, formatPhoneNumber, formatSecondsToTime, normalizePhoneNumber } from '../lib/helpers';
 import { request } from '../lib/realtime';
 import { loadCallsPage, totalPages } from '../lib/callHistory';
-import { $calls, $callsPage, $config, $isAdmin, $isPower, $view, type Call } from '../lib/stores';
+import { $calls, $callsPage, $can, $config, $view, type Call } from '../lib/stores';
 import { Card, Icon, Pagination, PhoneLabel } from './ui';
 
 const TITLE = 'Recent Calls';
@@ -80,8 +80,8 @@ const ACTION_CLASS =
 function CallCard({ call }: { call: Call }) {
   const config = useStore($config);
   const detail = useDetail(call);
-  const isPower = useStore($isPower);
-  const isAdmin = useStore($isAdmin);
+  const canFeed = useStore($can('feed'));
+  const showNames = useStore($can('agentNames'));
   const displayName = useDisplayName(call.phoneNumber);
 
   const jumpToFeed = () => {
@@ -96,7 +96,7 @@ function CallCard({ call }: { call: Call }) {
   if (displayName) rows.push({ key: 'Phone', value: formatPhoneNumber(call.phoneNumber) });
   if (detail?.status === 'ready') {
     const { contact } = detail;
-    if (isAdmin) rows.push({ key: 'Agent', value: contact.agent_name });
+    if (showNames) rows.push({ key: 'Agent', value: contact.agent_name });
     if (call.queueName) rows.push({ key: 'Queue', value: call.queueName });
     rows.push({ key: 'Answered', value: formatCallTime(contact.answered_timestamp), tooltip: contact.answered_timestamp });
     rows.push({
@@ -112,7 +112,7 @@ function CallCard({ call }: { call: Call }) {
       title={<PhoneLabel phoneNumber={call.phoneNumber} className="tabular-nums" />}
       actions={
         <div className="flex items-center gap-2">
-          {isPower && (
+          {canFeed && (
             <button type="button" onClick={jumpToFeed} title="Open feed" className={ACTION_CLASS}>
               <Icon name="chat" className="size-4" />
               <span className="hidden sm:inline">Feed</span>

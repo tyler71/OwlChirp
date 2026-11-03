@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { flowStage } from '../lib/flowCalls';
-import { $isAdmin, $timeline, $timelineInterval, type FlowCallBucket } from '../lib/stores';
+import { $can, $timeline, $timelineInterval, type FlowCallBucket } from '../lib/stores';
 import {
   groupBuckets,
   intervalLabel,
@@ -27,7 +27,7 @@ export function dayLabel(ms: number): string {
 }
 
 function Entry({ bucket, width, peak, day }: { bucket: FlowCallBucket; width: number; peak: number; day?: string }) {
-  const isAdmin = useStore($isAdmin);
+  const showNames = useStore($can('agentNames'));
   const [open, setOpen] = useState(false);
   const live = bucket.total - bucket.answered - bucket.abandoned;
 
@@ -79,7 +79,7 @@ function Entry({ bucket, width, peak, day }: { bucket: FlowCallBucket; width: nu
                 <span className="min-w-0 grow">
                   <Caller call={call} />
                 </span>
-                {isAdmin && call.agentName && (
+                {showNames && call.agentName && (
                   <span className="hidden text-xs text-secondary-500 sm:inline dark:text-secondary-400">{call.agentName}</span>
                 )}
                 <StageBadge stage={flowStage(call)} />

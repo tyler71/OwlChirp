@@ -8,7 +8,6 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/tyler71/owlchirp/app/internal/connect"
-	"github.com/tyler71/owlchirp/app/internal/flags"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
 )
 
@@ -49,12 +48,12 @@ type wsReply struct {
 // Browsers can't set headers on a WebSocket, so the first message must be
 // {"type":"auth","token":"<X-Api-Key>"}. After that:
 //   - the server pushes events as {"type":"<event>","data":...}
-//     ("flags", "metrics", "call.logged", "callerid.updated", "wrapup.saved",
+//     ("features", "metrics", "call.logged", "callerid.updated", "wrapup.saved",
 //     "help.requested", "permission.updated");
-//     "flags" is always the first, sent once per connection
+//     "features" is always the first, sent once per connection
 //   - the client sends wsRequest calls, answered with a wsReply. The
-//     permission level in "flags" decides what the UI shows; requests in
-//     requestPermission also need that level on the server.
+//     user's features decide what the UI shows; requests in
+//     requestFeature also need that feature on the server.
 func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	// The connection outlives the server's Read/WriteTimeout.
 	rc := http.NewResponseController(w)
@@ -78,13 +77,11 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(wsReadLimit)
 
-	// The flag is evaluated once per connection; levels set by an admin are
-	// checked on every request and pushed as "permission.updated".
-	flagLevel := app.flags.Permission(ctx, user.Username)
-	level := app.perms.level(user.Username, flagLevel)
-	msg, err := realtime.Message("flags", map[string]int{flags.OwlchirpKey: level})
+	// Features are checked on every request; changes by an admin are pushed
+	// as "permission.updated".
+	msg, err := realtime.Message("features", map[string][]string{"features": app.perms.features(user.Username)})
 	if err != nil {
-		app.logger.Error("websocket encode flags", "error", err)
+		app.logger.Error("websocket encode features", "error", err)
 		return
 	}
 	if err := wsWrite(ctx, conn, msg); err != nil {
@@ -97,7 +94,7 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	// coder/websocket allows one concurrent writer, so request handlers hand
 	// their replies to the write loop below.
 	replies := make(chan []byte, wsReplyBuffer)
-	go app.wsReadLoop(ctx, cancel, conn, user, flagLevel, replies)
+	go app.wsReadLoop(ctx, cancel, conn, user, replies)
 
 	ping := time.NewTicker(wsPingInterval)
 	defer ping.Stop()
@@ -130,7 +127,7 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 
 // wsReadLoop handles client requests until the connection fails, then
 // cancels the connection's context so the write loop exits too.
-func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, user connect.RegisteredUser, flagLevel int, replies chan<- []byte) {
+func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, user connect.RegisteredUser, replies chan<- []byte) {
 	defer cancel()
 
 	for {
@@ -153,7 +150,7 @@ func (app *application) wsReadLoop(ctx context.Context, cancel context.CancelFun
 		go func() {
 			reqCtx, reqCancel := context.WithTimeout(ctx, wsRequestTimeout)
 			defer reqCancel()
-			app.sendReply(ctx, replies, app.handleRequest(reqCtx, user, flagLevel, req))
+			app.sendReply(ctx, replies, app.handleRequest(reqCtx, user, req))
 		}()
 	}
 }

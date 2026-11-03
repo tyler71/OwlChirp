@@ -10,13 +10,13 @@ import { $queuedCount, loadFlowCalls } from '../lib/flowCalls';
 import {
   $agent,
   $agentSnapshot,
+  $can,
   $config,
+  $features,
   $flowCalls,
-  $isPower,
-  $permission,
   $view,
   $wsStatus,
-  PERMISSION,
+  type Feature,
   type View,
 } from '../lib/stores';
 import '../lib/theme';
@@ -157,15 +157,15 @@ function UserMenu() {
 // Count of calls waiting in queue, shown on the Flow Calls nav item.
 function FlowQueueBadge() {
   const count = useStore($queuedCount);
-  const isPower = useStore($isPower);
+  const canFlow = useStore($can('flow'));
   const wsStatus = useStore($wsStatus);
 
   // Seed the store so live flowcall.updated pushes are tracked without opening the view.
   useEffect(() => {
-    if (isPower && wsStatus === 'open' && $flowCalls.get() === null) {
+    if (canFlow && wsStatus === 'open' && $flowCalls.get() === null) {
       loadFlowCalls().catch((e) => console.error('loadFlowCalls', e));
     }
-  }, [isPower, wsStatus]);
+  }, [canFlow, wsStatus]);
 
   if (!count) return null;
   return (
@@ -178,25 +178,26 @@ function FlowQueueBadge() {
   );
 }
 
-// Views that need more than standard permission.
-const VIEW_PERMISSION: Partial<Record<View, number>> = {
-  calls: PERMISSION.power,
-  feed: PERMISSION.power,
-  flow: PERMISSION.power,
-  timeline: PERMISSION.power,
-  callerids: PERMISSION.admin,
-  admin: PERMISSION.admin,
+// Views that need a feature; the rest are open to everyone.
+const VIEW_FEATURE: Partial<Record<View, Feature>> = {
+  calls: 'calls',
+  feed: 'feed',
+  flow: 'flow',
+  timeline: 'timeline',
+  callerids: 'callerIds',
+  admin: 'admin',
 };
 
-function canView(view: View, permission: number): boolean {
-  return permission >= (VIEW_PERMISSION[view] ?? PERMISSION.standard);
+function canView(view: View, features: Feature[]): boolean {
+  const needed = VIEW_FEATURE[view];
+  return !needed || features.includes(needed);
 }
 
 export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const agent = useStore($agent);
   const view = useStore($view);
-  const permission = useStore($permission);
+  const features = useStore($features);
 
   return (
     <div
@@ -250,7 +251,7 @@ export default function App() {
         <div className="grow overflow-y-auto">
           <div className="flex flex-col gap-4 px-4 py-6">
             <nav className="flex flex-col gap-0.5">
-              {NAV.filter((item) => canView(item.view, permission)).map((item) => {
+              {NAV.filter((item) => canView(item.view, features)).map((item) => {
                 const active = item.view === view;
                 return (
                   <button
@@ -324,12 +325,12 @@ export default function App() {
 
           {view === 'settings' && <Settings />}
           {view === 'log' && <SystemLog />}
-          {view === 'calls' && agent && canView(view, permission) && <RecentCallList />}
-          {view === 'feed' && agent && canView(view, permission) && <Feed />}
-          {view === 'flow' && agent && canView(view, permission) && <FlowCalls />}
-          {view === 'timeline' && agent && canView(view, permission) && <Timeline />}
-          {view === 'callerids' && canView(view, permission) && <CallerIds />}
-          {view === 'admin' && canView(view, permission) && <Admin />}
+          {view === 'calls' && agent && canView(view, features) && <RecentCallList />}
+          {view === 'feed' && agent && canView(view, features) && <Feed />}
+          {view === 'flow' && agent && canView(view, features) && <FlowCalls />}
+          {view === 'timeline' && agent && canView(view, features) && <Timeline />}
+          {view === 'callerids' && canView(view, features) && <CallerIds />}
+          {view === 'admin' && canView(view, features) && <Admin />}
 
           {agent && (
             <div className={view === 'phone' ? 'contents' : 'hidden'}>

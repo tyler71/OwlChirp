@@ -1,20 +1,21 @@
 import { request } from './realtime';
+import type { Feature } from './stores';
 
-// Where a user's permission level comes from: set by an admin ("db"), the
-// owlchirp feature flag ("flag"), or always admin in the server ("hardcoded").
-export type PermissionSource = 'db' | 'flag' | 'hardcoded';
+// Where a user's features come from: set by an admin ("db"), none set yet
+// ("default"), or always admin in the server ("hardcoded").
+export type PermissionSource = 'db' | 'default' | 'hardcoded';
 
-export type ManagedUser = { username: string; level: number; source: PermissionSource };
+export type ManagedUser = { username: string; features: Feature[]; source: PermissionSource };
 
 export function listUsers(): Promise<ManagedUser[]> {
   return request<ManagedUser[]>('users.list');
 }
 
-export function setPermission(username: string, level: number): Promise<ManagedUser> {
-  return request<ManagedUser>('users.setPermission', { username, level });
+export function setFeatures(username: string, features: Feature[]): Promise<ManagedUser> {
+  return request<ManagedUser>('users.setFeatures', { username, features });
 }
 
-// Removes the admin-set level so the feature flag decides again.
-export function resetPermission(username: string): Promise<ManagedUser> {
-  return request<ManagedUser>('users.resetPermission', { username });
+// Removes the admin-set features, leaving the user with Phone and Settings only.
+export function resetFeatures(username: string): Promise<ManagedUser> {
+  return request<ManagedUser>('users.resetFeatures', { username });
 }

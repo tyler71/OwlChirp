@@ -17,7 +17,7 @@ import (
 	"github.com/tyler71/owlchirp/app/internal/cache"
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
-	"github.com/tyler71/owlchirp/app/internal/flags"
+	"github.com/tyler71/owlchirp/app/internal/features"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
 )
 
@@ -25,14 +25,6 @@ type fakeUsers []connect.RegisteredUser
 
 func (f fakeUsers) RegisteredUsers(context.Context) ([]connect.RegisteredUser, error) {
 	return f, nil
-}
-
-// fakeFlags gives the usernames it holds their permission level; anyone else
-// is standard.
-type fakeFlags map[string]int
-
-func (f fakeFlags) Permission(_ context.Context, username string) int {
-	return f[username]
 }
 
 var (
@@ -55,8 +47,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 		auth:   auth.NewVerifier(fakeUsers{testAgent, standardUser}),
 		users:  fakeUsers{testAgent, standardUser},
 		hub:    realtime.NewHub(nil, time.Hour, logger),
-		flags:  fakeFlags{testAgent.Username: flags.Admin},
-		perms:  newPermissionStore(nil),
+		perms:  newPermissionStore(map[string][]string{testAgent.Username: features.All}),
 		logger: logger,
 	}
 	app.handlers = app.wsHandlers()
@@ -166,23 +157,25 @@ func TestSocketRejectsBadToken(t *testing.T) {
 	assert.Equal(t, websocket.CloseStatus(err), wsStatusUnauthorized)
 }
 
-func TestSocketFlags(t *testing.T) {
+func TestSocketFeatures(t *testing.T) {
 	srv := newTestServer(t)
 
 	t.Run("admin", func(t *testing.T) {
 		c := dial(t, srv, validToken())
 		msg := c.readUntil(func(testMessage) bool { return true })
-		assert.Equal(t, msg.Type, "flags")
-		assert.Equal(t, string(msg.Data), `{"owlchirp":2}`)
+		assert.Equal(t, msg.Type, "features")
+		var got struct{ Features []string }
+		assert.Nil(t, json.Unmarshal(msg.Data, &got))
+		assert.Equal(t, strings.Join(got.Features, ","), strings.Join(features.All, ","))
 	})
 
-	t.Run("standard", func(t *testing.T) {
+	t.Run("none", func(t *testing.T) {
 		c := dial(t, srv, tokenFor(standardUser))
 		msg := c.readUntil(func(testMessage) bool { return true })
-		assert.Equal(t, msg.Type, "flags")
-		assert.Equal(t, string(msg.Data), `{"owlchirp":0}`)
+		assert.Equal(t, msg.Type, "features")
+		assert.Equal(t, string(msg.Data), `{"features":[]}`)
 
-		// Most requests are served at every level; only admin requests are refused.
+		// Most requests are served to everyone; only feature requests are refused.
 		reply := c.call("calls.agent", map[string]any{})
 		assert.Equal(t, reply.Type, "result")
 
@@ -192,9 +185,32 @@ func TestSocketFlags(t *testing.T) {
 		reply = c.call("callerid.set", map[string]any{"phoneNumber": "+15550009", "name": "Ada"})
 		assert.Equal(t, reply.Type, "result")
 
-		for _, typ := range []string{"callerid.list", "callerid.delete"} {
+		for _, typ := range []string{"callerid.list", "callerid.delete", "calls.all", "flowcalls.number", "users.list"} {
 			reply = c.call(typ, map[string]any{"phoneNumber": "+15550009"})
 			assert.Equal(t, reply.Type, "error")
+			assert.Equal(t, reply.Error, "permission denied")
+		}
+	})
+
+	t.Run("single feature", func(t *testing.T) {
+		admin := dial(t, srv, validToken())
+		reply := admin.call("users.setFeatures", map[string]any{"username": standardUser.Username, "features": []string{features.CallerIDs}})
+		assert.Equal(t, reply.Type, "result")
+
+		c := dial(t, srv, tokenFor(standardUser))
+		msg := c.readUntil(func(testMessage) bool { return true })
+		assert.Equal(t, string(msg.Data), `{"features":["callerIds"]}`)
+
+		reply = c.call("callerid.set", map[string]any{"phoneNumber": "+15550010", "name": "Grace"})
+		assert.Equal(t, reply.Type, "result")
+
+		// Caller IDs alone grants caller ID management and nothing else.
+		for _, typ := range []string{"callerid.list", "callerid.delete"} {
+			reply = c.call(typ, map[string]any{"phoneNumber": "+15550010"})
+			assert.Equal(t, reply.Type, "result")
+		}
+		for _, typ := range []string{"calls.all", "flowcalls.number", "users.list"} {
+			reply = c.call(typ, map[string]any{})
 			assert.Equal(t, reply.Error, "permission denied")
 		}
 	})
@@ -457,45 +473,58 @@ func TestSocketPermissions(t *testing.T) {
 	var users []managedUser
 	assert.Nil(t, json.Unmarshal(reply.Data, &users))
 	assert.Equal(t, len(users), 2)
-	assert.Equal(t, users[0], managedUser{Username: testAgent.Username, Level: flags.Admin, Source: sourceFlag})
-	assert.Equal(t, users[1], managedUser{Username: standardUser.Username, Level: flags.Standard, Source: sourceFlag})
+	assert.Equal(t, users[0].Source, sourceDB)
+	assert.Equal(t, len(users[0].Features), len(features.All))
+	assert.Equal(t, users[1].Source, sourceDefault)
+	assert.Equal(t, len(users[1].Features), 0)
 
-	reply = admin.call("users.setPermission", map[string]any{"username": testAgent.Username, "level": flags.Standard})
-	assert.Equal(t, reply.Error, "you can't change your own permission")
-	reply = admin.call("users.setPermission", map[string]any{"username": "nobody@example.com", "level": flags.Power})
+	set := func(c *testClient, username string, list ...string) testMessage {
+		return c.call("users.setFeatures", map[string]any{"username": username, "features": list})
+	}
+
+	reply = set(admin, testAgent.Username)
+	assert.Equal(t, reply.Error, "you can't change your own permissions")
+	reply = set(admin, "nobody@example.com", features.Feed)
 	assert.Equal(t, reply.Error, "user not found")
-	reply = admin.call("users.setPermission", map[string]any{"username": standardUser.Username, "level": 3})
-	assert.Equal(t, reply.Type, "error")
+	reply = set(admin, standardUser.Username, "bogus")
+	assert.Equal(t, reply.Error, "unknown feature")
 
-	// A promotion applies to the user's next request without reconnecting.
-	reply = admin.call("users.setPermission", map[string]any{"username": standardUser.Username, "level": flags.Admin})
+	// Features are de-duplicated and kept in display order.
+	reply = set(admin, standardUser.Username, features.Timeline, features.Feed, features.Feed)
 	assert.Equal(t, reply.Type, "result")
-	event := standard.readUntil(func(m testMessage) bool { return m.Type == "permission.updated" })
 	var updated managedUser
+	assert.Nil(t, json.Unmarshal(reply.Data, &updated))
+	assert.Equal(t, strings.Join(updated.Features, ","), "feed,timeline")
+	assert.Equal(t, updated.Source, sourceDB)
+
+	// Granting admin applies to the user's next request without reconnecting.
+	reply = set(admin, standardUser.Username, features.Admin)
+	assert.Equal(t, reply.Type, "result")
+	event := standard.readUntil(func(m testMessage) bool {
+		return m.Type == "permission.updated" && strings.Contains(string(m.Data), `"admin"`)
+	})
 	assert.Nil(t, json.Unmarshal(event.Data, &updated))
-	assert.Equal(t, updated, managedUser{Username: standardUser.Username, Level: flags.Admin, Source: sourceDB})
+	assert.Equal(t, updated.Username, standardUser.Username)
 
 	reply = standard.call("users.list", nil)
 	assert.Equal(t, reply.Type, "result")
 
-	// A level set in the database overrides the flag, including on connect.
-	reply = standard.call("users.setPermission", map[string]any{"username": testAgent.Username, "level": flags.Power})
+	// Saved features apply on connect too.
+	reply = set(standard, testAgent.Username, features.Feed)
 	assert.Equal(t, reply.Type, "result")
 	reply = admin.call("users.list", nil)
 	assert.Equal(t, reply.Error, "permission denied")
 
 	again := dial(t, srv, validToken())
 	msg := again.readUntil(func(testMessage) bool { return true })
-	assert.Equal(t, string(msg.Data), `{"owlchirp":1}`)
+	assert.Equal(t, string(msg.Data), `{"features":["feed"]}`)
 
-	// Resetting returns the user to their flag level.
-	reply = standard.call("users.resetPermission", map[string]any{"username": testAgent.Username})
+	// Resetting removes every feature.
+	reply = standard.call("users.resetFeatures", map[string]any{"username": testAgent.Username})
 	assert.Equal(t, reply.Type, "result")
 	assert.Nil(t, json.Unmarshal(reply.Data, &updated))
-	assert.Equal(t, updated, managedUser{Username: testAgent.Username, Level: flags.Admin, Source: sourceFlag})
-
-	reply = admin.call("users.list", nil)
-	assert.Equal(t, reply.Type, "result")
+	assert.Equal(t, len(updated.Features), 0)
+	assert.Equal(t, updated.Source, sourceDefault)
 }
 
 func TestHardcodedAdmin(t *testing.T) {
@@ -505,16 +534,17 @@ func TestHardcodedAdmin(t *testing.T) {
 	srv := newTestServer(t)
 	c := dial(t, srv, tokenFor(standardUser))
 	msg := c.readUntil(func(testMessage) bool { return true })
-	assert.Equal(t, string(msg.Data), `{"owlchirp":2}`)
+	assert.True(t, strings.Contains(string(msg.Data), `"admin"`))
 
 	admin := dial(t, srv, validToken())
-	reply := admin.call("users.setPermission", map[string]any{"username": standardUser.Username, "level": flags.Standard})
+	reply := admin.call("users.setFeatures", map[string]any{"username": standardUser.Username, "features": []string{}})
 	assert.Equal(t, reply.Error, "this user is always an admin")
-	reply = admin.call("users.resetPermission", map[string]any{"username": standardUser.Username})
+	reply = admin.call("users.resetFeatures", map[string]any{"username": standardUser.Username})
 	assert.Equal(t, reply.Error, "this user is always an admin")
 
 	reply = admin.call("users.list", nil)
 	var users []managedUser
 	assert.Nil(t, json.Unmarshal(reply.Data, &users))
-	assert.Equal(t, users[1], managedUser{Username: standardUser.Username, Level: flags.Admin, Source: sourceHardcoded})
+	assert.Equal(t, users[1].Source, sourceHardcoded)
+	assert.Equal(t, len(users[1].Features), len(features.All))
 }

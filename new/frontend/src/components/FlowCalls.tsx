@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { flowStage, isLive, loadFlowCalls, type FlowStage } from '../lib/flowCalls';
 import { formatCallTime, formatSecondsToTime, normalizePhoneNumber } from '../lib/helpers';
-import { $config, $flowCalls, $isAdmin, $view, type FlowCall } from '../lib/stores';
+import { $can, $config, $flowCalls, $view, type FlowCall } from '../lib/stores';
 import { loadNumberFeed } from '../lib/wrapups';
 import { Button, Card, Icon, PhoneLabel, formatElapsed, useNow } from './ui';
 
@@ -86,7 +86,7 @@ function LiveRow({ call, now }: { call: FlowCall; now: number }) {
   );
 }
 
-function HistoryRow({ call, isAdmin }: { call: FlowCall; isAdmin: boolean }) {
+function HistoryRow({ call, showNames }: { call: FlowCall; showNames: boolean }) {
   const stage = flowStage(call);
   // Time in the flow ends at enqueue, or at hang-up/answer if never queued.
   const flowEnd = call.enqueuedAt || call.connectedAt || call.disconnectedAt;
@@ -105,7 +105,7 @@ function HistoryRow({ call, isAdmin }: { call: FlowCall; isAdmin: boolean }) {
       <td className="px-4 py-2 tabular-nums" title={call.queueName || undefined}>
         {call.enqueuedAt && queueEnd ? formatSecondsToTime(seconds(call.enqueuedAt, queueEnd)) : '—'}
       </td>
-      {isAdmin && <td className="px-4 py-2">{call.agentName || '—'}</td>}
+      {showNames && <td className="px-4 py-2">{call.agentName || '—'}</td>}
       <td className="px-4 py-2">
         <ConnectLink contactId={call.contactId} />
       </td>
@@ -115,7 +115,7 @@ function HistoryRow({ call, isAdmin }: { call: FlowCall; isAdmin: boolean }) {
 
 export default function FlowCalls() {
   const calls = useStore($flowCalls);
-  const isAdmin = useStore($isAdmin);
+  const showNames = useStore($can('agentNames'));
   const now = useNow();
   const [error, setError] = useState<string | null>(null);
 
@@ -166,13 +166,13 @@ export default function FlowCalls() {
                   <th className="px-4 py-2 font-semibold">Outcome</th>
                   <th className="px-4 py-2 font-semibold">In flow</th>
                   <th className="px-4 py-2 font-semibold">In queue</th>
-                  {isAdmin && <th className="px-4 py-2 font-semibold">Agent</th>}
+                  {showNames && <th className="px-4 py-2 font-semibold">Agent</th>}
                   <th className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {history.map((call) => (
-                  <HistoryRow key={call.contactId} call={call} isAdmin={isAdmin} />
+                  <HistoryRow key={call.contactId} call={call} showNames={showNames} />
                 ))}
               </tbody>
             </table>

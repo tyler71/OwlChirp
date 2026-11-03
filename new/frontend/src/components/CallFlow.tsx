@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { CURSOR_HELP_CLASS, STATUS_AFTERCALL, STATUS_AVAILABLE, STATUS_ON_CALL } from '../lib/const';
 import { flowStage, type FlowStage } from '../lib/flowCalls';
-import { $flowCalls, $isPower, $metrics, agentCountLabel, type ActiveUser } from '../lib/stores';
+import { $flowCalls, $can, $metrics, agentCountLabel, type ActiveUser } from '../lib/stores';
 import { Card } from './ui';
 import { STATUS_EMOJI, statusClass } from './VisualAgentList';
 
@@ -78,7 +78,7 @@ function AgentRow({ user, highlight }: { user: ActiveUser; highlight: boolean })
 }
 
 export default function CallFlow() {
-  const isPower = useStore($isPower);
+  const canFlow = useStore($can('flow'));
   const calls = useStore($flowCalls);
   const metrics = useStore($metrics, { keys: ['user_list', 'available_count', 'active_agent_count'] });
   const userList = metrics.user_list;
@@ -123,7 +123,7 @@ export default function CallFlow() {
     }
   }, [calls]);
 
-  if (!isPower) return null;
+  if (!canFlow) return null;
 
   const counts = { flow: 0, queued: 0 };
   for (const c of calls ?? []) {

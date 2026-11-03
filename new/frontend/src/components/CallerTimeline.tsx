@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { flowStage } from '../lib/flowCalls';
 import { usePhoneLabel } from '../lib/callerId';
 import { agentName } from '../lib/helpers';
-import { $contactSnapshot, $isPower, $numberCalls } from '../lib/stores';
+import { $can, $contactSnapshot, $numberCalls } from '../lib/stores';
 import { ConnectLink, StageBadge } from './FlowCalls';
 import { dayLabel, timeFormat } from './Timeline';
 import { Card } from './ui';
@@ -14,11 +14,11 @@ import { Card } from './ui';
  */
 export default function CallerTimeline() {
   const contact = useStore($contactSnapshot);
-  const isPower = useStore($isPower);
+  const canHistory = useStore($can('callerHistory'));
   const history = useStore($numberCalls);
   const caller = usePhoneLabel(contact?.phoneNumber ?? '');
 
-  if (!isPower || !contact?.phoneNumber || history?.phoneNumber !== contact.phoneNumber) return null;
+  if (!canHistory || !contact?.phoneNumber || history?.phoneNumber !== contact.phoneNumber) return null;
 
   const { calls, loading } = history;
 

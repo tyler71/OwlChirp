@@ -2,13 +2,13 @@ import { useStore } from '@nanostores/react';
 
 import { LOADING_CLASS } from '../lib/const';
 import { agentName, formatCallTime } from '../lib/helpers';
-import { $isAdmin, $wrapups, type Wrapup } from '../lib/stores';
+import { $can, $wrapups, type Wrapup } from '../lib/stores';
 import { MOODS } from '../lib/wrapups';
 import { Icon } from './ui';
 
 function Entry({ wrapup }: { wrapup: Wrapup }) {
   const mood = MOODS.find((m) => m.value === wrapup.mood);
-  const isAdmin = useStore($isAdmin);
+  const showNames = useStore($can('agentNames'));
   return (
     <li className="flex gap-3 px-4 py-2.5">
       <span className="w-6 flex-none text-center text-lg leading-6" title={mood?.label} aria-label={mood?.label}>
@@ -17,7 +17,7 @@ function Entry({ wrapup }: { wrapup: Wrapup }) {
       <div className="min-w-0 grow">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-500 dark:text-secondary-400">
           <time dateTime={new Date(wrapup.timestamp).toISOString()}>{formatCallTime(wrapup.timestamp)}</time>
-          {isAdmin && <span>· {agentName(wrapup.agent)}</span>}
+          {showNames && <span>· {agentName(wrapup.agent)}</span>}
           {wrapup.incident && (
             <span className="rounded-md bg-secondary-100 px-1.5 py-0.5 font-mono font-medium text-base-content dark:bg-secondary-800">
               {wrapup.incident}

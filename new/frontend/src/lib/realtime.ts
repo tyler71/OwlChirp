@@ -1,7 +1,7 @@
 import { apiKey } from './auth';
 import { API } from './const';
 import { sleep } from './helpers';
-import { $agent, $alert, $metrics, $permission, $wsStatus, type Metrics } from './stores';
+import { $agent, $alert, $features, $metrics, $wsStatus, type Feature, type Metrics } from './stores';
 
 const FAIL_MESSAGE = 'Realtime connection lost; restoring...';
 const MIN_RETRY_SECONDS = 2;
@@ -36,14 +36,14 @@ export function onEvent<T>(type: string, handler: (data: T) => void): () => void
   return () => handlers.delete(handler);
 }
 
-onEvent<{ owlchirp: number }>('flags', (data) => {
-  $permission.set(data.owlchirp ?? 0);
+onEvent<{ features: Feature[] }>('features', (data) => {
+  $features.set(data.features ?? []);
 });
 
 // An admin changed someone's permission; follow it when it's this agent.
-onEvent<{ username: string; level: number }>('permission.updated', ({ username, level }) => {
+onEvent<{ username: string; features: Feature[] }>('permission.updated', ({ username, features }) => {
   if (username === $agent.get()?.getConfiguration().username) {
-    $permission.set(level);
+    $features.set(features);
   }
 });
 

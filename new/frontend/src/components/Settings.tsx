@@ -99,9 +99,9 @@ export default function Settings() {
           }}
         />
         <span className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold">Alert me to help at queue count</span>
+          <span className="text-sm font-semibold">High queue count alert</span>
           <span className="text-xs text-secondary-500 dark:text-secondary-400">
-            When you're not routable and the queue rises to this number. 0 turns it off.
+            When you're not taking calls and the queue rises, this will send an alert. 0 to disable
           </span>
         </span>
       </label>

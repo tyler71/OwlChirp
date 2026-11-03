@@ -18,7 +18,6 @@ import (
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
 	"github.com/tyler71/owlchirp/app/internal/env"
-	"github.com/tyler71/owlchirp/app/internal/flags"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
 	"github.com/tyler71/owlchirp/app/internal/version"
 
@@ -64,18 +63,10 @@ type config struct {
 		timeZone     string
 		telemetryURL string
 	}
-	flags struct {
-		endpoint string
-		apiKey   string
-	}
 	flowCalls struct {
 		interval  time.Duration
 		retention time.Duration
 	}
-}
-
-type flagEvaluator interface {
-	Permission(ctx context.Context, username string) int
 }
 
 type application struct {
@@ -85,7 +76,6 @@ type application struct {
 	auth     *auth.Verifier
 	users    auth.UserSource
 	hub      *realtime.Hub
-	flags    flagEvaluator
 	perms    *permissionStore
 	handlers map[string]wsHandler
 	timeline *cache.Value[flowTimeline]
@@ -112,8 +102,6 @@ func run(logger *slog.Logger) error {
 	cfg.frontend.timeZone = env.GetString("TIME_ZONE", "UTC")
 	cfg.frontend.telemetryURL = env.GetString("TELEMETRY_URL", "")
 
-	cfg.flags.endpoint = env.GetString("GOFF_ENDPOINT", "https://flag.sandcatdev.com")
-	cfg.flags.apiKey = env.GetString("GOFF_API_KEY", "")
 
 	cfg.flowCalls.interval = time.Duration(env.GetInt("FLOW_POLL_INTERVAL", 5)) * time.Second
 	// Keep at least the timeline's window so it never shows pruned gaps.
@@ -143,18 +131,9 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("connect client: %w", err)
 	}
 
-	if cfg.flags.endpoint == "" {
-		logger.Warn("GOFF_ENDPOINT is empty; feature flags disabled, everyone gets standard permission")
-	}
-	ff, err := flags.New(cfg.flags.endpoint, cfg.flags.apiKey, logger)
+	featureSets, err := db.ListFeatures(ctx)
 	if err != nil {
-		return fmt.Errorf("feature flags: %w", err)
-	}
-	defer ff.Close()
-
-	levels, err := db.ListPermissions(ctx)
-	if err != nil {
-		return fmt.Errorf("load permissions: %w", err)
+		return fmt.Errorf("load features: %w", err)
 	}
 
 	app := &application{
@@ -164,8 +143,7 @@ func run(logger *slog.Logger) error {
 		auth:    auth.NewVerifier(cc),
 		users:   cc,
 		hub:     realtime.NewHub(cc.Snapshot, time.Second, logger),
-		flags:   ff,
-		perms:   newPermissionStore(levels),
+		perms:   newPermissionStore(featureSets),
 		logger:  logger,
 	}
 

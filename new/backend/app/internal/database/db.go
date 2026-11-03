@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/tyler71/owlchirp/app/assets"
+	"github.com/tyler71/owlchirp/app/internal/features"
 
 	"github.com/jmoiron/sqlx"
 	_ "modernc.org/sqlite"
@@ -64,7 +65,52 @@ func migrate(ctx context.Context, db *sqlx.DB) error {
 	}
 	_, err = db.ExecContext(ctx,
 		`CREATE INDEX IF NOT EXISTS ix_flow_calls_phone ON flow_calls (phone_number, initiated_at)`)
-	return err
+	if err != nil {
+		return err
+	}
+	return migratePermissions(ctx, db)
+}
+
+// migratePermissions converts the old user_permissions levels (0 standard,
+// 1 power, 2 admin) to user_features presets, then drops the old table.
+func migratePermissions(ctx context.Context, db *sqlx.DB) error {
+	var exists int
+	err := db.GetContext(ctx, &exists,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'user_permissions'`)
+	if err != nil || exists == 0 {
+		return err
+	}
+
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var rows []struct {
+		UserID int64         `db:"user_id"`
+		Level  sql.NullInt64 `db:"level"`
+	}
+	if err := tx.SelectContext(ctx, &rows, `SELECT user_id, level FROM user_permissions`); err != nil {
+		return err
+	}
+	ts := now()
+	for _, r := range rows {
+		data, err := json.Marshal(features.FromLevel(int(r.Level.Int64)))
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx,
+			`INSERT OR IGNORE INTO user_features (user_id, features, created_on, updated_on) VALUES (?, ?, ?, ?)`,
+			r.UserID, string(data), ts, ts)
+		if err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DROP TABLE user_permissions`); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ensureColumn adds column to table unless it already exists.
@@ -313,31 +359,42 @@ func (db *DB) DeleteCallerID(ctx context.Context, phoneNumber string) (bool, err
 	return n > 0, err
 }
 
-// ListPermissions returns the permission level set for each user, keyed by
-// username.
-func (db *DB) ListPermissions(ctx context.Context) (map[string]int, error) {
+// ListFeatures returns the features set for each user, keyed by username.
+func (db *DB) ListFeatures(ctx context.Context) (map[string][]string, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	var rows []struct {
 		Username string `db:"username"`
-		Level    int    `db:"level"`
+		Features string `db:"features"`
 	}
 	err := db.SelectContext(ctx, &rows,
-		`SELECT u.username, p.level FROM user_permissions p JOIN users u ON u.id = p.user_id`)
+		`SELECT u.username, f.features FROM user_features f JOIN users u ON u.id = f.user_id`)
 	if err != nil {
 		return nil, err
 	}
 
-	levels := make(map[string]int, len(rows))
+	sets := make(map[string][]string, len(rows))
 	for _, r := range rows {
-		levels[r.Username] = r.Level
+		var list []string
+		if err := json.Unmarshal([]byte(r.Features), &list); err != nil {
+			return nil, err
+		}
+		sets[r.Username] = list
 	}
-	return levels, nil
+	return sets, nil
 }
 
-func (db *DB) SetPermission(ctx context.Context, username string, level int) error {
+// SetFeatures saves the features granted to username.
+func (db *DB) SetFeatures(ctx context.Context, username string, list []string) error {
 	userID, err := db.GetOrCreateUser(ctx, username)
+	if err != nil {
+		return err
+	}
+	if list == nil {
+		list = []string{}
+	}
+	data, err := json.Marshal(list)
 	if err != nil {
 		return err
 	}
@@ -347,20 +404,20 @@ func (db *DB) SetPermission(ctx context.Context, username string, level int) err
 
 	ts := now()
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO user_permissions (user_id, level, created_on, updated_on) VALUES (?, ?, ?, ?)
-		 ON CONFLICT (user_id) DO UPDATE SET level = excluded.level, updated_on = excluded.updated_on`,
-		userID, level, ts, ts)
+		`INSERT INTO user_features (user_id, features, created_on, updated_on) VALUES (?, ?, ?, ?)
+		 ON CONFLICT (user_id) DO UPDATE SET features = excluded.features, updated_on = excluded.updated_on`,
+		userID, string(data), ts, ts)
 	return err
 }
 
-// DeletePermission removes the level set for username and reports whether
-// there was one.
-func (db *DB) DeletePermission(ctx context.Context, username string) (bool, error) {
+// DeleteFeatures removes the features set for username and reports whether
+// there were any.
+func (db *DB) DeleteFeatures(ctx context.Context, username string) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	res, err := db.ExecContext(ctx,
-		`DELETE FROM user_permissions WHERE user_id = (SELECT id FROM users WHERE username = ?)`, username)
+		`DELETE FROM user_features WHERE user_id = (SELECT id FROM users WHERE username = ?)`, username)
 	if err != nil {
 		return false, err
 	}

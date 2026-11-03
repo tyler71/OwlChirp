@@ -13,7 +13,7 @@ import (
 
 	"github.com/tyler71/owlchirp/app/internal/connect"
 	"github.com/tyler71/owlchirp/app/internal/database"
-	"github.com/tyler71/owlchirp/app/internal/flags"
+	"github.com/tyler71/owlchirp/app/internal/features"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
 )
 
@@ -68,27 +68,27 @@ func (app *application) wsHandlers() map[string]wsHandler {
 		"flowcalls.number":      app.wsFlowCallsByNumber,
 		"help.request":          app.wsRequestHelp,
 		"users.list":            app.wsListUsers,
-		"users.setPermission":   app.wsSetPermission,
-		"users.resetPermission": app.wsResetPermission,
+		"users.setFeatures":     app.wsSetFeatures,
+		"users.resetFeatures":   app.wsResetFeatures,
 	}
 }
 
-// requestPermission lists requests that need more than flags.Standard.
-var requestPermission = map[string]int{
-	"calls.all":        flags.Admin,
-	"flowcalls.number": flags.Power,
-	"callerid.list":    flags.Admin, "callerid.delete": flags.Admin,
-	"users.list": flags.Admin, "users.setPermission": flags.Admin, "users.resetPermission": flags.Admin,
+// requestFeature lists requests that need a feature; the rest are open to
+// every user.
+var requestFeature = map[string]string{
+	"calls.all":        features.CallsAll,
+	"flowcalls.number": features.CallerHistory,
+	"callerid.list":    features.CallerIDs, "callerid.delete": features.CallerIDs,
+	"users.list": features.Admin, "users.setFeatures": features.Admin, "users.resetFeatures": features.Admin,
 }
 
-// handleRequest serves req. flagLevel is the user's feature flag level; a
-// level set by an admin overrides it.
-func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, flagLevel int, req wsRequest) wsReply {
+// handleRequest serves req if user has the feature it needs.
+func (app *application) handleRequest(ctx context.Context, user connect.RegisteredUser, req wsRequest) wsReply {
 	handler, ok := app.handlers[req.Type]
 	if !ok {
 		return wsReply{ID: req.ID, Type: "error", Error: fmt.Sprintf("unknown request type %q", req.Type)}
 	}
-	if app.perms.level(user.Username, flagLevel) < requestPermission[req.Type] {
+	if f, ok := requestFeature[req.Type]; ok && !app.perms.has(user.Username, f) {
 		return wsReply{ID: req.ID, Type: "error", Error: "permission denied"}
 	}
 

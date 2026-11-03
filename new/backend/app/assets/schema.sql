@@ -54,11 +54,11 @@ CREATE TABLE IF NOT EXISTS user_settings (
 	updated_on DATETIME
 );
 
--- Permission level an admin set for a user (0 standard, 1 power, 2 admin);
--- overrides the owlchirp feature flag. One row per user.
-CREATE TABLE IF NOT EXISTS user_permissions (
+-- Features an admin granted to a user, as a JSON array of feature keys
+-- (see internal/features). Users without a row get no features.
+CREATE TABLE IF NOT EXISTS user_features (
 	user_id INTEGER NOT NULL PRIMARY KEY REFERENCES users (id),
-	level INTEGER NOT NULL,
+	features TEXT NOT NULL,
 	created_on DATETIME,
 	updated_on DATETIME
 );
