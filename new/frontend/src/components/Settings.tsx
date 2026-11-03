@@ -5,9 +5,11 @@ import { downloadCcpLog } from '../lib/ccp';
 import { $view } from '../lib/stores';
 import {
   $followTeamMeeting,
+  $helpQueueThreshold,
   $hideCallerIds,
   $theme,
   setFollowTeamMeeting,
+  setHelpQueueThreshold,
   setHideCallerIds,
   setTheme,
   THEMES,
@@ -51,6 +53,7 @@ export default function Settings() {
   const theme = useStore($theme);
   const followTeamMeeting = useStore($followTeamMeeting);
   const hideCallerIds = useStore($hideCallerIds);
+  const helpQueueThreshold = useStore($helpQueueThreshold);
   const [showThemes, setShowThemes] = useState(false)
   return (
     <>
@@ -81,6 +84,24 @@ export default function Settings() {
           <span className="text-sm font-semibold">Auto switch to in a meeting</span>
           <span className="text-xs text-secondary-500 dark:text-secondary-400">
             Switches when 75% of users are "In a Meeting"
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 px-4 pb-4">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          className="input input-sm w-20"
+          value={helpQueueThreshold}
+          onChange={(e) => {
+            if (e.target.value !== '') void setHelpQueueThreshold(e.target.valueAsNumber);
+          }}
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold">Alert me to help at queue count</span>
+          <span className="text-xs text-secondary-500 dark:text-secondary-400">
+            When you're not routable and the queue rises to this number. 0 turns it off.
           </span>
         </span>
       </label>

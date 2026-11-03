@@ -206,6 +206,15 @@ func TestSettings(t *testing.T) {
 	assert.Equal(t, s.Theme, "nord")
 	assert.Equal(t, s.FollowTeamMeeting, true)
 	assert.Equal(t, s.HideCallerIDs, true)
+	assert.Nil(t, s.HelpQueueThreshold)
+
+	off := 0
+	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "nord", HelpQueueThreshold: &off})
+	assert.Nil(t, err)
+	s, err = db.GetSettings(ctx, "alice")
+	assert.Nil(t, err)
+	assert.NotNil(t, s.HelpQueueThreshold)
+	assert.Equal(t, *s.HelpQueueThreshold, 0)
 
 	s, err = db.GetSettings(ctx, "bob")
 	assert.Nil(t, err)

@@ -53,6 +53,8 @@ export const LONG_BREAK_NOTIFICATION_INTERVAL = 60;
 export const LONG_BREAK_SNOOZE_MINUTES = 15;
 
 export const MAX_QUEUE_COUNT = 1;
+// Default queue count at which a non-routable agent is alerted to help.
+export const DEFAULT_HELP_QUEUE_THRESHOLD = 2;
 export const MIN_AGENT_STAFFED = 1;
 
 // Matches the server's per-agent help request cooldown.

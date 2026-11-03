@@ -1,9 +1,9 @@
 import { useStore } from '@nanostores/react';
 import { useEffect, useRef, useState } from 'react';
 
-import { STATUS_AFTERCALL, STATUS_AVAILABLE, STATUS_ON_CALL } from '../lib/const';
+import { CURSOR_HELP_CLASS, STATUS_AFTERCALL, STATUS_AVAILABLE, STATUS_ON_CALL } from '../lib/const';
 import { flowStage, type FlowStage } from '../lib/flowCalls';
-import { $flowCalls, $isPower, $metrics, type ActiveUser } from '../lib/stores';
+import { $flowCalls, $isPower, $metrics, agentCountLabel, type ActiveUser } from '../lib/stores';
 import { Card } from './ui';
 import { STATUS_EMOJI, statusClass } from './VisualAgentList';
 
@@ -80,7 +80,9 @@ function AgentRow({ user, highlight }: { user: ActiveUser; highlight: boolean })
 export default function CallFlow() {
   const isPower = useStore($isPower);
   const calls = useStore($flowCalls);
-  const userList = useStore($metrics, { keys: ['user_list'] }).user_list;
+  const metrics = useStore($metrics, { keys: ['user_list', 'available_count', 'active_agent_count'] });
+  const userList = metrics.user_list;
+  const agentCount = agentCountLabel(metrics);
 
   const [dots, setDots] = useState<Dot[]>([]);
   const [highlights, setHighlights] = useState<Set<string>>(new Set());
@@ -150,7 +152,14 @@ export default function CallFlow() {
         <Connector active={counts.queued > 0} dots={dots.filter((d) => d.track === 1)} onDone={removeDot} />
         <div className="w-44 flex-none rounded-lg border border-secondary-200 bg-secondary-50 dark:border-secondary-700 dark:bg-secondary-800/50 xl:w-52">
           <div className="flex items-center justify-between border-b border-secondary-200 px-2 py-1.5 text-xs font-semibold dark:border-secondary-700">
-            <span>Taking calls ({agents.length})</span>
+            <span>
+              Taking calls{' '}
+              {agentCount && (
+                <span className={`${CURSOR_HELP_CLASS} tabular-nums`} title={agentCount.title}>
+                  {agentCount.text}
+                </span>
+              )}
+            </span>
             {onCall > 0 && <span className="text-primary-600 dark:text-primary-300">{onCall} on call</span>}
           </div>
           {userList === undefined && <p className="px-2 py-2 text-xs text-secondary-500">Loading…</p>}

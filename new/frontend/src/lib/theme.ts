@@ -1,5 +1,6 @@
 import { persistentAtom } from '@nanostores/persistent';
 
+import { DEFAULT_HELP_QUEUE_THRESHOLD } from './const';
 import { request } from './realtime';
 import { $alert, $wsStatus } from './stores';
 
@@ -37,7 +38,21 @@ export const $hideCallerIds = persistentAtom<boolean>('owlchirp:hideCallerIds', 
   decode: (v) => v === 'true',
 });
 
-type Settings = { theme: string; followTeamMeeting?: boolean; hideCallerIds?: boolean };
+// Queue count at which a non-routable agent is alerted to help (0 = off).
+export const $helpQueueThreshold = persistentAtom<number>('owlchirp:helpQueueThreshold', DEFAULT_HELP_QUEUE_THRESHOLD, {
+  encode: String,
+  decode: (v) => {
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 0 ? n : DEFAULT_HELP_QUEUE_THRESHOLD;
+  },
+});
+
+type Settings = {
+  theme: string;
+  followTeamMeeting?: boolean;
+  hideCallerIds?: boolean;
+  helpQueueThreshold?: number;
+};
 
 function isThemeChoice(name: string): name is ThemeChoice {
   return name === 'system' || (THEMES as readonly string[]).includes(name);
@@ -50,6 +65,7 @@ async function saveSettings(what: string): Promise<void> {
       theme: $theme.get(),
       followTeamMeeting: $followTeamMeeting.get(),
       hideCallerIds: $hideCallerIds.get(),
+      helpQueueThreshold: $helpQueueThreshold.get(),
     });
   } catch (e) {
     console.error('save settings', e);
@@ -72,6 +88,11 @@ export function setHideCallerIds(hidden: boolean): Promise<void> {
   return saveSettings('Caller ID setting');
 }
 
+export function setHelpQueueThreshold(count: number): Promise<void> {
+  $helpQueueThreshold.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : DEFAULT_HELP_QUEUE_THRESHOLD);
+  return saveSettings('Help alert setting');
+}
+
 // On each (re)connect the server's settings win. An account with none saved
 // adopts this browser's choices, carrying over themes picked before settings
 // moved to the server.
@@ -82,7 +103,13 @@ async function syncSettings(): Promise<void> {
       $theme.set(settings.theme);
       $followTeamMeeting.set(settings.followTeamMeeting ?? false);
       $hideCallerIds.set(settings.hideCallerIds ?? false);
-    } else if ($theme.get() !== 'system' || $followTeamMeeting.get() || $hideCallerIds.get()) {
+      $helpQueueThreshold.set(settings.helpQueueThreshold ?? DEFAULT_HELP_QUEUE_THRESHOLD);
+    } else if (
+      $theme.get() !== 'system' ||
+      $followTeamMeeting.get() ||
+      $hideCallerIds.get() ||
+      $helpQueueThreshold.get() !== DEFAULT_HELP_QUEUE_THRESHOLD
+    ) {
       await saveSettings('Settings');
     }
   } catch {

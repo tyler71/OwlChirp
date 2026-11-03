@@ -1,6 +1,6 @@
 import { atom, computed, map } from 'nanostores';
 import { persistentAtom, persistentMap } from '@nanostores/persistent';
-import type { STATUS } from './const';
+import { SIDELINE_STATUSES, type STATUS } from './const';
 
 export type AppConfig = {
   connectDomain: string;
@@ -22,6 +22,20 @@ export type Metrics = {
   user_list?: ActiveUser[];
   handled_incoming?: number;
 };
+
+// "available/active+sideline" agent counter (e.g. 0/3+2) with its tooltip,
+// or null until the counts and user list have loaded.
+export function agentCountLabel(m: Metrics): { text: string; title: string } | null {
+  const { available_count, active_agent_count, user_list } = m;
+  if (available_count === undefined || active_agent_count === undefined || user_list === undefined) return null;
+  const sideline = user_list.filter((u) => SIDELINE_STATUSES.has(u.status.name.toLowerCase())).length;
+  return {
+    text: `${available_count}/${active_agent_count}${sideline > 0 ? `+${sideline}` : ''}`,
+    title:
+      `${available_count} able to take a call now, ${active_agent_count} taking calls.` +
+      (sideline > 0 ? ` ${sideline} ready to help` : ''),
+  };
+}
 
 // A Recent Calls entry. Inbound calls the flow poller saw carry their Connect
 // details (ms epoch); calls only a browser logged (e.g. outbound) don't.

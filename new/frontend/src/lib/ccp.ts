@@ -26,6 +26,7 @@ import { authorize, notify, snooze } from './notifier';
 import { startRealtime } from './realtime';
 import { installConsoleCapture } from './systemLog';
 import { trackAgent, trackContact } from './softphone';
+import { $helpQueueThreshold } from './theme';
 import { $agent, $alert, $config, $metrics, $storageAccess, type AppConfig } from './stores';
 
 export async function loadConfig(): Promise<AppConfig> {
@@ -178,11 +179,20 @@ function checkStateDuration(agent: connect.Agent): void {
   );
 }
 
+// Last queue count seen, so sideline alerts fire only as the queue grows.
+let lastQueueCount = 0;
+
 function notifyQueueCount(value: number): void {
-  if (value <= MAX_QUEUE_COUNT) return;
+  const previous = lastQueueCount;
+  lastQueueCount = value;
 
   if (agentSideline()) {
-    notify(`Queue Count is ${value}!\nCan you help?`, 'Callers Waiting', 'queueCount', HIGH_QUEUE_COUNT_NOTIFICATION_INTERVAL);
+    const threshold = $helpQueueThreshold.get();
+    if (threshold > 0 && value > previous && value >= threshold) {
+      notify(`Queue Count is ${value}!\nCan you help?`, 'Callers Waiting', 'queueCount');
+    }
+  } else if (value <= MAX_QUEUE_COUNT) {
+    return;
   } else if ($agent.get()?.getState().name.toLowerCase() === STATUS_ON_CONTACT) {
     notify(
       `Queue Count is ${value}\nWe're asking for help!`,

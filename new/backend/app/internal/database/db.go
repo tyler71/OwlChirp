@@ -432,6 +432,9 @@ type Settings struct {
 	// HideCallerIDs opts out of showing saved caller ID names in place of
 	// phone numbers.
 	HideCallerIDs bool `json:"hideCallerIds"`
+	// HelpQueueThreshold is the queue count at which a non-routable agent is
+	// alerted to help as the queue grows. nil means the client default; 0 is off.
+	HelpQueueThreshold *int `json:"helpQueueThreshold,omitempty"`
 }
 
 // GetSettings returns zero Settings when the user has saved none.

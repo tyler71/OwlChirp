@@ -5,10 +5,9 @@ import {
   LOADING_CLASS,
   MAX_QUEUE_COUNT,
   MIN_AGENT_STAFFED,
-  SIDELINE_STATUSES,
   TABLE_ALERT_CLASS,
 } from '../lib/const';
-import { $metrics } from '../lib/stores';
+import { $metrics, agentCountLabel } from '../lib/stores';
 import { Card } from './ui';
 
 const KEY_CLASS = 'px-4 py-2.5 text-secondary-600 select-none dark:text-secondary-400';
@@ -20,20 +19,10 @@ function Loading() {
 
 export default function MetricsTable() {
   const metrics = useStore($metrics);
-  const { queue_count, available_count, active_agent_count, user_list } = metrics;
+  const { queue_count, active_agent_count } = metrics;
 
   const queueLoaded = queue_count !== undefined;
-  const agentsLoaded = available_count !== undefined && active_agent_count !== undefined && user_list !== undefined;
-
-  let agentsText = '';
-  let agentsTitle = '';
-  if (agentsLoaded) {
-    const sideline = user_list.filter((u) => SIDELINE_STATUSES.has(u.status.name.toLowerCase())).length;
-    agentsText = `${available_count}/${active_agent_count}${sideline > 0 ? `+${sideline}` : ''}`;
-    agentsTitle =
-      `${available_count} able to take a call now, ${active_agent_count} taking calls.` +
-      (sideline > 0 ? ` ${sideline} ready to help` : '');
-  }
+  const agents = agentCountLabel(metrics);
 
   return (
     <Card title="Queue">
@@ -45,11 +34,11 @@ export default function MetricsTable() {
           </tr>
           <tr
             id="availableAgentCount"
-            className={agentsLoaded && active_agent_count <= MIN_AGENT_STAFFED ? TABLE_ALERT_CLASS : undefined}
+            className={agents && active_agent_count! <= MIN_AGENT_STAFFED ? TABLE_ALERT_CLASS : undefined}
           >
             <td className={KEY_CLASS}>Available Agents</td>
-            <td className={`${VALUE_CLASS} ${CURSOR_HELP_CLASS}`} title={agentsTitle || undefined}>
-              {agentsLoaded ? agentsText : <Loading />}
+            <td className={`${VALUE_CLASS} ${CURSOR_HELP_CLASS}`} title={agents?.title}>
+              {agents ? agents.text : <Loading />}
             </td>
           </tr>
         </tbody>
