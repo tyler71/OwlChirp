@@ -26,6 +26,7 @@ import AlertSection from './AlertSection';
 import AskForHelpButton from './AskForHelpButton';
 import CallerIds from './CallerIds';
 import CallerTimeline from './CallerTimeline';
+import CallFlow from './CallFlow';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
 import Ccp from './Ccp';
@@ -336,7 +337,8 @@ export default function App() {
                   <CallPanel />
                   <TabbedFunctions />
                 </div>
-                <div className="hidden lg:col-span-2 lg:block">
+                <div className="hidden flex-col gap-6 lg:col-span-2 lg:flex">
+                  <CallFlow />
                   <CallerTimeline />
                 </div>
               </div>

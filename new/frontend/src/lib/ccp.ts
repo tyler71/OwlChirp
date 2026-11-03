@@ -6,7 +6,7 @@ import 'amazon-connect-streams';
 import { addCall, refreshCalls } from './callHistory';
 import { loadCallerId } from './callerId';
 import { loadWrapups } from './wrapups';
-import { loadNumberCalls } from './flowCalls';
+import './flowCalls';
 import {
   API,
   BREAK_STATUSES,
@@ -26,7 +26,7 @@ import { authorize, notify, snooze } from './notifier';
 import { startRealtime } from './realtime';
 import { installConsoleCapture } from './systemLog';
 import { trackAgent, trackContact } from './softphone';
-import { $agent, $alert, $config, $isPower, $metrics, $storageAccess, type AppConfig } from './stores';
+import { $agent, $alert, $config, $metrics, $storageAccess, type AppConfig } from './stores';
 
 export async function loadConfig(): Promise<AppConfig> {
   const existing = $config.get();
@@ -142,7 +142,6 @@ async function onIncomingCall(contact: connect.Contact): Promise<void> {
   await Promise.all([
     loadCallerId(phoneNumber).catch((e) => console.error('loadCallerId', e)),
     loadWrapups(phoneNumber),
-    $isPower.get() && phoneNumber ? loadNumberCalls(phoneNumber) : undefined,
     addCall(contactId, phoneNumber),
   ]);
 

@@ -1,7 +1,11 @@
 set dotenv-load
 
 backend_port := env("APP_PORT", "4444")
+image_host := "559610805985.dkr.ecr.us-west-2.amazonaws.com"
 image_name := "owlchirp"
+
+docker-login token:
+  echo '{{ token }}' | docker login --username AWS --password-stdin 559610805985.dkr.ecr.us-west-2.amazonaws.com
 
 default:
     @just --list
@@ -50,7 +54,14 @@ test:
     cd backend && go test -race ./...
     cd frontend && pnpm astro check
 
+deploy: docker
+    #!/usr/bin/env bash
+    today="$(echo -n v2-$(date +%m-%d-%y))"
+    docker image push {{ image_host }}/{{ image_name }}:"$today"
+
 # Build the Docker image (frontend + backend)
 docker:
+    #!/usr/bin/env bash
+    today="$(echo -n v2-$(date +%m-%d-%y))"
     docker build --progress plain --build-arg VERSION="$(git -C backend rev-parse --short HEAD 2>/dev/null || echo dev)" \
-        -t {{ image_name }} -f ./Dockerfile .
+      -t {{ image_host }}/{{ image_name }}:"$today" -f ./Dockerfile .

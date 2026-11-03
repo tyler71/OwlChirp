@@ -21,7 +21,7 @@ import {
 import { $metrics, type ActiveUser } from '../lib/stores';
 
 // Rendered via ::after on each agent chip (see data-emoji below).
-const STATUS_EMOJI: Record<string, string> = {
+export const STATUS_EMOJI: Record<string, string> = {
   [STATUS_AVAILABLE]: '',
   [STATUS_ON_CALL]: '📞',
   [STATUS_ON_CONTACT]: '💬',

@@ -52,3 +52,41 @@
     cursor: pointer;
   }
 }
+
+/* Call flow card (CallFlow.tsx) */
+@theme {
+  --animate-flow-travel: flow-travel 0.9s ease-in-out forwards;
+  --animate-flow-drop: flow-drop 0.9s ease-out forwards;
+  --animate-flow-pop: flow-pop 0.35s ease-out;
+
+  @keyframes flow-travel {
+    0% { left: 0%; opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { left: 100%; opacity: 0; }
+  }
+  @keyframes flow-drop {
+    0% { left: 0%; opacity: 1; margin-top: 0; }
+    100% { left: 25%; opacity: 0; margin-top: 1rem; }
+  }
+  @keyframes flow-pop {
+    0% { transform: scale(1.5); }
+    100% { transform: scale(1); }
+  }
+}
+
+@keyframes flow-dash {
+  to { background-position: 16px 0; }
+}
+
+@layer components {
+  .flow-track-active {
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--color-primary-400) 0 8px,
+      transparent 8px 16px
+    );
+    background-size: 16px 100%;
+    animation: flow-dash 0.6s linear infinite;
+  }
+}

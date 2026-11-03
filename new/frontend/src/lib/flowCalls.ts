@@ -2,7 +2,7 @@ import { computed } from 'nanostores';
 
 import { onEvent, request } from './realtime';
 import { normalizePhoneNumber } from './helpers';
-import { $flowCalls, $numberCalls, $wsStatus, type FlowCall } from './stores';
+import { $contactSnapshot, $flowCalls, $isPower, $numberCalls, $wsStatus, type FlowCall } from './stores';
 
 const HISTORY_HOURS = 24;
 const HISTORY_MS = HISTORY_HOURS * 60 * 60 * 1000;
@@ -76,3 +76,16 @@ export async function loadNumberCalls(phoneNumber: string): Promise<void> {
     loading: false,
   });
 }
+
+// Load the current contact's history once per contact, as soon as both the
+// contact and the power level are known. Covers a page refresh mid-call or in
+// after-call work, where Connect never fires onConnecting again.
+let historyContactId = '';
+function syncNumberCalls(): void {
+  const contact = $contactSnapshot.get();
+  if (!$isPower.get() || !contact?.phoneNumber || contact.contactId === historyContactId) return;
+  historyContactId = contact.contactId;
+  loadNumberCalls(contact.phoneNumber).catch((e) => console.error('loadNumberCalls', e));
+}
+$contactSnapshot.subscribe(syncNumberCalls);
+$isPower.subscribe(syncNumberCalls);
