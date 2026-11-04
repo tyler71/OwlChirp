@@ -35,6 +35,7 @@ import DataPanel from './DataPanel';
 import Feed from './Feed';
 import HelpRequestDialog from './HelpRequestDialog';
 import FlowCalls from './FlowCalls';
+import MapView from './map/MapView';
 import MiniCallBar from './MiniCallBar';
 import RecentCallList from './RecentCallList';
 import Settings from './Settings';
@@ -61,6 +62,7 @@ const NAV: { view: View; label: string; icon: IconName }[] = [
   { view: 'feed', label: 'Feed', icon: 'chat' },
   { view: 'flow', label: 'Flow Calls', icon: 'queue' },
   { view: 'timeline', label: 'Timeline', icon: 'timeline' },
+  { view: 'map', label: 'Map', icon: 'map' },
   { view: 'calls', label: 'Recent Calls', icon: 'clock' },
   { view: 'callerids', label: 'Caller IDs', icon: 'user' },
   { view: 'admin', label: 'Admin', icon: 'shield' },
@@ -184,6 +186,7 @@ const VIEW_FEATURE: Partial<Record<View, Feature>> = {
   feed: 'feed',
   flow: 'flow',
   timeline: 'timeline',
+  map: 'map',
   callerids: 'callerIds',
   admin: 'admin',
 };
@@ -329,6 +332,7 @@ export default function App() {
           {view === 'feed' && agent && canView(view, features) && <Feed />}
           {view === 'flow' && agent && canView(view, features) && <FlowCalls />}
           {view === 'timeline' && agent && canView(view, features) && <Timeline />}
+          {view === 'map' && agent && canView(view, features) && <MapView />}
           {view === 'callerids' && canView(view, features) && <CallerIds />}
           {view === 'admin' && canView(view, features) && <Admin />}
 

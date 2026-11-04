@@ -49,7 +49,9 @@ type wsReply struct {
 // {"type":"auth","token":"<X-Api-Key>"}. After that:
 //   - the server pushes events as {"type":"<event>","data":...}
 //     ("features", "metrics", "call.logged", "callerid.updated", "wrapup.saved",
-//     "help.requested", "permission.updated");
+//     "help.requested", "permission.updated", "flowcall.updated",
+//     "map.joined", "map.moved", "map.left", "building.updated",
+//     "building.deleted");
 //     "features" is always the first, sent once per connection
 //   - the client sends wsRequest calls, answered with a wsReply. The
 //     user's features decide what the UI shows; requests in
@@ -90,6 +92,8 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 
 	client := app.hub.Subscribe()
 	defer app.hub.Unsubscribe(client)
+
+	defer app.mapJoin(user)()
 
 	// coder/websocket allows one concurrent writer, so request handlers hand
 	// their replies to the write loop below.

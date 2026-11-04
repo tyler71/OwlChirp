@@ -80,6 +80,7 @@ type application struct {
 	handlers map[string]wsHandler
 	timeline *cache.Value[flowTimeline]
 	help     helpLimiter
+	presence mapPresence
 	logger   *slog.Logger
 	wg       sync.WaitGroup
 }
@@ -101,7 +102,6 @@ func run(logger *slog.Logger) error {
 
 	cfg.frontend.timeZone = env.GetString("TIME_ZONE", "UTC")
 	cfg.frontend.telemetryURL = env.GetString("TELEMETRY_URL", "")
-
 
 	cfg.flowCalls.interval = time.Duration(env.GetInt("FLOW_POLL_INTERVAL", 5)) * time.Second
 	// Keep at least the timeline's window so it never shows pruned gaps.

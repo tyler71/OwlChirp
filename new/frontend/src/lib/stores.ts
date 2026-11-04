@@ -140,7 +140,7 @@ export type FlowTimeline = {
 export const $timeline = atom<FlowTimeline | null>(null);
 
 // Which main view the sidebar has selected.
-export type View = 'phone' | 'calls' | 'feed' | 'flow' | 'timeline' | 'callerids' | 'admin' | 'settings' | 'log';
+export type View = 'phone' | 'calls' | 'feed' | 'flow' | 'timeline' | 'map' | 'callerids' | 'admin' | 'settings' | 'log';
 export const $view = atom<View>('phone');
 
 export const $alert = atom<Alert>({ kind: 'welcome' });
@@ -158,6 +158,8 @@ export const FEATURES = [
   { key: 'callerHistory', label: 'Caller history', detail: 'Past calls from the active caller' },
   { key: 'callerIds', label: 'Caller IDs', detail: 'Manage outbound caller IDs' },
   { key: 'agentNames', label: 'Agent names', detail: 'Agent names in Feed, Flow Calls, Timeline and call details' },
+  { key: 'map', label: 'Map', detail: 'Team map with live incoming calls' },
+  { key: 'mapEdit', label: 'Map buildings', detail: 'Manage Map buildings and the numbers they match' },
   { key: 'admin', label: 'Admin', detail: 'Admin page and user permissions' },
 ] as const;
 
@@ -167,8 +169,12 @@ export const ALL_FEATURES: Feature[] = FEATURES.map((f) => f.key);
 
 // Feature sets matching the old permission levels.
 export const PRESETS: { key: string; label: string; features: Feature[] }[] = [
-  { key: 'standard', label: 'Standard', features: [] },
-  { key: 'power', label: 'Power', features: ['feed', 'flow', 'timeline', 'calls', 'callerHistory', 'callerIds'] },
+  { key: 'standard', label: 'Standard', features: ['map'] },
+  {
+    key: 'power',
+    label: 'Power',
+    features: ['feed', 'flow', 'timeline', 'calls', 'callerHistory', 'callerIds', 'map', 'mapEdit'],
+  },
   { key: 'admin', label: 'Admin', features: ALL_FEATURES },
 ];
 

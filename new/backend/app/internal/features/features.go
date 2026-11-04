@@ -17,16 +17,18 @@ const (
 	CallerHistory = "callerHistory" // past calls from the active caller
 	CallerIDs     = "callerIds"     // Caller IDs management view
 	AgentNames    = "agentNames"    // agent names on calls and wrapups
+	Map           = "map"           // Map view
+	MapEdit       = "mapEdit"       // manage Map buildings and their numbers
 	Admin         = "admin"         // Admin view and user management
 )
 
 // All lists every feature in display order.
-var All = []string{Feed, Flow, Timeline, Calls, CallsAll, CallerHistory, CallerIDs, AgentNames, Admin}
+var All = []string{Feed, Flow, Timeline, Calls, CallsAll, CallerHistory, CallerIDs, AgentNames, Map, MapEdit, Admin}
 
 // Presets are the feature sets matching the old permission levels.
 var Presets = map[string][]string{
-	"standard": {},
-	"power":    {Feed, Flow, Timeline, Calls, CallerHistory, CallerIDs},
+	"standard": {Map},
+	"power":    {Feed, Flow, Timeline, Calls, CallerHistory, CallerIDs, Map, MapEdit},
 	"admin":    All,
 }
 
