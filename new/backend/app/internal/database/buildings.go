@@ -267,3 +267,103 @@ func (db *DB) DeleteBuilding(ctx context.Context, id int64) (bool, error) {
 	n, err := res.RowsAffected()
 	return n > 0, err
 }
+
+// SchoolPrefix is the normalized prefix of every school's phone number
+// (206-252-*). Each saved caller ID under it gets its own building.
+const SchoolPrefix = "1206252"
+
+// maxSchoolNameLength matches the map_buildings.name column.
+const maxSchoolNameLength = 30
+
+// SchoolPattern returns the building pattern for phone and whether phone is a
+// school number: an exact 11 digit NANP number starting with SchoolPrefix.
+func SchoolPattern(phone string) (string, bool) {
+	p, err := NormalizePattern(phone)
+	if err != nil || strings.HasSuffix(p, "*") || len(p) != 11 || !strings.HasPrefix(p, SchoolPrefix) {
+		return "", false
+	}
+	return p, true
+}
+
+// schoolBuilding finds the building linked to pattern: the one whose only
+// pattern is that exact number. Buildings with other patterns are never linked.
+func (db *DB) schoolBuilding(ctx context.Context, pattern string) (Building, bool, error) {
+	encoded, err := json.Marshal([]string{pattern})
+	if err != nil {
+		return Building{}, false, err
+	}
+	var row buildingRow
+	err = db.GetContext(ctx, &row,
+		`SELECT id, name, patterns, x, y, style FROM map_buildings WHERE patterns = ? ORDER BY id LIMIT 1`, string(encoded))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Building{}, false, nil
+	}
+	if err != nil {
+		return Building{}, false, err
+	}
+	return row.building(), true, nil
+}
+
+// SchoolSync says what SyncSchoolBuilding did.
+type SchoolSync int
+
+const (
+	SchoolUnchanged SchoolSync = iota
+	SchoolCreated
+	SchoolRenamed
+)
+
+// SyncSchoolBuilding makes sure the school number phone has a building named
+// name, creating or renaming it. It returns ErrMapFull when there is no room.
+// Callers should check SchoolPattern first; other numbers are ignored.
+func (db *DB) SyncSchoolBuilding(ctx context.Context, phone, name string) (Building, SchoolSync, error) {
+	pattern, ok := SchoolPattern(phone)
+	if !ok {
+		return Building{}, SchoolUnchanged, nil
+	}
+	name = strings.TrimSpace(name)
+	if r := []rune(name); len(r) > maxSchoolNameLength {
+		name = string(r[:maxSchoolNameLength])
+	}
+	if name == "" {
+		return Building{}, SchoolUnchanged, nil
+	}
+
+	b, found, err := db.schoolBuilding(ctx, pattern)
+	if err != nil {
+		return Building{}, SchoolUnchanged, err
+	}
+	if found {
+		if b.Name == name {
+			return b, SchoolUnchanged, nil
+		}
+		b, found, err = db.UpdateBuilding(ctx, b.ID, name, b.Patterns, b.Style)
+		if err != nil || !found {
+			return Building{}, SchoolUnchanged, err
+		}
+		return b, SchoolRenamed, nil
+	}
+
+	// Spread the styles so neighbouring schools look different.
+	style := int(pattern[len(pattern)-1]-'0') % MapStyleCount
+	b, err = db.CreateBuilding(ctx, name, []string{pattern}, style)
+	if err != nil {
+		return Building{}, SchoolUnchanged, err
+	}
+	return b, SchoolCreated, nil
+}
+
+// DeleteSchoolBuilding removes the building linked to the school number
+// phone. found is false when there is none.
+func (db *DB) DeleteSchoolBuilding(ctx context.Context, phone string) (id int64, found bool, err error) {
+	pattern, ok := SchoolPattern(phone)
+	if !ok {
+		return 0, false, nil
+	}
+	b, found, err := db.schoolBuilding(ctx, pattern)
+	if err != nil || !found {
+		return 0, false, err
+	}
+	found, err = db.DeleteBuilding(ctx, b.ID)
+	return b.ID, found, err
+}

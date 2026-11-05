@@ -422,3 +422,76 @@ func (app *application) wsDeleteProp(ctx context.Context, _ connect.RegisteredUs
 	app.broadcast("map.prop.deleted", map[string]int64{"id": input.ID})
 	return map[string]int64{"id": input.ID}, nil
 }
+
+// syncSchoolBuilding keeps a school caller ID's building in step with it. A
+// failure is logged; it never fails the caller ID save.
+func (app *application) syncSchoolBuilding(ctx context.Context, phone, name string) {
+	if _, ok := database.SchoolPattern(phone); !ok {
+		return
+	}
+	b, what, err := app.db.SyncSchoolBuilding(ctx, phone, name)
+	if err != nil {
+		app.logger.Warn("sync school building", "phone", phone, "error", err)
+		return
+	}
+	if what != database.SchoolUnchanged {
+		app.broadcast("building.updated", b)
+	}
+}
+
+// deleteSchoolBuilding removes the building of a deleted school caller ID.
+func (app *application) deleteSchoolBuilding(ctx context.Context, phone string) {
+	if _, ok := database.SchoolPattern(phone); !ok {
+		return
+	}
+	id, found, err := app.db.DeleteSchoolBuilding(ctx, phone)
+	if err != nil {
+		app.logger.Warn("delete school building", "phone", phone, "error", err)
+		return
+	}
+	if found {
+		app.broadcast("building.deleted", map[string]int64{"id": id})
+	}
+}
+
+// schoolImport is the result of buildings.import.
+type schoolImport struct {
+	Created  int  `json:"created"`
+	Renamed  int  `json:"renamed"`
+	Existing int  `json:"existing"`
+	MapFull  bool `json:"mapFull"`
+}
+
+// wsImportSchools gives every saved school caller ID (206-252-*) a building.
+func (app *application) wsImportSchools(ctx context.Context, _ connect.RegisteredUser, _ json.RawMessage) (any, error) {
+	callerIDs, err := app.db.ListCallerIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var result schoolImport
+	for _, c := range callerIDs {
+		if _, ok := database.SchoolPattern(c.PhoneNumber); !ok || strings.TrimSpace(c.Name) == "" {
+			continue
+		}
+		b, what, err := app.db.SyncSchoolBuilding(ctx, c.PhoneNumber, c.Name)
+		if errors.Is(err, database.ErrMapFull) {
+			result.MapFull = true
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		switch what {
+		case database.SchoolCreated:
+			result.Created++
+		case database.SchoolRenamed:
+			result.Renamed++
+		default:
+			result.Existing++
+		}
+		if what != database.SchoolUnchanged {
+			app.broadcast("building.updated", b)
+		}
+	}
+	return result, nil
+}

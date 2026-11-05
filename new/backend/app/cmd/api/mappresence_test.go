@@ -14,7 +14,7 @@ func TestSocketMapPermissions(t *testing.T) {
 	srv := newTestServer(t)
 	std := dial(t, srv, tokenFor(standardUser))
 
-	for _, typ := range []string{"map.state", "map.move", "map.gear", "map.paint", "map.props.create", "map.props.delete", "buildings.create", "buildings.update", "buildings.delete", "buildings.move"} {
+	for _, typ := range []string{"map.state", "map.move", "map.gear", "map.paint", "map.props.create", "map.props.delete", "buildings.create", "buildings.update", "buildings.delete", "buildings.move", "buildings.import"} {
 		reply := std.call(typ, map[string]any{})
 		assert.Equal(t, reply.Type, "error")
 		assert.Equal(t, reply.Error, "permission denied")
@@ -155,4 +155,54 @@ func TestMapPresenceTabs(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = p.move("nobody", 1, 1, "up", now)
 	assert.False(t, ok)
+}
+
+func TestSocketSchoolBuildings(t *testing.T) {
+	srv := newTestServer(t)
+	agent := dial(t, srv, validToken())
+
+	setCaller := func(phone, name string) database.Building {
+		t.Helper()
+		reply := agent.call("callerid.set", map[string]any{"phoneNumber": phone, "name": name})
+		assert.Equal(t, reply.Type, "result")
+		m := agent.readUntil(func(m testMessage) bool { return m.Type == "building.updated" })
+		var b database.Building
+		assert.Nil(t, json.Unmarshal(m.Data, &b))
+		return b
+	}
+
+	// Saving a school caller ID adds its building.
+	adams := setCaller("+12062520001", "Adams Elem")
+	assert.Equal(t, adams.Name, "Adams Elem")
+	assert.Equal(t, adams.Patterns, []string{"12062520001"})
+
+	// Renaming renames the same building.
+	renamed := setCaller("+12062520001", "Adams Elementary")
+	assert.Equal(t, renamed.ID, adams.ID)
+	assert.Equal(t, renamed.Name, "Adams Elementary")
+
+	// Other numbers get no building.
+	reply := agent.call("callerid.set", map[string]any{"phoneNumber": "+12065550100", "name": "Not a school"})
+	assert.Equal(t, reply.Type, "result")
+
+	// Import puts back a school building that was deleted by hand.
+	reply = agent.call("buildings.delete", map[string]any{"id": adams.ID})
+	assert.Equal(t, reply.Type, "result")
+	reply = agent.call("buildings.import", nil)
+	assert.Equal(t, reply.Type, "result")
+	var result schoolImport
+	assert.Nil(t, json.Unmarshal(reply.Data, &result))
+	assert.Equal(t, result, schoolImport{Created: 1})
+
+	reply = agent.call("buildings.import", nil)
+	assert.Nil(t, json.Unmarshal(reply.Data, &result))
+	assert.Equal(t, result, schoolImport{Existing: 1})
+
+	// Deleting the caller ID deletes its building.
+	reply = agent.call("callerid.delete", map[string]any{"phoneNumber": "+12062520001"})
+	assert.Equal(t, reply.Type, "result")
+	agent.readUntil(func(m testMessage) bool { return m.Type == "building.deleted" })
+	reply = agent.call("buildings.import", nil)
+	assert.Nil(t, json.Unmarshal(reply.Data, &result))
+	assert.Equal(t, result, schoolImport{})
 }

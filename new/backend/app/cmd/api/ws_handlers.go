@@ -81,6 +81,7 @@ func (app *application) wsHandlers() map[string]wsHandler {
 		"buildings.create":    app.wsCreateBuilding,
 		"buildings.update":    app.wsUpdateBuilding,
 		"buildings.delete":    app.wsDeleteBuilding,
+		"buildings.import":    app.wsImportSchools,
 		"transcribe.start":    app.wsStartTranscript,
 		"transcribe.stop":     app.wsStopTranscript,
 	}
@@ -95,7 +96,8 @@ var requestFeature = map[string]string{
 	"users.list": features.Admin, "users.setFeatures": features.Admin, "users.resetFeatures": features.Admin,
 	"map.state": features.Map, "map.move": features.Map, "map.gear": features.Map, "buildings.list": features.Map,
 	"buildings.create": features.MapEdit, "buildings.update": features.MapEdit, "buildings.delete": features.MapEdit,
-	"buildings.move": features.MapDesign, "map.paint": features.MapDesign,
+	"buildings.import": features.MapEdit,
+	"buildings.move":   features.MapDesign, "map.paint": features.MapDesign,
 	"map.props.create": features.MapDesign, "map.props.delete": features.MapDesign,
 	"transcribe.start": features.Transcription, "transcribe.stop": features.Transcription,
 }
@@ -289,6 +291,7 @@ func (app *application) wsSetCallerID(ctx context.Context, _ connect.RegisteredU
 	}
 
 	app.broadcast("callerid.updated", input)
+	app.syncSchoolBuilding(ctx, input.PhoneNumber, input.Name)
 	return input, nil
 }
 
@@ -316,6 +319,7 @@ func (app *application) wsDeleteCallerID(ctx context.Context, _ connect.Register
 	}
 
 	app.broadcast("callerid.deleted", input)
+	app.deleteSchoolBuilding(ctx, input.PhoneNumber)
 	return input, nil
 }
 

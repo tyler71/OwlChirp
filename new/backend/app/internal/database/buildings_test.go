@@ -175,3 +175,69 @@ func TestMigrateBuildingSlots(t *testing.T) {
 	_, err = db.CreateBuilding(ctx, "c", nil, 0)
 	assert.Nil(t, err)
 }
+
+func TestSchoolPattern(t *testing.T) {
+	tests := []struct {
+		in, want string
+		ok       bool
+	}{
+		{in: "+12062521234", want: "12062521234", ok: true},
+		{in: "206-252-1234", want: "12062521234", ok: true},
+		{in: "+12062561234"},
+		{in: "+1206252123"},
+		{in: "206-252-*"},
+		{in: ""},
+	}
+	for _, tt := range tests {
+		got, ok := SchoolPattern(tt.in)
+		assert.Equal(t, ok, tt.ok)
+		assert.Equal(t, got, tt.want)
+	}
+}
+
+func TestSyncSchoolBuilding(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	// A hand-made building with extra patterns is never linked.
+	other, err := db.CreateBuilding(ctx, "District", []string{"12062521234", "1425*"}, 0)
+	assert.Nil(t, err)
+
+	b, what, err := db.SyncSchoolBuilding(ctx, "+12062521234", "Lincoln Elem")
+	assert.Nil(t, err)
+	assert.Equal(t, what, SchoolCreated)
+	assert.Equal(t, b.Name, "Lincoln Elem")
+	assert.Equal(t, b.Patterns, []string{"12062521234"})
+
+	// Syncing again changes nothing.
+	again, what, err := db.SyncSchoolBuilding(ctx, "+12062521234", "Lincoln Elem")
+	assert.Nil(t, err)
+	assert.Equal(t, what, SchoolUnchanged)
+	assert.Equal(t, again.ID, b.ID)
+
+	// A rename keeps the building and its spot.
+	renamed, what, err := db.SyncSchoolBuilding(ctx, "+12062521234", "Lincoln Elementary")
+	assert.Nil(t, err)
+	assert.Equal(t, what, SchoolRenamed)
+	assert.Equal(t, renamed.ID, b.ID)
+	assert.Equal(t, [2]int{renamed.X, renamed.Y}, [2]int{b.X, b.Y})
+	assert.Equal(t, renamed.Name, "Lincoln Elementary")
+
+	// Other numbers are ignored.
+	_, what, err = db.SyncSchoolBuilding(ctx, "+12065550100", "Not a school")
+	assert.Nil(t, err)
+	assert.Equal(t, what, SchoolUnchanged)
+
+	id, found, err := db.DeleteSchoolBuilding(ctx, "+12062521234")
+	assert.Nil(t, err)
+	assert.True(t, found)
+	assert.Equal(t, id, b.ID)
+	_, found, err = db.DeleteSchoolBuilding(ctx, "+12062521234")
+	assert.Nil(t, err)
+	assert.Equal(t, found, false)
+
+	list, err := db.ListBuildings(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(list), 1)
+	assert.Equal(t, list[0].ID, other.ID)
+}

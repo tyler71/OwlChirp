@@ -53,6 +53,11 @@ export default function CallerIds() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [addError, setAddError] = useState("");
+  const [editing, setEditing] = useState<{
+    phoneNumber: string;
+    draft: string;
+  } | null>(null);
+  const [editError, setEditError] = useState("");
   // A new search starts back at the first page.
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [query]);
@@ -114,6 +119,21 @@ export default function CallerIds() {
     setAddError("");
     setPhone("");
     setName("");
+  }
+
+  // Enter and blur both commit; clearing `editing` first makes the second a no-op.
+  async function commitEdit(c: SavedCallerId): Promise<void> {
+    if (editing?.phoneNumber !== c.phoneNumber) return;
+    const draft = editing.draft;
+    setEditing(null);
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === c.name) return;
+    if (await saveCallerId(c.phoneNumber, trimmed)) {
+      setEditError("");
+    } else {
+      setEditError("Failed to rename caller ID");
+      setEditing({ phoneNumber: c.phoneNumber, draft });
+    }
   }
 
   async function onDelete(c: SavedCallerId): Promise<void> {
@@ -237,7 +257,48 @@ export default function CallerIds() {
                       key={c.phoneNumber}
                       className="border-b border-secondary-100 dark:border-secondary-700/50"
                     >
-                      <td className="py-3 pr-3 font-medium">{c.name}</td>
+                      <td className="py-3 pr-3 font-medium">
+                        {editing?.phoneNumber === c.phoneNumber ? (
+                          <input
+                            type="text"
+                            value={editing.draft}
+                            onChange={(e) =>
+                              setEditing({
+                                phoneNumber: c.phoneNumber,
+                                draft: e.target.value,
+                              })
+                            }
+                            onFocus={(e) => e.target.select()}
+                            onBlur={() => void commitEdit(c)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void commitEdit(c);
+                              } else if (e.key === "Escape") {
+                                setEditing(null);
+                              }
+                            }}
+                            maxLength={MAX_NAME_LENGTH}
+                            autoFocus
+                            aria-label="Name"
+                            className={`${INPUT_CLASS} -my-2 sm:w-48`}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            title="Click to rename"
+                            onClick={() =>
+                              setEditing({
+                                phoneNumber: c.phoneNumber,
+                                draft: c.name,
+                              })
+                            }
+                            className="-mx-2 cursor-text rounded-md px-2 py-1 text-left hover:bg-base-100 dark:hover:bg-secondary-800"
+                          >
+                            {c.name}
+                          </button>
+                        )}
+                      </td>
                       <td
                         className="p-3 text-secondary-500 dark:text-secondary-400"
                         title={c.phoneNumber}
@@ -259,6 +320,11 @@ export default function CallerIds() {
                 </tbody>
               </table>
             </div>
+            {editError && (
+              <p className="text-sm text-rose-600 dark:text-rose-400">
+                {editError}
+              </p>
+            )}
             <Pagination
               page={current}
               totalPages={totalPages}

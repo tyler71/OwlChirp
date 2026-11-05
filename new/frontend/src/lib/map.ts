@@ -144,6 +144,13 @@ export async function deleteBuilding(id: number): Promise<void> {
   await request('buildings.delete', { id });
 }
 
+export type SchoolImport = { created: number; renamed: number; existing: number; mapFull: boolean };
+
+// Gives every saved 206-252-* caller ID (a school) its own building.
+export async function importSchoolBuildings(): Promise<SchoolImport> {
+  return request<SchoolImport>('buildings.import');
+}
+
 export async function moveBuilding(id: number, x: number, y: number): Promise<MapBuilding> {
   return request<MapBuilding>('buildings.move', { id, x, y });
 }

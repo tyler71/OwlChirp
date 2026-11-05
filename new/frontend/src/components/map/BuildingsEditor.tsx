@@ -10,6 +10,7 @@ import {
   createBuilding,
   deleteBuilding,
   formatPattern,
+  importSchoolBuildings,
   updateBuilding,
   type MapBuilding,
 } from '../../lib/map';
@@ -156,7 +157,23 @@ export default function BuildingsEditor() {
   const [patterns, setPatterns] = useState('');
   const [style, setStyle] = useState(0);
   const [error, setError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState('');
   const full = buildings.length >= BUILDING_LIMIT;
+
+  async function onImport() {
+    setImporting(true);
+    setImportNote('');
+    try {
+      const r = await importSchoolBuildings();
+      const parts = [`${r.created} added`, `${r.renamed} renamed`, `${r.existing} already on the map`];
+      setImportNote(r.mapFull ? `${parts.join(', ')}. The map is full: delete a building to import the rest.` : `${parts.join(', ')}.`);
+    } catch (err) {
+      setImportNote(errorMessage(err));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
@@ -178,12 +195,20 @@ export default function BuildingsEditor() {
   return (
     <section className="flex flex-col overflow-hidden rounded-lg border border-secondary-200 bg-base-100 dark:border-secondary-800 dark:bg-secondary-900">
       <div className="flex flex-col gap-1 border-b border-secondary-100 px-5 py-4 dark:border-secondary-800">
-        <h2 className="font-semibold">Buildings</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold">Buildings</h2>
+          <Button size="sm" disabled={importing} onClick={() => void onImport()}>
+            {importing ? 'Importing…' : 'Import schools from caller IDs'}
+          </Button>
+        </div>
         <p className="text-sm text-secondary-500 dark:text-secondary-400">
           Calls from a building's numbers start there on the map. End a number with * to match every number that
-          starts with it, e.g. 206-256-*. When numbers overlap, an exact number wins, then the longest prefix.{' '}
+          starts with it, e.g. 206-256-*. When numbers overlap, an exact number wins, then the longest prefix.
+          Caller IDs saved with a 206-252 number are schools: each gets its own building, kept in sync when the
+          caller ID is renamed or deleted.{' '}
           {buildings.length} of {BUILDING_LIMIT} buildings.
         </p>
+        {importNote && <p className="text-xs text-secondary-500 dark:text-secondary-400">{importNote}</p>}
       </div>
       <form onSubmit={onAdd} className="flex flex-col gap-2 border-b border-secondary-100 px-5 py-4 sm:flex-row sm:items-start dark:border-secondary-800">
         <input
