@@ -24,6 +24,8 @@ func (app *application) routes() http.Handler {
 		// Metrics and all call handling. Authenticates with its first
 		// message instead of a header; see socket.
 		r.Get("/ws", app.socket)
+		// Map proximity voice relay; authenticates like /ws. See voiceSocket.
+		r.Get("/voice", app.voiceSocket)
 
 		r.NotFound(app.notFound)
 	})

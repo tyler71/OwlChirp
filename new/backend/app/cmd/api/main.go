@@ -86,6 +86,7 @@ type application struct {
 	timeline    *cache.Value[flowTimeline]
 	help        helpLimiter
 	presence    mapPresence
+	voice       voiceRoom
 	transcriber *transcribe.Service
 	logger      *slog.Logger
 	wg          sync.WaitGroup

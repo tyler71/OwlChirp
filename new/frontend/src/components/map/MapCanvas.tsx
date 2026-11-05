@@ -37,6 +37,7 @@ import {
   type Ride,
 } from '../../lib/map';
 import { $can, $metrics } from '../../lib/stores';
+import { isSpeaking, VOICE_RANGE } from '../../lib/voice';
 import { Icon } from '../ui';
 import {
   BUILDING_STYLES,
@@ -810,6 +811,26 @@ export default function MapCanvas({ me }: { me: string }) {
           ctx.fillText('z Z', x + 10 * scale, top - bob * 8 * scale);
         }
         const isMe = name === me;
+        if (isSpeaking(name)) {
+          // Sound waves beside the head; my own carry range while I talk.
+          const wave = reduced ? 0.5 : (t * 2) % 1;
+          ctx.lineWidth = 1.5 * dpr;
+          for (let i = 0; i < 3; i++) {
+            const r = (3 + i * 3 + wave * 3) * scale;
+            ctx.strokeStyle = `rgba(255,255,255,${0.9 - i * 0.25 - wave * 0.2})`;
+            ctx.beginPath();
+            ctx.arc(x + 5 * scale, top + 4 * scale, r, -Math.PI / 4, Math.PI / 4);
+            ctx.stroke();
+          }
+          if (isMe) {
+            ctx.strokeStyle = 'rgba(41, 182, 168, 0.35)';
+            ctx.setLineDash([4 * dpr, 4 * dpr]);
+            ctx.beginPath();
+            ctx.arc(x, sy(s.y - 8), VOICE_RANGE * scale, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
         const label = isMe ? 'You' : canSeeNames.get() ? agentName(name) : '';
         const dot = status && (pose === 'stand' || riding) ? STATUS_DOT[status] : undefined;
         if (!label && !dot) continue;

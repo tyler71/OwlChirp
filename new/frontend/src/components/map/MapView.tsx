@@ -7,6 +7,7 @@ import { $queuedCount, loadFlowCalls } from '../../lib/flowCalls';
 import { agentName } from '../../lib/helpers';
 import { $mapMode, $mapPlayers, $myUsername, loadMapState } from '../../lib/map';
 import { $agent, $can, $flowCalls, $metrics, $wsStatus } from '../../lib/stores';
+import { startVoice, stopVoice } from '../../lib/voice';
 import { STATUS_EMOJI, statusClass } from '../VisualAgentList';
 import { Card } from '../ui';
 import BuildingsEditor from './BuildingsEditor';
@@ -63,6 +64,10 @@ function Legend() {
         <dd>Pets follow their owner</dd>
         <dt>🚲</dt>
         <dd>Bikes and cars go faster</dd>
+        <dt>🔊</dt>
+        <dd>Talking: heard within 10 tiles, louder up close</dd>
+        <dt>📞</dt>
+        <dd>Voice pauses while you're on a call</dd>
       </dl>
       <p className="border-t border-secondary-100 px-4 py-2 text-xs text-secondary-500 dark:border-secondary-800 dark:text-secondary-400">
         {queued ? `${queued} waiting in queue` : 'Nobody waiting in queue'}
@@ -80,6 +85,12 @@ export default function MapView() {
   const me = agent?.getConfiguration().username ?? '';
 
   useEffect(() => $myUsername.set(me), [me]);
+  // Voice is on whenever the Map is open, and only then.
+  useEffect(() => {
+    if (!me) return;
+    startVoice(me);
+    return stopVoice;
+  }, [me]);
   // Leave design tools when the page closes.
   useEffect(() => () => $mapMode.set('walk'), []);
 

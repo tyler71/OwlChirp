@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { $mapBrush, $mapMode, $myGear, sendGear, type Brush, type MapMode, type Pet, type Ride } from '../../lib/map';
 import { $can } from '../../lib/stores';
+import { $voiceMuted, $voiceOnCall, $voiceStatus, $voiceTalking } from '../../lib/voice';
 import { GROUND, PROP_INFO } from './sprites';
 import { PROP_KINDS, TILE_KINDS } from './world';
 
@@ -114,6 +115,50 @@ function Palette() {
   );
 }
 
+const VOICE_LABEL: Record<string, { text: string; title: string }> = {
+  off: { text: 'Voice off', title: 'Voice is off' },
+  connecting: { text: 'Connecting…', title: 'Connecting to map voice' },
+  live: { text: 'Live', title: 'People within 10 tiles hear you, louder the closer they are' },
+  listenOnly: { text: 'Listen only', title: "The microphone isn't available, so you can hear others but they can't hear you" },
+  elsewhere: { text: 'In another tab', title: 'Map voice is running in another Owlchirp tab' },
+  unsupported: { text: 'Not supported', title: "This browser can't do map voice (needs WebCodecs)" },
+  error: { text: 'Unavailable', title: "Map voice isn't available for your account" },
+};
+
+function VoiceControl() {
+  const status = useStore($voiceStatus);
+  const muted = useStore($voiceMuted);
+  const onCall = useStore($voiceOnCall);
+  const talking = useStore($voiceTalking);
+  const canTalk = status === 'live';
+  const label = onCall && (status === 'live' || status === 'listenOnly') ? { text: 'Paused: on a call', title: 'Map voice is muted both ways while you are on a call' } : VOICE_LABEL[status];
+  const dot = onCall || !canTalk ? 'bg-secondary-400' : muted ? 'bg-rose-500' : talking ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-600';
+
+  return (
+    <div className="flex items-center gap-2" title={label.title}>
+      <span className="text-xs font-semibold text-secondary-500 uppercase dark:text-secondary-400">Voice</span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium">
+        <span className={`size-2 rounded-full ${dot}`} aria-hidden />
+        {label.text}
+      </span>
+      {canTalk && (
+        <button
+          type="button"
+          aria-pressed={muted}
+          onClick={() => $voiceMuted.set(!muted)}
+          className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${
+            muted
+              ? 'border-rose-700 bg-rose-600 text-white'
+              : 'border-secondary-200 bg-base-100 hover:bg-secondary-100 dark:border-secondary-700 dark:bg-secondary-800 dark:hover:bg-secondary-700'
+          }`}
+        >
+          {muted ? '🔇 Unmute' : '🎙️ Mute'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function MapToolbar() {
   const gear = useStore($myGear);
   const mode = useStore($mapMode);
@@ -125,6 +170,7 @@ export default function MapToolbar() {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
         <Segmented label="Pet" options={PETS} value={gear.pet} onChange={(pet) => sendGear(pet, gear.ride)} />
         <Segmented label="Ride" options={RIDES} value={gear.ride} onChange={(ride) => sendGear(gear.pet, ride)} />
+        <VoiceControl />
         {canDesign && (
           <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
             {MODES.map((m) => (

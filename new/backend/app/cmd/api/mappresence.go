@@ -128,6 +128,20 @@ func (p *mapPresence) gear(username, pet, ride string) (mapPlayer, bool) {
 	return *pl, true
 }
 
+// positions returns where each of names is, leaving out anyone not on the
+// map.
+func (p *mapPresence) positions(names []string) map[string][2]float64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make(map[string][2]float64, len(names))
+	for _, n := range names {
+		if pl, ok := p.players[n]; ok {
+			out[n] = [2]float64{pl.X, pl.Y}
+		}
+	}
+	return out
+}
+
 func (p *mapPresence) list() []mapPlayer {
 	p.mu.Lock()
 	defer p.mu.Unlock()
