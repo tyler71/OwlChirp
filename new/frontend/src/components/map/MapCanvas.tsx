@@ -23,8 +23,10 @@ import {
   $myGear,
   createProp,
   deleteProp,
+  liveCalls,
   matchBuilding,
   moveBuilding,
+  onCallEnd,
   onCallPulse,
   paintTiles,
   sendMove,
@@ -80,6 +82,7 @@ const SEND_INTERVAL_MS = 100;
 const PAINT_FLUSH_MS = 150;
 const MAX_PAINT_BATCH = 400;
 const PULSE_TRAVEL_MS = 3200;
+const PULSE_GAP_MS = 5000; // pause between laps of a live call
 const RING_MS = 1200;
 const BUILDING_FLASH_MS = 3500;
 const MINIMAP_SCALE = 1.5; // css px per tile
@@ -118,11 +121,14 @@ type Sprite = {
   petState: PetState;
 };
 
+/** A live call's pulse, lapping from its building to HQ until the call ends. */
 type ActivePulse = {
   pulse: CallPulse;
   route: Point[];
   length: number;
   start: number;
+  /** The call disconnected: finish this lap, then stop. */
+  ended: boolean;
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -570,24 +576,31 @@ export default function MapCanvas({ me }: { me: string }) {
     const rings: number[] = []; // start times
     const flashes = new Map<number, number>(); // building id → start time
 
-    const offPulse = onCallPulse((pulse) => {
-      const building = matchBuilding(pulse.phoneNumber, $buildings.get() ?? []);
-      const now = performance.now();
-      if (building) flashes.set(building.id, now);
-      if (reduced) {
-        rings.push(now);
-        return;
-      }
-      let route: Point[];
+    /** Route the next lap (re-matched each time, so moved or new buildings count) and flash its building. */
+    const lap = (p: ActivePulse, start: number) => {
+      const building = matchBuilding(p.pulse.phoneNumber, $buildings.get() ?? []);
       if (building) {
-        route = world.routeFromBuilding(building);
+        flashes.set(building.id, performance.now());
+        p.route = world.routeFromBuilding(building);
       } else {
         let h = 0;
-        for (const ch of pulse.contactId) h = (h * 31 + ch.charCodeAt(0)) | 0;
+        for (const ch of p.pulse.contactId) h = (h * 31 + ch.charCodeAt(0)) | 0;
         const edge = EDGE_ENTRIES[Math.abs(h) % EDGE_ENTRIES.length];
-        route = world.routeToHQ(edge, { x: edge.x === 0 ? -8 : WORLD_W + 8, y: edge.y * TILE + TILE / 2 });
+        p.route = world.routeToHQ(edge, { x: edge.x === 0 ? -8 : WORLD_W + 8, y: edge.y * TILE + TILE / 2 });
       }
-      pulses.push({ pulse, route, length: pathLength(route), start: now });
+      p.length = pathLength(p.route);
+      p.start = start;
+    };
+    const startPulse = (pulse: CallPulse) => {
+      if (pulses.some((p) => p.pulse.contactId === pulse.contactId)) return;
+      const p: ActivePulse = { pulse, route: [], length: 0, start: 0, ended: false };
+      lap(p, performance.now());
+      pulses.push(p);
+    };
+    for (const pulse of liveCalls()) startPulse(pulse);
+    const offPulse = onCallPulse(startPulse);
+    const offEnd = onCallEnd((contactId) => {
+      for (const p of pulses) if (p.pulse.contactId === contactId) p.ended = true;
     });
 
     // ---- Drawing ----
@@ -724,15 +737,18 @@ export default function MapCanvas({ me }: { me: string }) {
       drawables.sort((a, b) => a.y - b.y);
       for (const d of drawables) d.draw();
 
-      // Pulses travel the roads to HQ, then ring it.
+      // Pulses travel the roads to HQ, ring it, and go again until the call ends.
       for (let i = pulses.length - 1; i >= 0; i--) {
         const p = pulses[i];
         const f = (now - p.start) / PULSE_TRAVEL_MS;
+        if (f < 0) continue; // between laps
         if (f >= 1) {
-          pulses.splice(i, 1);
           rings.push(now);
+          if (p.ended) pulses.splice(i, 1);
+          else lap(p, now + PULSE_GAP_MS);
           continue;
         }
+        if (reduced) continue; // no moving dot; the flash and ring still mark each lap
         const eased = 1 - (1 - f) * (1 - f);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -848,6 +864,7 @@ export default function MapCanvas({ me }: { me: string }) {
       offFocus();
       offPlayers();
       offPulse();
+      offEnd();
       offTiles();
       offProps();
       offBuildings();

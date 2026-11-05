@@ -214,11 +214,16 @@ export function formatPattern(p: string): string {
 /** A call that just arrived, for the canvas to animate. */
 export type CallPulse = { contactId: string; phoneNumber: string; at: number };
 
-// Calls older than this when first seen started before the map was open
+// Calls older than this when first pushed started before the map was open
 // and don't pulse.
 const PULSE_MAX_AGE_MS = 45_000;
+// A call still "live" after this long has probably lost its disconnect event.
+const LIVE_MAX_MS = 60 * 60 * 1000;
 const seen = new Set<string>();
+/** Calls that haven't disconnected yet, by contact ID. */
+const live = new Map<string, CallPulse & { initiatedAt: number }>();
 const pulseListeners = new Set<(p: CallPulse) => void>();
+const endListeners = new Set<(contactId: string) => void>();
 
 /** Run listener for every new incoming call. Returns an unsubscribe function. */
 export function onCallPulse(listener: (p: CallPulse) => void): () => void {
@@ -226,21 +231,64 @@ export function onCallPulse(listener: (p: CallPulse) => void): () => void {
   return () => pulseListeners.delete(listener);
 }
 
-function seed(calls: readonly FlowCall[] | null): void {
-  for (const c of calls ?? []) seen.add(c.contactId);
+/** Run listener when a pulsing call disconnects. Returns an unsubscribe function. */
+export function onCallEnd(listener: (contactId: string) => void): () => void {
+  endListeners.add(listener);
+  return () => endListeners.delete(listener);
 }
+
+function endCall(contactId: string): void {
+  if (!live.delete(contactId)) return;
+  for (const l of endListeners) l(contactId);
+}
+
+/** Calls still in progress, so a freshly opened map can pulse them. */
+export function liveCalls(): CallPulse[] {
+  const cutoff = Date.now() - LIVE_MAX_MS;
+  for (const [id, c] of live) if (c.initiatedAt < cutoff) endCall(id);
+  return [...live.values()].map(({ contactId, phoneNumber, at }) => ({ contactId, phoneNumber, at }));
+}
+
+const pulseOf = (c: FlowCall) => ({ contactId: c.contactId, phoneNumber: c.phoneNumber, at: Date.now(), initiatedAt: c.initiatedAt });
+
+function seed(calls: readonly FlowCall[] | null): void {
+  const cutoff = Date.now() - LIVE_MAX_MS;
+  for (const c of calls ?? []) {
+    seen.add(c.contactId);
+    if (!c.disconnectedAt && c.initiatedAt >= cutoff && !live.has(c.contactId)) live.set(c.contactId, pulseOf(c));
+  }
+}
+
+/** End calls the list shows as disconnected (or no longer has). */
+function reconcile(calls: readonly FlowCall[]): void {
+  const byId = new Map(calls.map((c) => [c.contactId, c]));
+  for (const id of [...live.keys()]) {
+    const c = byId.get(id);
+    if (!c || c.disconnectedAt) endCall(id);
+  }
+}
+
 // Only whole-list loads seed; single pushes update $flowCalls before the
 // handler below runs and must still pulse.
 seed($flowCalls.get());
 $flowCalls.listen((calls, old) => {
   if (old === null) seed(calls);
+  // Every update is the whole 24h list (reloads after a reconnect too), so
+  // it also catches disconnects pushed while the socket was down.
+  else if (calls) reconcile(calls);
 });
 
 // flowcall.updated reaches everyone, so this works without the Flow feature.
 onEvent<FlowCall>('flowcall.updated', (call) => {
+  if (call.disconnectedAt) {
+    seen.add(call.contactId);
+    endCall(call.contactId);
+    return;
+  }
   if (seen.has(call.contactId)) return;
   seen.add(call.contactId);
   if (Date.now() - call.initiatedAt > PULSE_MAX_AGE_MS) return;
-  const pulse = { contactId: call.contactId, phoneNumber: call.phoneNumber, at: Date.now() };
-  for (const l of pulseListeners) l(pulse);
+  const pulse = pulseOf(call);
+  live.set(call.contactId, pulse);
+  for (const l of pulseListeners) l({ contactId: pulse.contactId, phoneNumber: pulse.phoneNumber, at: pulse.at });
 });

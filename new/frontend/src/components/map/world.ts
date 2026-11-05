@@ -271,10 +271,38 @@ export class World {
     });
   }
 
-  /** The route a call from building b takes to HQ. */
+  /**
+   * The route a call from building b takes to HQ: out the side that touches
+   * the road network closest to HQ, then along the roads. Only a building
+   * with no road beside it hops straight to the nearest one.
+   */
   routeFromBuilding(b: Point): Point[] {
-    const doorTile = { x: b.x + 1, y: b.y + BUILDING_SIZE };
-    const door = { x: (b.x + BUILDING_SIZE / 2) * TILE, y: (b.y + BUILDING_SIZE) * TILE };
+    const d = this.distances();
+    const S = BUILDING_SIZE;
+    // Tiles bordering the footprint with the wall point beside each; bottom
+    // first so a lot's own driveway wins ties.
+    const sides: { tile: Point; wall: Point }[] = [];
+    for (let i = 0; i < S; i++) {
+      sides.push({ tile: { x: b.x + i, y: b.y + S }, wall: { x: (b.x + i) * TILE + TILE / 2, y: (b.y + S) * TILE } });
+    }
+    for (let i = 0; i < S; i++) {
+      sides.push({ tile: { x: b.x - 1, y: b.y + i }, wall: { x: b.x * TILE, y: (b.y + i) * TILE + TILE / 2 } });
+      sides.push({ tile: { x: b.x + S, y: b.y + i }, wall: { x: (b.x + S) * TILE, y: (b.y + i) * TILE + TILE / 2 } });
+      sides.push({ tile: { x: b.x + i, y: b.y - 1 }, wall: { x: (b.x + i) * TILE + TILE / 2, y: b.y * TILE } });
+    }
+    let best: { tile: Point; wall: Point } | null = null;
+    let bestDist = Infinity;
+    for (const s of sides) {
+      const dist = inMap(s.tile.x, s.tile.y) ? d[tileKey(s.tile.x, s.tile.y)] : Infinity;
+      if (dist < bestDist) {
+        best = s;
+        bestDist = dist;
+      }
+    }
+    if (best) return this.routeToHQ(best.tile, best.wall);
+
+    const doorTile = { x: b.x + 1, y: b.y + S };
+    const door = { x: (b.x + S / 2) * TILE, y: (b.y + S) * TILE };
     const road = this.nearestRoad(doorTile);
     return road ? this.routeToHQ(road, door) : [door, HQ_DOOR];
   }

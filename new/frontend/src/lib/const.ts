@@ -62,7 +62,7 @@ export const HELP_REQUEST_COOLDOWN_MS = 30_000;
 
 export const STATE_CHECK_INTERVAL_MS = 5000;
 // Share of other (non-offline) agents In a meeting that pulls this agent in too.
-export const TEAM_MEETING_THRESHOLD = 0.75;
+export const TEAM_MEETING_THRESHOLD = 0.50;
 // Recent Calls page size; divides evenly into the 1/2/3-column grid.
 export const RECENT_CALLS_PAGE_SIZE = 12;
 // Rows per page in the Caller IDs admin table.
