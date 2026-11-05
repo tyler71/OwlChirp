@@ -3,7 +3,7 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 import { usePhoneLabel } from '../lib/callerId';
-import { formatPhoneNumber } from '../lib/helpers';
+import { formatPhoneNumber, incidentUrl } from '../lib/helpers';
 
 const ICONS = {
   phone:
@@ -248,5 +248,21 @@ export function PhoneLabel({ phoneNumber, className }: { phoneNumber: string; cl
     <span className={className} title={formatPhoneNumber(phoneNumber)}>
       {label}
     </span>
+  );
+}
+
+/** An incident number linked to its ServiceNow search; opens in a new tab. */
+export function IncidentLink({ incident, className = '' }: { incident: string; className?: string }) {
+  return (
+    <a
+      href={incidentUrl(incident)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`underline decoration-current/40 underline-offset-2 hover:decoration-current ${className}`}
+      onClick={(e) => e.stopPropagation()}
+      title="Open in ServiceNow"
+    >
+      {incident}
+    </a>
   );
 }

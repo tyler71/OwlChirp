@@ -1,6 +1,9 @@
 // Map view state: buildings that incoming calls are matched to, the
 // characters of everyone with Owlchirp open, and new-call pulses.
+import { persistentJSON } from '@nanostores/persistent';
 import { atom } from 'nanostores';
+
+import type { PropKind, Tile } from '../components/map/world';
 
 import { onEvent, request } from './realtime';
 import { $flowCalls, $wsStatus, type FlowCall } from './stores';
@@ -12,7 +15,9 @@ export type MapBuilding = {
   name: string;
   /** Normalized digits: "1206256*" is a prefix, "12062561234" an exact number. */
   patterns: string[];
-  slot: number;
+  /** Top-left tile of the building's footprint. */
+  x: number;
+  y: number;
   style: number;
 };
 
@@ -21,21 +26,63 @@ export type MapPlayer = {
   x: number;
   y: number;
   dir: Dir;
+  pet: Pet;
+  ride: Ride;
 };
 
-type MapState = { buildings: MapBuilding[]; players: MapPlayer[]; slots: number };
+export type Pet = '' | 'dog' | 'cat';
+export type Ride = 'walk' | 'bike' | 'car';
+export type MapTile = { x: number; y: number; tile: Tile };
+export type MapProp = { id: number; kind: PropKind; x: number; y: number };
 
-/** Buildings ordered by lot; null until loaded. */
+type MapState = { buildings: MapBuilding[]; players: MapPlayer[]; tiles: MapTile[]; props: MapProp[]; limit: number };
+
+const byPosition = (a: MapBuilding, b: MapBuilding) => a.y - b.y || a.x - b.x || a.id - b.id;
+
+/** Buildings top to bottom; null until loaded. */
 export const $buildings = atom<MapBuilding[] | null>(null);
 /** Everyone on the map by username; null until loaded. */
 export const $mapPlayers = atom<Record<string, MapPlayer> | null>(null);
 /** Building to highlight on the canvas (hovered in the editor). */
 export const $highlightBuilding = atom<number | null>(null);
+/** Ground painted over the default layout. */
+export const $mapTiles = atom<MapTile[]>([]);
+export const $mapProps = atom<MapProp[]>([]);
+/** A building to pan the map camera to (set by "Locate"). */
+export const $mapFocus = atom<{ x: number; y: number; at: number } | null>(null);
+
+/** This user's pet and ride, remembered across reloads. */
+export const $myGear = persistentJSON<{ pet: Pet; ride: Ride }>('owlchirp:map:gear', { pet: '', ride: 'walk' });
+
+export type MapMode = 'walk' | 'create' | 'destroy' | 'move';
+export type Brush = { type: 'tile'; tile: Tile } | { type: 'prop'; kind: PropKind };
+export const $mapMode = atom<MapMode>('walk');
+export const $mapBrush = atom<Brush>({ type: 'tile', tile: 'road' });
 
 export async function loadMapState(): Promise<void> {
   const state = await request<MapState>('map.state');
-  $buildings.set(state.buildings ?? []);
-  $mapPlayers.set(Object.fromEntries((state.players ?? []).map((p) => [p.username, p])));
+  $buildings.set((state.buildings ?? []).sort(byPosition));
+  $mapTiles.set(state.tiles ?? []);
+  $mapProps.set(state.props ?? []);
+  const players = Object.fromEntries((state.players ?? []).map((p) => [p.username, p]));
+  $mapPlayers.set(players);
+  syncGear();
+}
+
+/** Send this user's pet and ride if the server's copy differs. */
+function syncGear(): void {
+  const me = Object.values($mapPlayers.get() ?? {}).find((p) => p.username === $myUsername.get());
+  const gear = $myGear.get();
+  if (me && (me.pet !== gear.pet || me.ride !== gear.ride)) sendGear(gear.pet, gear.ride);
+}
+
+/** Set by MapView so gear can be matched to this user's player. */
+export const $myUsername = atom('');
+$myUsername.listen(syncGear);
+
+export function sendGear(pet: Pet, ride: Ride): void {
+  $myGear.set({ pet, ride });
+  request('map.gear', { pet, ride }).catch((e) => console.error('map.gear', e));
 }
 
 function setPlayer(p: MapPlayer): void {
@@ -55,11 +102,23 @@ onEvent<{ username: string }>('map.left', ({ username }) => {
 onEvent<MapBuilding>('building.updated', (b) => {
   const list = $buildings.get();
   if (!list) return;
-  $buildings.set([...list.filter((x) => x.id !== b.id), b].sort((a, c) => a.slot - c.slot));
+  $buildings.set([...list.filter((x) => x.id !== b.id), b].sort(byPosition));
 });
 onEvent<{ id: number }>('building.deleted', ({ id }) => {
   const list = $buildings.get();
   if (list) $buildings.set(list.filter((b) => b.id !== id));
+});
+
+onEvent<{ tiles: MapTile[] }>('map.painted', ({ tiles }) => {
+  const byTile = new Map($mapTiles.get().map((t) => [`${t.x},${t.y}`, t]));
+  for (const t of tiles) byTile.set(`${t.x},${t.y}`, t);
+  $mapTiles.set([...byTile.values()]);
+});
+onEvent<MapProp>('map.prop.created', (p) => {
+  $mapProps.set([...$mapProps.get().filter((x) => x.id !== p.id), p]);
+});
+onEvent<{ id: number }>('map.prop.deleted', ({ id }) => {
+  $mapProps.set($mapProps.get().filter((p) => p.id !== id));
 });
 
 // Events sent while the socket was down are lost; reload once it's back.
@@ -83,6 +142,22 @@ export async function updateBuilding(b: Pick<MapBuilding, 'id' | 'name' | 'patte
 
 export async function deleteBuilding(id: number): Promise<void> {
   await request('buildings.delete', { id });
+}
+
+export async function moveBuilding(id: number, x: number, y: number): Promise<MapBuilding> {
+  return request<MapBuilding>('buildings.move', { id, x, y });
+}
+
+export async function paintTiles(tiles: MapTile[]): Promise<void> {
+  await request('map.paint', { tiles });
+}
+
+export async function createProp(kind: PropKind, x: number, y: number): Promise<MapProp> {
+  return request<MapProp>('map.props.create', { kind, x, y });
+}
+
+export async function deleteProp(id: number): Promise<void> {
+  await request('map.props.delete', { id });
 }
 
 /**

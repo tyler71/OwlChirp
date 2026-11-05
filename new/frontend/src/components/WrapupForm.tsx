@@ -13,6 +13,7 @@ import {
   THOUGHTS_MAX_LENGTH,
   updateDraft,
 } from '../lib/wrapups';
+import { incidentUrl } from '../lib/helpers';
 import { Button } from './ui';
 
 const INPUT_CLASS =
@@ -45,9 +46,21 @@ export default function WrapupForm({ contactId, phoneNumber }: { contactId: stri
     <div className="space-y-3 border-t border-secondary-100 px-4 py-4 dark:border-secondary-800" onKeyDown={submitOnShortcut}>
       <h3 className="text-xs font-semibold tracking-wide text-secondary-500 uppercase dark:text-secondary-400">Call notes</h3>
       <div>
-        <label htmlFor={`wrapup-incident-${contactId}`} className={LABEL_CLASS}>
-          Incident created
-        </label>
+        <div className="flex items-baseline justify-between gap-2">
+          <label htmlFor={`wrapup-incident-${contactId}`} className={LABEL_CLASS}>
+            Incident created
+          </label>
+          {draft.incident.trim() && (
+            <a
+              href={incidentUrl(draft.incident)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-primary-700 hover:underline dark:text-primary-400"
+            >
+              Open ↗
+            </a>
+          )}
+        </div>
         <input
           id={`wrapup-incident-${contactId}`}
           type="text"

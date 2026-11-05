@@ -156,10 +156,12 @@ export const FEATURES = [
   { key: 'calls', label: 'Recent Calls', detail: 'Own call history' },
   { key: 'callsAll', label: 'All calls', detail: "Every agent's calls in Recent Calls" },
   { key: 'callerHistory', label: 'Caller history', detail: 'Past calls from the active caller' },
+  { key: 'transcription', label: 'Voice transcription', detail: 'Live transcript of the current call on the Phone tab' },
   { key: 'callerIds', label: 'Caller IDs', detail: 'Manage outbound caller IDs' },
   { key: 'agentNames', label: 'Agent names', detail: 'Agent names in Feed, Flow Calls, Timeline and call details' },
   { key: 'map', label: 'Map', detail: 'Team map with live incoming calls' },
   { key: 'mapEdit', label: 'Map buildings', detail: 'Manage Map buildings and the numbers they match' },
+  { key: 'mapDesign', label: 'Map design', detail: 'Move Map buildings, paint ground and place decorations' },
   { key: 'admin', label: 'Admin', detail: 'Admin page and user permissions' },
 ] as const;
 
@@ -173,7 +175,7 @@ export const PRESETS: { key: string; label: string; features: Feature[] }[] = [
   {
     key: 'power',
     label: 'Power',
-    features: ['feed', 'flow', 'timeline', 'calls', 'callerHistory', 'callerIds', 'map', 'mapEdit'],
+    features: ['feed', 'flow', 'timeline', 'calls', 'callerHistory', 'transcription', 'callerIds', 'map', 'mapEdit', 'mapDesign'],
   },
   { key: 'admin', label: 'Admin', features: ALL_FEATURES },
 ];

@@ -1,6 +1,7 @@
 // Pixel art for the Map, drawn in code: each sprite is a grid of palette
 // keys, rendered once per colour scheme to an offscreen canvas and cached.
-import { COLS, HQ, LOTS, POND, ROWS, TILE, TILES, hash, type Rect } from './world';
+import type { Pet, Ride } from '../../lib/map';
+import { BUILDING_SIZE, COLS, DEFAULT_LOTS, HQ, ROWS, TILE, hash, type PropKind, type Rect, type Tile, type World } from './world';
 
 type Grid = readonly string[];
 type Palette = Record<string, string>;
@@ -139,7 +140,8 @@ export type Pose = 'stand' | 'walk' | 'phone' | 'typing' | 'eating' | 'sleeping'
 
 /**
  * Draw one character with its feet at (x, y). t is seconds, for idle
- * animation.
+ * animation. On a bike or in a car they ride it unless they're busy, when
+ * it's parked beside them.
  */
 export function drawCharacter(
   ctx: CanvasRenderingContext2D,
@@ -149,7 +151,15 @@ export function drawCharacter(
   facing: Facing,
   pose: Pose,
   t: number,
+  ride: Ride = 'walk',
 ): void {
+  if (ride !== 'walk') {
+    if (pose === 'stand' || pose === 'walk' || pose === 'phone') {
+      drawRiding(ctx, username, x, y, facing, ride, pose === 'walk', t);
+      return;
+    }
+    drawParked(ctx, username, x, y, ride);
+  }
   const look = lookFor(username);
   const sprite = (name: string, grid: Grid, flip = false) =>
     cached(`${username}:${name}:${flip}`, () => render(grid, look, flip));
@@ -215,6 +225,154 @@ export function drawCharacter(
   }
 }
 
+// ---- Rides ----
+
+const RIDE_COLORS: Palette = {
+  ...BASE,
+  w: 'rgba(170, 220, 255, 0.55)', // glass: the driver's head shows through
+  y: '#ffe28a', // headlights
+  R: '#e5484d', // tail lights
+  k: '#2b2233', // tyres
+  m: '#b8c2cc', // hubs
+};
+
+// Car seen from the side, front on the left. 22x10.
+const CAR_SIDE: Grid = [
+  '......oooooooooo......',
+  '.....owwwwowwwwwo.....',
+  '....owwwwwowwwwwwo....',
+  '..oooCCCCCCCCCCCCCooo.',
+  '.oCCCCCCCCCCCCCCCCCCCo',
+  'oyCCCCCCCCCCCCCCCCCCCo',
+  'oCCCCCCCCCCCCCCCCCCCRo',
+  'oDDDookkooDDDDookkoDDo',
+  '....okmmko....okmmko..',
+  '.....okko......okko...',
+];
+// Car from the front (lights 'L' are headlights or tail lights). 14x10.
+const CAR_END: Grid = [
+  '..oooooooooo..',
+  '.owwwwwwwwwwo.',
+  '.owwwwwwwwwwo.',
+  'oooCCCCCCCCooo',
+  'oCCCCCCCCCCCCo',
+  'oLLCCCCCCCCLLo',
+  'oCCCCCCCCCCCCo',
+  'oDDDDDDDDDDDDo',
+  'okkooooooookko',
+  '.kk........kk.',
+];
+// Bicycle from the side, front on the left. 14x9.
+const BIKE_SIDE: Grid = [
+  '.oo.....ooo...',
+  '..o......o....',
+  '..oFFFFFFo....',
+  '..o.F..F.o....',
+  '.ooo.FF..ooo..',
+  'o...o.o.o...o.',
+  'o.o.o...o.o.o.',
+  'o...o...o...o.',
+  '.ooo.....ooo..',
+];
+const BIKE_END: Grid = ['oooooo', '..oo..', '..FF..', '..FF..', '..oo..', '..oo..', '..oo..', '..oo..', '..oo..'];
+
+function darken(hex: string, f = 0.75): string {
+  const n = parseInt(hex.slice(1), 16);
+  const c = (v: number) => Math.round(v * f).toString(16).padStart(2, '0');
+  return `#${c(n >> 16)}${c((n >> 8) & 255)}${c(n & 255)}`;
+}
+
+function vehicle(username: string, ride: Ride, facing: Facing): HTMLCanvasElement {
+  const look = lookFor(username);
+  const palette = { ...RIDE_COLORS, C: look.b, D: darken(look.b), F: look.b, L: facing === 'up' ? '#e5484d' : '#ffe28a' };
+  const side = facing === 'left' || facing === 'right';
+  const grid = ride === 'car' ? (side ? CAR_SIDE : CAR_END) : side ? BIKE_SIDE : BIKE_END;
+  const flip = facing === 'right';
+  return cached(`${username}:${ride}:${side ? 'side' : facing}:${flip}`, () => render(grid, palette, flip));
+}
+
+/** A character riding with feet at (x, y). */
+function drawRiding(
+  ctx: CanvasRenderingContext2D,
+  username: string,
+  x: number,
+  y: number,
+  facing: Facing,
+  ride: Ride,
+  moving: boolean,
+  t: number,
+) {
+  const look = lookFor(username);
+  const v = vehicle(username, ride, facing);
+  const vx = Math.round(x - v.width / 2);
+  const vy = Math.round(y - v.height);
+  const bump = moving && Math.floor(t * 10) % 2 ? 1 : 0;
+  const flip = facing === 'right';
+  const dir = flip ? 'left' : facing;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillRect(vx + 1, Math.round(y) - 2, v.width - 2, 3);
+
+  if (ride === 'car') {
+    // Head behind the glass, then the car over it.
+    const head = facing === 'up' ? HEAD_UP : facing === 'down' ? HEAD_DOWN : HEAD_SIDE;
+    const sprite = cached(`${username}:head-${dir}:${flip}`, () => render(head, look, flip));
+    const hx = facing === 'left' ? vx + 6 : facing === 'right' ? vx + v.width - 16 : vx + 2;
+    ctx.drawImage(sprite, hx, vy - 4 - bump);
+    ctx.drawImage(v, vx, vy - bump);
+    return;
+  }
+  // Bike: pedalling legs, the frame over them.
+  const frame = moving ? Math.floor(t * 8) % 2 : 0;
+  const body = cached(`${username}:${dir}${frame}:${flip}`, () => render(character(dir, frame), look, flip));
+  ctx.drawImage(body, Math.round(x - CHAR_W / 2), vy - CHAR_H + 6);
+  ctx.drawImage(v, vx, vy);
+}
+
+/** A parked bike or car beside someone who's busy. */
+function drawParked(ctx: CanvasRenderingContext2D, username: string, x: number, y: number, ride: Ride) {
+  const v = vehicle(username, ride, 'left');
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(Math.round(x + 8), Math.round(y) - 2, v.width - 2, 2);
+  ctx.drawImage(v, Math.round(x + 8), Math.round(y - v.height));
+}
+
+// ---- Pets ----
+
+const PET_COLORS: Record<Exclude<Pet, ''>, Palette> = {
+  dog: { o: '#2b2233', A: '#b07a46', E: '#6b4423', e: '#2b2233', n: '#2b2233' },
+  cat: { o: '#2b2233', A: '#9aa0aa', E: '#9aa0aa', e: '#6ee07a', n: '#f28fb0' },
+};
+const PET_SIDE: Record<Exclude<Pet, ''>, [Grid, Grid]> = {
+  dog: [
+    ['.oo.......', 'oEAo.....o', 'oeAAooooAo', 'nAAAAAAAAo', '.oAAAAAAo.', '.oAo..oAo.', '.oo...oo..'],
+    ['.oo.......', 'oEAo.....o', 'oeAAooooAo', 'nAAAAAAAAo', '.oAAAAAAo.', '..oAooAo..', '..oo.oo...'],
+  ],
+  cat: [
+    ['o.o.......', 'oAAo.....o', 'eAAAoooo.o', 'oAAAAAAAoo', '.oAAAAAAo.', '.oAo..oAo.', '.oo...oo..'],
+    ['o.o.......', 'oAAo.....o', 'eAAAoooo.o', 'oAAAAAAAoo', '.oAAAAAAo.', '..oAooAo..', '..oo.oo...'],
+  ],
+};
+const PET_FRONT: Record<Exclude<Pet, ''>, Grid> = {
+  dog: ['oo....oo', 'oEooooEo', '.oeAAeo.', '.oAnnAo.', '.oAAAAo.', '.oAooAo.', '.oo..oo.'],
+  cat: ['o......o', 'oo....oo', 'oAAAAAAo', 'oAeAAeAo', '.oAnnAo.', '.oAAAAo.', '.oo..oo.'],
+};
+const PET_BACK: Record<Exclude<Pet, ''>, Grid> = {
+  dog: ['oo....oo', 'oEooooEo', '.oAAAAo.', '.oAAAAo.', '.oAAAAo.', '.oAooAo.', '.oo..oo.'],
+  cat: ['o......o', 'oo....oo', 'oAAAAAAo', 'oAAAAAAo', '.oAAAAo.', '.oAAAAo.', '.oo..oo.'],
+};
+
+/** A pet with its feet at (x, y). */
+export function drawPet(ctx: CanvasRenderingContext2D, pet: Exclude<Pet, ''>, x: number, y: number, facing: Facing, moving: boolean, t: number) {
+  const frame = moving ? Math.floor(t * 10) % 2 : 0;
+  const flip = facing === 'right';
+  const grid = facing === 'down' ? PET_FRONT[pet] : facing === 'up' ? PET_BACK[pet] : PET_SIDE[pet][frame];
+  const sprite = cached(`pet:${pet}:${facing}:${frame}`, () => render(grid, PET_COLORS[pet], flip));
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(Math.round(x - sprite.width / 2) + 1, Math.round(y) - 1, sprite.width - 2, 2);
+  ctx.drawImage(sprite, Math.round(x - sprite.width / 2), Math.round(y - sprite.height - (moving && frame ? 1 : 0)));
+}
+
 // ---- Buildings ----
 
 type BuildingStyle = { wall: string; wallDark: string; roof: string; roofDark: string; trim: string };
@@ -240,10 +398,10 @@ function windowAt(ctx: CanvasRenderingContext2D, x: number, y: number, lit: bool
   ctx.fillRect(x, y + 3, 6, 1);
 }
 
-/** A house/office on a 4x4 tile lot. glow (0..1) lights it up. */
-export function drawBuilding(ctx: CanvasRenderingContext2D, slot: number, style: number, glow: number, t: number) {
+/** A school/office whose footprint's top-left tile is (tx, ty). glow (0..1) lights it up. */
+export function drawBuilding(ctx: CanvasRenderingContext2D, tx: number, ty: number, style: number, glow: number, t: number) {
   const s = BUILDING_STYLES[style % BUILDING_STYLES.length];
-  const { x, y, w, h } = px(LOTS[slot].rect);
+  const { x, y, w, h } = px({ x: tx, y: ty, w: BUILDING_SIZE, h: BUILDING_SIZE });
   const bx = x + 4;
   const bw = w - 8;
   const roofH = 22;
@@ -372,6 +530,8 @@ export function drawHQ(ctx: CanvasRenderingContext2D, glow: number, ring: number
   }
 }
 
+// ---- Trees and decorations ----
+
 export function drawTree(ctx: CanvasRenderingContext2D, tx: number, ty: number) {
   const x = tx * TILE;
   const y = ty * TILE;
@@ -394,28 +554,153 @@ export function drawTree(ctx: CanvasRenderingContext2D, tx: number, ty: number) 
   ctx.fillRect(x + 3, y - 6, 3, 3);
 }
 
-// ---- Ground ----
-
-const GROUND: Record<string, [string, string]> = {
-  grass: ['#7cc36a', '#6db35c'],
-  flowers: ['#7cc36a', '#6db35c'],
-  lot: ['#c9b27e', '#b9a06c'],
-  road: ['#5c5f6b', '#55585f'],
-  path: ['#d8c39a', '#c8b086'],
-  plaza: ['#d7d2c8', '#c7c0b3'],
-  water: ['#4aa3df', '#3d8fc8'],
+/** Labels and colours for the Create palette. */
+export const PROP_INFO: Record<PropKind, { label: string; emoji: string }> = {
+  tree: { label: 'Tree', emoji: '🌳' },
+  pine: { label: 'Pine', emoji: '🌲' },
+  bush: { label: 'Bush', emoji: '🌿' },
+  rock: { label: 'Rock', emoji: '🪨' },
+  flowerpot: { label: 'Flowers', emoji: '🌷' },
+  bench: { label: 'Bench', emoji: '🪑' },
+  lamp: { label: 'Lamp', emoji: '💡' },
+  fountain: { label: 'Fountain', emoji: '⛲' },
+  fence: { label: 'Fence', emoji: '🚧' },
+  sign: { label: 'Sign', emoji: '🪧' },
 };
 
-/** Paint every ground tile once; the result is drawn as a single image. */
-export function renderGround(): HTMLCanvasElement {
+/** A decoration standing on tile (tx, ty). */
+export function drawProp(ctx: CanvasRenderingContext2D, kind: PropKind, tx: number, ty: number, t: number) {
+  const x = tx * TILE;
+  const y = ty * TILE;
+  const O = '#2b2233';
+  const rect = (c: string, rx: number, ry: number, w: number, h: number) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(x + rx, y + ry, w, h);
+  };
+  switch (kind) {
+    case 'tree':
+      drawTree(ctx, tx, ty);
+      return;
+    case 'pine':
+      rect('rgba(0,0,0,0.2)', 3, 12, 10, 3);
+      rect(O, 6, 8, 4, 7);
+      rect('#7a4e2d', 7, 8, 2, 6);
+      for (let i = 0; i < 4; i++) {
+        const w = 6 + i * 3;
+        rect(O, 8 - w / 2 - 1, -14 + i * 6, w + 2, 7);
+        rect(i % 2 ? '#2f6e3a' : '#3c8d4a', 8 - w / 2, -13 + i * 6, w, 5);
+      }
+      return;
+    case 'bush':
+      rect('rgba(0,0,0,0.18)', 2, 13, 12, 2);
+      rect(O, 1, 5, 14, 10);
+      rect(O, 3, 3, 10, 2);
+      rect('#4caf50', 2, 6, 12, 8);
+      rect('#4caf50', 4, 4, 8, 2);
+      rect('#7ed36f', 4, 5, 4, 3);
+      return;
+    case 'rock':
+      rect('rgba(0,0,0,0.18)', 2, 13, 12, 2);
+      rect(O, 2, 6, 12, 9);
+      rect(O, 4, 4, 7, 2);
+      rect('#9aa0aa', 3, 7, 10, 7);
+      rect('#9aa0aa', 5, 5, 5, 2);
+      rect('#c4c9d1', 5, 6, 3, 2);
+      return;
+    case 'flowerpot': {
+      rect(O, 4, 9, 8, 6);
+      rect('#c8644b', 5, 10, 6, 4);
+      rect('#3c8d40', 7, 4, 2, 6);
+      const colors = ['#ff6b8b', '#ffd23f', '#b38cff'];
+      colors.forEach((c, i) => rect(c, 3 + i * 4, 2 + (i % 2) * 2, 3, 3));
+      return;
+    }
+    case 'bench':
+      rect('rgba(0,0,0,0.18)', 1, 13, 14, 2);
+      rect(O, 0, 4, 16, 4);
+      rect('#a0703f', 1, 5, 14, 2);
+      rect(O, 0, 8, 16, 3);
+      rect('#c08a52', 1, 9, 14, 1);
+      rect(O, 2, 11, 2, 4);
+      rect(O, 12, 11, 2, 4);
+      return;
+    case 'lamp': {
+      rect('rgba(0,0,0,0.2)', 4, 13, 8, 2);
+      rect(O, 7, -10, 2, 25);
+      rect(O, 4, -14, 8, 6);
+      const on = 0.75 + 0.25 * Math.sin(t * 3);
+      rect(`rgba(255, 226, 138, ${on})`, 5, -13, 6, 4);
+      return;
+    }
+    case 'fountain': {
+      rect('rgba(0,0,0,0.2)', 0, 12, 16, 3);
+      rect(O, 0, 6, 16, 9);
+      rect('#c4ccd6', 1, 7, 14, 7);
+      rect('#4aa3df', 2, 8, 12, 4);
+      rect(O, 7, 0, 2, 8);
+      const p = Math.floor(t * 6) % 3;
+      ctx.fillStyle = 'rgba(200, 235, 255, 0.9)';
+      ctx.fillRect(x + 6 - p, y - 2 + p, 1, 2);
+      ctx.fillRect(x + 9 + p, y - 2 + p, 1, 2);
+      ctx.fillRect(x + 7, y - 3, 2, 2);
+      return;
+    }
+    case 'fence':
+      rect(O, 0, 5, 16, 2);
+      rect(O, 0, 9, 16, 2);
+      rect('#e9e2cf', 0, 6, 16, 1);
+      rect('#e9e2cf', 0, 10, 16, 1);
+      for (const fx of [1, 7, 13]) {
+        rect(O, fx, 2, 3, 13);
+        rect('#f4efe0', fx + 1, 3, 1, 11);
+      }
+      return;
+    case 'sign':
+      rect('rgba(0,0,0,0.18)', 5, 13, 6, 2);
+      rect(O, 7, 4, 2, 11);
+      rect(O, 1, -2, 14, 8);
+      rect('#d9b97c', 2, -1, 12, 6);
+      rect('#7a4e2d', 4, 1, 8, 1);
+      rect('#7a4e2d', 4, 3, 5, 1);
+      return;
+  }
+}
+
+// ---- Ground ----
+
+export const GROUND: Record<Tile, { label: string; colors: [string, string] }> = {
+  grass: { label: 'Grass', colors: ['#7cc36a', '#6db35c'] },
+  flowers: { label: 'Flowers', colors: ['#7cc36a', '#6db35c'] },
+  road: { label: 'Road', colors: ['#5c5f6b', '#55585f'] },
+  path: { label: 'Path', colors: ['#d8c39a', '#c8b086'] },
+  plaza: { label: 'Plaza', colors: ['#d7d2c8', '#c7c0b3'] },
+  sand: { label: 'Sand', colors: ['#ecdcab', '#ddc98f'] },
+  water: { label: 'Water', colors: ['#4aa3df', '#3d8fc8'] },
+  lot: { label: 'Lot', colors: ['#c9b27e', '#b9a06c'] },
+};
+
+/** A canvas holding the whole map's ground. Repaint parts with paintGround. */
+export function renderGround(world: World): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = COLS * TILE;
   c.height = ROWS * TILE;
+  paintGround(c, world, 0, 0, COLS - 1, ROWS - 1);
+  return c;
+}
+
+/** Repaint the ground tiles from (x0, y0) to (x1, y1) inclusive. */
+export function paintGround(c: HTMLCanvasElement, world: World, x0: number, y0: number, x1: number, y1: number) {
   const ctx = c.getContext('2d')!;
-  for (let ty = 0; ty < ROWS; ty++) {
-    for (let tx = 0; tx < COLS; tx++) {
-      const tile = TILES[ty][tx];
-      const [base, alt] = GROUND[tile];
+  x0 = Math.max(0, x0);
+  y0 = Math.max(0, y0);
+  x1 = Math.min(COLS - 1, x1);
+  y1 = Math.min(ROWS - 1, y1);
+  const at = (x: number, y: number) => world.tile(x, y);
+
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      const tile = at(tx, ty)!;
+      const [base, alt] = GROUND[tile].colors;
       const x = tx * TILE;
       const y = ty * TILE;
       ctx.fillStyle = base;
@@ -437,51 +722,51 @@ export function renderGround(): HTMLCanvasElement {
         ctx.fillStyle = 'rgba(255,255,255,0.18)';
         ctx.fillRect(x, y, TILE, TILE);
       }
-    }
-  }
 
-  // Road markings: dashed centre lines on two-tile-wide roads.
-  ctx.fillStyle = '#e8d36a';
-  for (const yLine of [9, 30, 22]) {
-    for (let tx = 0; tx < COLS; tx++) {
-      if (TILES[yLine][tx] === 'road' && TILES[yLine - 1][tx] === 'road' && tx % 2 === 0) {
-        ctx.fillRect(tx * TILE + 3, yLine * TILE - 1, 10, 2);
+      if (tile === 'road') {
+        // Dashed centre lines on two-wide roads, not across junctions.
+        const road = (dx: number, dy: number) => at(tx + dx, ty + dy) === 'road';
+        ctx.fillStyle = '#e8d36a';
+        if (road(0, -1) && !road(0, -2) && !road(0, 1) && tx % 2 === 0) ctx.fillRect(x + 3, y - 1, 10, 2);
+        if (road(-1, 0) && !road(-2, 0) && !road(1, 0) && ty % 2 === 0) ctx.fillRect(x - 1, y + 3, 2, 10);
+      }
+      if (tile === 'water') {
+        // Banks where water meets land.
+        ctx.fillStyle = '#2b2233';
+        const land = (dx: number, dy: number) => {
+          const n = at(tx + dx, ty + dy);
+          return n !== undefined && n !== 'water';
+        };
+        if (land(0, -1)) {
+          ctx.fillRect(x, y, TILE, 2);
+          ctx.fillStyle = '#c9e7f7';
+          ctx.fillRect(x, y + 2, TILE, 2);
+          ctx.fillStyle = '#2b2233';
+        }
+        if (land(0, 1)) ctx.fillRect(x, y + TILE - 2, TILE, 2);
+        if (land(-1, 0)) ctx.fillRect(x, y, 2, TILE);
+        if (land(1, 0)) ctx.fillRect(x + TILE - 2, y, 2, TILE);
+      }
+      if (tile === 'lot') {
+        // Dashed edge around each lot.
+        const lot = (dx: number, dy: number) => at(tx + dx, ty + dy) === 'lot';
+        ctx.fillStyle = 'rgba(80, 60, 30, 0.35)';
+        for (let i = 0; i < TILE; i += 6) {
+          if (!lot(0, -1)) ctx.fillRect(x + i, y + 2, 3, 1);
+          if (!lot(0, 1)) ctx.fillRect(x + i, y + TILE - 3, 3, 1);
+          if (!lot(-1, 0)) ctx.fillRect(x + 2, y + i, 1, 3);
+          if (!lot(1, 0)) ctx.fillRect(x + TILE - 3, y + i, 1, 3);
+        }
       }
     }
   }
-  for (const xLine of [8, 38]) {
-    for (let ty = 0; ty < ROWS; ty++) {
-      if (TILES[ty][xLine] === 'road' && TILES[ty][xLine - 1] === 'road' && ty % 2 === 0 && ty !== 8 && ty !== 9 && ty !== 21 && ty !== 22 && ty !== 29 && ty !== 30) {
-        ctx.fillRect(xLine * TILE - 1, ty * TILE + 3, 2, 10);
-      }
-    }
-  }
-
-  // Pond edge.
-  const p = px(POND);
-  ctx.strokeStyle = '#2b2233';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(p.x, p.y, p.w, p.h);
-  ctx.fillStyle = '#c9e7f7';
-  ctx.fillRect(p.x + 2, p.y + 2, p.w - 4, 2);
-
-  // Empty lots get a little "for sale" post.
-  for (const lot of LOTS) {
-    const r = px(lot.rect);
-    ctx.strokeStyle = 'rgba(80, 60, 30, 0.35)';
-    ctx.setLineDash([3, 3]);
-    ctx.lineWidth = 1;
-    ctx.strokeRect(r.x + 2.5, r.y + 2.5, r.w - 5, r.h - 5);
-    ctx.setLineDash([]);
-  }
-  return c;
 }
 
-/** The little sign on an empty lot (drawn only while the lot is free). */
-export function drawEmptyLot(ctx: CanvasRenderingContext2D, slot: number) {
-  const r = px(LOTS[slot].rect);
-  const x = r.x + r.w / 2 - 6;
-  const y = r.y + r.h / 2 - 6;
+/** The little sign on an empty default lot. */
+export function drawEmptyLot(ctx: CanvasRenderingContext2D, r: Rect) {
+  const p = px(r);
+  const x = p.x + p.w / 2 - 6;
+  const y = p.y + p.h / 2 - 6;
   ctx.fillStyle = '#2b2233';
   ctx.fillRect(x + 5, y + 6, 2, 10);
   ctx.fillRect(x - 1, y - 1, 14, 9);
@@ -492,17 +777,23 @@ export function drawEmptyLot(ctx: CanvasRenderingContext2D, slot: number) {
   ctx.fillRect(x + 2, y + 4, 5, 1);
 }
 
-/** Water shimmer, drawn each frame over the pond. */
-export function drawWater(ctx: CanvasRenderingContext2D, t: number) {
-  const p = px(POND);
+/** Empty default lots: still lot ground and not built on. */
+export function emptyLots(world: World): Rect[] {
+  return DEFAULT_LOTS.filter(
+    (r) => world.tile(r.x, r.y) === 'lot' && world.tile(r.x + 3, r.y + 3) === 'lot' && !world.buildingAt(r.x + 1, r.y + 1),
+  );
+}
+
+/** Water shimmer on the visible water tiles. */
+export function drawWater(ctx: CanvasRenderingContext2D, world: World, view: Rect, t: number) {
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  for (let i = 0; i < 6; i++) {
-    const phase = (t * 0.6 + i * 0.37) % 1;
-    const sx = p.x + 6 + Math.floor(hash(i, 1, 3) * (p.w - 18));
-    const sy = p.y + 8 + Math.floor(hash(i, 2, 3) * (p.h - 16));
-    ctx.globalAlpha = Math.sin(phase * Math.PI) * 0.8;
-    ctx.fillRect(sx + Math.floor(phase * 4), sy, 5, 1);
+  for (let ty = view.y; ty < view.y + view.h; ty++) {
+    for (let tx = view.x; tx < view.x + view.w; tx++) {
+      if (world.tile(tx, ty) !== 'water' || hash(tx, ty, 13) > 0.35) continue;
+      const phase = (t * 0.6 + hash(tx, ty, 2)) % 1;
+      ctx.globalAlpha = Math.sin(phase * Math.PI) * 0.8;
+      ctx.fillRect(tx * TILE + 3 + Math.floor(phase * 4), ty * TILE + 4 + Math.floor(hash(tx, ty, 4) * 8), 5, 1);
+    }
   }
   ctx.globalAlpha = 1;
 }
-

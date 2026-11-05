@@ -30,6 +30,7 @@ import CallerTimeline from './CallerTimeline';
 import CallFlow from './CallFlow';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
+import VoiceTranscript from './VoiceTranscript';
 import Ccp from './Ccp';
 import DataPanel from './DataPanel';
 import Feed from './Feed';
@@ -346,6 +347,7 @@ export default function App() {
                 </div>
                 <div className="hidden flex-col gap-6 lg:col-span-2 lg:flex">
                   <CallFlow />
+                  <VoiceTranscript />
                   <CallerTimeline />
                 </div>
               </div>

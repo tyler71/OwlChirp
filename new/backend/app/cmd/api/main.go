@@ -19,6 +19,7 @@ import (
 	"github.com/tyler71/owlchirp/app/internal/database"
 	"github.com/tyler71/owlchirp/app/internal/env"
 	"github.com/tyler71/owlchirp/app/internal/realtime"
+	"github.com/tyler71/owlchirp/app/internal/transcribe"
 	"github.com/tyler71/owlchirp/app/internal/version"
 
 	"github.com/lmittmann/tint"
@@ -67,22 +68,27 @@ type config struct {
 		interval  time.Duration
 		retention time.Duration
 	}
+	transcription struct {
+		language        string
+		streamAttribute string
+	}
 }
 
 type application struct {
-	config   config
-	db       *database.DB
-	connect  *connect.Client
-	auth     *auth.Verifier
-	users    auth.UserSource
-	hub      *realtime.Hub
-	perms    *permissionStore
-	handlers map[string]wsHandler
-	timeline *cache.Value[flowTimeline]
-	help     helpLimiter
-	presence mapPresence
-	logger   *slog.Logger
-	wg       sync.WaitGroup
+	config      config
+	db          *database.DB
+	connect     *connect.Client
+	auth        *auth.Verifier
+	users       auth.UserSource
+	hub         *realtime.Hub
+	perms       *permissionStore
+	handlers    map[string]wsHandler
+	timeline    *cache.Value[flowTimeline]
+	help        helpLimiter
+	presence    mapPresence
+	transcriber *transcribe.Service
+	logger      *slog.Logger
+	wg          sync.WaitGroup
 }
 
 func run(logger *slog.Logger) error {
@@ -105,6 +111,8 @@ func run(logger *slog.Logger) error {
 
 	cfg.flowCalls.interval = time.Duration(env.GetInt("FLOW_POLL_INTERVAL", 5)) * time.Second
 	// Keep at least the timeline's window so it never shows pruned gaps.
+	cfg.transcription.language = env.GetString("TRANSCRIBE_LANGUAGE", "en-US")
+	cfg.transcription.streamAttribute = env.GetString("KVS_STREAM_ATTRIBUTE", "kvsStreamArn")
 	cfg.flowCalls.retention = max(time.Duration(env.GetInt("FLOW_RETENTION_DAYS", 56))*24*time.Hour, timelineWindow)
 
 	showVersion := flag.Bool("version", false, "display version and exit")
@@ -147,6 +155,7 @@ func run(logger *slog.Logger) error {
 		logger:  logger,
 	}
 
+	app.transcriber = transcribe.New(cc.AWSConfig(), cfg.transcription.language)
 	app.handlers = app.wsHandlers()
 	app.timeline = cache.NewValue(timelineTTL, app.buildTimeline)
 

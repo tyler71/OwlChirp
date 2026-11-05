@@ -104,15 +104,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_flow_calls_contact_id ON flow_calls (contac
 CREATE INDEX IF NOT EXISTS ix_flow_calls_initiated_at ON flow_calls (initiated_at);
 
 -- Map buildings: where incoming calls come from. patterns is a JSON array of
--- normalized digit patterns ("1206256*" prefix or "12062561234" exact). slot
--- is the lot the building was auto-placed in, kept so the layout is stable.
+-- normalized digit patterns ("1206256*" prefix or "12062561234" exact). x, y
+-- is the top-left tile of the building. slot is unused (the old fixed lot,
+-- converted to x, y by the migration).
 CREATE TABLE IF NOT EXISTS map_buildings (
 	id INTEGER NOT NULL PRIMARY KEY,
 	name VARCHAR(30) NOT NULL,
 	patterns TEXT NOT NULL DEFAULT '[]',
-	slot INTEGER NOT NULL,
+	slot INTEGER NOT NULL DEFAULT 0,
+	x INTEGER NOT NULL DEFAULT -1,
+	y INTEGER NOT NULL DEFAULT -1,
 	style INTEGER NOT NULL DEFAULT 0,
 	created_on DATETIME,
 	updated_on DATETIME
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ix_map_buildings_slot ON map_buildings (slot);
+
+-- Map ground painted over the default layout, one row per tile.
+CREATE TABLE IF NOT EXISTS map_tiles (
+	x INTEGER NOT NULL,
+	y INTEGER NOT NULL,
+	tile VARCHAR(20) NOT NULL,
+	PRIMARY KEY (x, y)
+);
+
+-- Map decorations, at most one per tile.
+CREATE TABLE IF NOT EXISTS map_props (
+	id INTEGER NOT NULL PRIMARY KEY,
+	kind VARCHAR(20) NOT NULL,
+	x INTEGER NOT NULL,
+	y INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_map_props_xy ON map_props (x, y);

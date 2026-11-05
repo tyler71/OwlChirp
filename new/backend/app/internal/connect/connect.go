@@ -73,6 +73,7 @@ type currentMetrics struct {
 
 type Client struct {
 	api      *awsconnect.Client
+	awsCfg   aws.Config
 	instance string
 
 	queues          *cache.Value[[]string]
@@ -98,7 +99,7 @@ func New(ctx context.Context, instance string, snapshotTTL time.Duration) (*Clie
 		return nil, err
 	}
 
-	c := &Client{api: awsconnect.NewFromConfig(cfg), instance: instance}
+	c := &Client{api: awsconnect.NewFromConfig(cfg), awsCfg: cfg, instance: instance}
 
 	c.queues = cache.NewValue(6*time.Hour, c.fetchQueues)
 	c.registeredUsers = cache.NewValue(10*time.Minute, c.fetchRegisteredUsers)
@@ -269,6 +270,48 @@ func (c *Client) fetchContact(ctx context.Context, contactID string) (*types.Con
 		return nil, fmt.Errorf("describe contact: %w", err)
 	}
 	return out.Contact, nil
+}
+
+// AWSConfig is the AWS config the client was built with, so other AWS
+// clients share its credentials and region.
+func (c *Client) AWSConfig() aws.Config { return c.awsCfg }
+
+// ErrNotAgentContact means the contact isn't connected to the given agent.
+var ErrNotAgentContact = errors.New("contact is not handled by this agent")
+
+// ErrNoMediaStream means the contact has no KVS stream ARN attribute.
+var ErrNoMediaStream = errors.New("contact has no media stream")
+
+// ContactStream returns the Kinesis Video Stream ARN the contact flow saved
+// in the contact attribute named attr, after checking that the contact is
+// connected to agentID. It bypasses the contact cache: the agent is only
+// assigned once the call is answered.
+func (c *Client) ContactStream(ctx context.Context, contactID, agentID, attr string) (string, error) {
+	contact, err := c.fetchContact(ctx, contactID)
+	if err != nil {
+		return "", err
+	}
+	if contact.AgentInfo == nil || !strings.EqualFold(aws.ToString(contact.AgentInfo.Id), agentID) {
+		return "", ErrNotAgentContact
+	}
+
+	// Attributes live on the first contact of a transfer chain.
+	initial := contactID
+	if id := aws.ToString(contact.InitialContactId); id != "" {
+		initial = id
+	}
+	out, err := c.api.GetContactAttributes(ctx, &awsconnect.GetContactAttributesInput{
+		InstanceId:       aws.String(c.instance),
+		InitialContactId: aws.String(initial),
+	})
+	if err != nil {
+		return "", fmt.Errorf("get contact attributes: %w", err)
+	}
+	arn := strings.TrimSpace(out.Attributes[attr])
+	if !strings.HasPrefix(arn, "arn:") {
+		return "", ErrNoMediaStream
+	}
+	return arn, nil
 }
 
 func (c *Client) fetchUser(ctx context.Context, userID string) (UserDetail, error) {

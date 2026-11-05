@@ -1,11 +1,12 @@
-// Buildings on the Map and the numbers they match. Every building is placed
-// in the next free lot, which is kept so the town looks the same each time.
+// Buildings on the Map and the numbers they match. A new building goes in
+// the first free lot nearest HQ; with Map design it can be dragged anywhere.
 import { useStore } from '@nanostores/react';
 import { useState, type FormEvent } from 'react';
 
 import {
   $buildings,
   $highlightBuilding,
+  $mapFocus,
   createBuilding,
   deleteBuilding,
   formatPattern,
@@ -14,7 +15,7 @@ import {
 } from '../../lib/map';
 import { Button } from '../ui';
 import { BUILDING_STYLES } from './sprites';
-import { LOTS } from './world';
+import { BUILDING_LIMIT } from './world';
 
 const MAX_NAME_LENGTH = 30;
 const INPUT_CLASS =
@@ -75,7 +76,7 @@ function Row({ building }: { building: MapBuilding }) {
   }
 
   async function remove() {
-    if (!confirm(`Delete building "${building.name}"? Its lot becomes free.`)) return;
+    if (!confirm(`Delete building "${building.name}"?`)) return;
     try {
       await deleteBuilding(building.id);
     } catch (e) {
@@ -135,6 +136,9 @@ function Row({ building }: { building: MapBuilding }) {
           </td>
           <td className="p-3">{BUILDING_STYLES[building.style]?.label}</td>
           <td className="py-2 pl-3 text-right whitespace-nowrap">
+            <Button size="sm" onClick={() => $mapFocus.set({ x: building.x, y: building.y, at: Date.now() })}>
+              Locate
+            </Button>{' '}
             <Button size="sm" onClick={startEdit}>
               Edit
             </Button>{' '}
@@ -152,7 +156,7 @@ export default function BuildingsEditor() {
   const [patterns, setPatterns] = useState('');
   const [style, setStyle] = useState(0);
   const [error, setError] = useState('');
-  const full = buildings.length >= LOTS.length;
+  const full = buildings.length >= BUILDING_LIMIT;
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
@@ -178,7 +182,7 @@ export default function BuildingsEditor() {
         <p className="text-sm text-secondary-500 dark:text-secondary-400">
           Calls from a building's numbers start there on the map. End a number with * to match every number that
           starts with it, e.g. 206-256-*. When numbers overlap, an exact number wins, then the longest prefix.{' '}
-          {buildings.length} of {LOTS.length} lots used.
+          {buildings.length} of {BUILDING_LIMIT} buildings.
         </p>
       </div>
       <form onSubmit={onAdd} className="flex flex-col gap-2 border-b border-secondary-100 px-5 py-4 sm:flex-row sm:items-start dark:border-secondary-800">
@@ -204,7 +208,7 @@ export default function BuildingsEditor() {
       </form>
       {(error || full) && (
         <p className="border-b border-secondary-100 px-5 py-2 text-sm text-rose-600 dark:border-secondary-800 dark:text-rose-400">
-          {error || 'Every lot is taken. Delete a building to free one.'}
+          {error || 'The map is full. Delete a building to add another.'}
         </p>
       )}
       <div className="overflow-x-auto p-5">

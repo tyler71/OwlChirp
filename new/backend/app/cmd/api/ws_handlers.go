@@ -72,10 +72,17 @@ func (app *application) wsHandlers() map[string]wsHandler {
 		"users.resetFeatures": app.wsResetFeatures,
 		"map.state":           app.wsMapState,
 		"map.move":            app.wsMapMove,
+		"map.gear":            app.wsMapGear,
+		"map.paint":           app.wsMapPaint,
+		"map.props.create":    app.wsCreateProp,
+		"map.props.delete":    app.wsDeleteProp,
+		"buildings.move":      app.wsMoveBuilding,
 		"buildings.list":      app.wsListBuildings,
 		"buildings.create":    app.wsCreateBuilding,
 		"buildings.update":    app.wsUpdateBuilding,
 		"buildings.delete":    app.wsDeleteBuilding,
+		"transcribe.start":    app.wsStartTranscript,
+		"transcribe.stop":     app.wsStopTranscript,
 	}
 }
 
@@ -86,8 +93,11 @@ var requestFeature = map[string]string{
 	"flowcalls.number": features.CallerHistory,
 	"callerid.list":    features.CallerIDs, "callerid.delete": features.CallerIDs,
 	"users.list": features.Admin, "users.setFeatures": features.Admin, "users.resetFeatures": features.Admin,
-	"map.state": features.Map, "map.move": features.Map, "buildings.list": features.Map,
+	"map.state": features.Map, "map.move": features.Map, "map.gear": features.Map, "buildings.list": features.Map,
 	"buildings.create": features.MapEdit, "buildings.update": features.MapEdit, "buildings.delete": features.MapEdit,
+	"buildings.move": features.MapDesign, "map.paint": features.MapDesign,
+	"map.props.create": features.MapDesign, "map.props.delete": features.MapDesign,
+	"transcribe.start": features.Transcription, "transcribe.stop": features.Transcription,
 }
 
 // handleRequest serves req if user has the feature it needs.

@@ -16,10 +16,10 @@ import (
 )
 
 // Map world size in pixels. Mirrors WORLD_W/WORLD_H in the frontend's
-// components/map/world.ts (48x32 tiles of 16px).
+// components/map/world.ts.
 const (
-	mapWidth  = 48 * 16
-	mapHeight = 32 * 16
+	mapWidth  = database.MapCols * 16
+	mapHeight = database.MapRows * 16
 
 	maxBuildingNameLength = 30
 	maxBuildingPatterns   = 20
@@ -27,10 +27,19 @@ const (
 	// mapMoveInterval is the shortest gap between accepted moves per user;
 	// faster moves are dropped. Clients send at most ~10/s.
 	mapMoveInterval = 50 * time.Millisecond
+
+	// maxPaintTiles caps the tiles painted by one request.
+	maxPaintTiles = 400
 )
 
 // Spawn area: the plaza in front of Techline HQ.
-var mapSpawn = struct{ minX, maxX, minY, maxY float64 }{19 * 16, 29 * 16, 17*16 + 8, 19 * 16}
+var mapSpawn = struct{ minX, maxX, minY, maxY float64 }{57 * 16, 72 * 16, 52 * 16, 55 * 16}
+
+// Pets that follow a character, and what they ride.
+var (
+	validPets  = map[string]bool{"": true, "dog": true, "cat": true}
+	validRides = map[string]bool{"walk": true, "bike": true, "car": true}
+)
 
 // mapPlayer is one Owlchirp user on the map. Everyone with Owlchirp open is
 // on the map, in every tab they have open at the same spot.
@@ -39,6 +48,8 @@ type mapPlayer struct {
 	X        float64 `json:"x"`
 	Y        float64 `json:"y"`
 	Dir      string  `json:"dir"`
+	Pet      string  `json:"pet"`  // "", "dog" or "cat"
+	Ride     string  `json:"ride"` // "walk", "bike" or "car"
 
 	conns    int
 	lastMove time.Time
@@ -66,6 +77,7 @@ func (p *mapPresence) join(username string) (player mapPlayer, joined bool) {
 			X:        mapSpawn.minX + rand.Float64()*(mapSpawn.maxX-mapSpawn.minX),
 			Y:        mapSpawn.minY + rand.Float64()*(mapSpawn.maxY-mapSpawn.minY),
 			Dir:      "down",
+			Ride:     "walk",
 		}
 		p.players[username] = pl
 	}
@@ -103,6 +115,19 @@ func (p *mapPresence) move(username string, x, y float64, dir string, now time.T
 	return *pl, true
 }
 
+// gear sets username's pet and ride. ok is false when the user isn't on the
+// map.
+func (p *mapPresence) gear(username, pet, ride string) (mapPlayer, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	pl, found := p.players[username]
+	if !found {
+		return mapPlayer{}, false
+	}
+	pl.Pet, pl.Ride = pet, ride
+	return *pl, true
+}
+
 func (p *mapPresence) list() []mapPlayer {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -135,7 +160,9 @@ func (app *application) mapJoin(user connect.RegisteredUser) func() {
 type mapState struct {
 	Buildings []database.Building `json:"buildings"`
 	Players   []mapPlayer         `json:"players"`
-	Slots     int                 `json:"slots"`
+	Tiles     []database.MapTile  `json:"tiles"`
+	Props     []database.MapProp  `json:"props"`
+	Limit     int                 `json:"limit"`
 }
 
 func (app *application) wsMapState(ctx context.Context, _ connect.RegisteredUser, _ json.RawMessage) (any, error) {
@@ -143,7 +170,21 @@ func (app *application) wsMapState(ctx context.Context, _ connect.RegisteredUser
 	if err != nil {
 		return nil, err
 	}
-	return mapState{Buildings: buildings, Players: app.presence.list(), Slots: database.MapSlotCount}, nil
+	tiles, err := app.db.ListTiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	props, err := app.db.ListProps(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mapState{
+		Buildings: buildings,
+		Players:   app.presence.list(),
+		Tiles:     tiles,
+		Props:     props,
+		Limit:     database.MapBuildingLimit,
+	}, nil
 }
 
 // wsMapMove moves the user's character. Moves arriving faster than
@@ -223,7 +264,7 @@ func (app *application) wsCreateBuilding(ctx context.Context, _ connect.Register
 		return nil, err
 	}
 	b, err := app.db.CreateBuilding(ctx, input.Name, input.Patterns, input.Style)
-	if errors.Is(err, database.ErrNoFreeSlot) {
+	if errors.Is(err, database.ErrMapFull) {
 		return nil, clientError(err.Error())
 	}
 	if err != nil {
@@ -267,5 +308,117 @@ func (app *application) wsDeleteBuilding(ctx context.Context, _ connect.Register
 		return nil, clientError("building not found")
 	}
 	app.broadcast("building.deleted", map[string]int64{"id": input.ID})
+	return map[string]int64{"id": input.ID}, nil
+}
+
+// wsMapGear sets the user's pet and ride, seen by everyone.
+func (app *application) wsMapGear(_ context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		Pet  string `json:"pet"`
+		Ride string `json:"ride"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if !validPets[input.Pet] {
+		return nil, clientError("pet must be dog, cat or empty")
+	}
+	if !validRides[input.Ride] {
+		return nil, clientError("ride must be walk, bike or car")
+	}
+	player, ok := app.presence.gear(user.Username, input.Pet, input.Ride)
+	if !ok {
+		return nil, clientError("not on the map")
+	}
+	app.broadcast("map.moved", player)
+	return player, nil
+}
+
+// wsMoveBuilding moves a building to a new spot.
+func (app *application) wsMoveBuilding(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		ID int64 `json:"id"`
+		X  int   `json:"x"`
+		Y  int   `json:"y"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	b, found, err := app.db.MoveBuilding(ctx, input.ID, input.X, input.Y)
+	if errors.Is(err, database.ErrBadSpot) || errors.Is(err, database.ErrSpotTaken) {
+		return nil, clientError(err.Error())
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, clientError("building not found")
+	}
+	app.broadcast("building.updated", b)
+	return b, nil
+}
+
+// wsMapPaint paints ground tiles over the default layout.
+func (app *application) wsMapPaint(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		Tiles []database.MapTile `json:"tiles"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if len(input.Tiles) == 0 {
+		return nil, clientError("no tiles to paint")
+	}
+	if len(input.Tiles) > maxPaintTiles {
+		return nil, clientError(fmt.Sprintf("at most %d tiles at a time", maxPaintTiles))
+	}
+	err := app.db.PaintTiles(ctx, input.Tiles)
+	if errors.Is(err, database.ErrBadTile) {
+		return nil, clientError(err.Error())
+	}
+	if err != nil {
+		return nil, err
+	}
+	app.broadcast("map.painted", map[string]any{"tiles": input.Tiles})
+	return map[string]int{"painted": len(input.Tiles)}, nil
+}
+
+// wsCreateProp places a decoration.
+func (app *application) wsCreateProp(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		Kind string `json:"kind"`
+		X    int    `json:"x"`
+		Y    int    `json:"y"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	prop, err := app.db.CreateProp(ctx, input.Kind, input.X, input.Y)
+	if errors.Is(err, database.ErrBadProp) || errors.Is(err, database.ErrTileTaken) {
+		return nil, clientError(err.Error())
+	}
+	if err != nil {
+		return nil, err
+	}
+	app.broadcast("map.prop.created", prop)
+	return prop, nil
+}
+
+// wsDeleteProp removes a decoration.
+func (app *application) wsDeleteProp(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		ID int64 `json:"id"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	found, err := app.db.DeleteProp(ctx, input.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, clientError("decoration not found")
+	}
+	app.broadcast("map.prop.deleted", map[string]int64{"id": input.ID})
 	return map[string]int64{"id": input.ID}, nil
 }

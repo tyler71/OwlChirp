@@ -98,7 +98,9 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	// coder/websocket allows one concurrent writer, so request handlers hand
 	// their replies to the write loop below.
 	replies := make(chan []byte, wsReplyBuffer)
-	go app.wsReadLoop(ctx, cancel, conn, user, replies)
+	session := newWSSession(ctx)
+	defer session.close()
+	go app.wsReadLoop(withSession(ctx, session), cancel, conn, user, replies)
 
 	ping := time.NewTicker(wsPingInterval)
 	defer ping.Stop()
@@ -115,6 +117,10 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case msg := <-replies:
+			if err := wsWrite(ctx, conn, msg); err != nil {
+				return
+			}
+		case msg := <-session.push:
 			if err := wsWrite(ctx, conn, msg); err != nil {
 				return
 			}

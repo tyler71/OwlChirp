@@ -6,17 +6,18 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+
+	"github.com/jmoiron/sqlx"
 )
 
-// MapSlotCount is how many building lots the map has. The frontend's world
-// layout (components/map/world.ts) defines the same number of lots.
-const MapSlotCount = 16
+// ErrMapFull is returned when the map already has MapBuildingLimit buildings.
+var ErrMapFull = errors.New("the map is full: delete a building first")
 
-// MapStyleCount is how many building sprite styles the frontend draws.
-const MapStyleCount = 4
+// ErrBadSpot is returned for a building position off the map or on HQ.
+var ErrBadSpot = errors.New("buildings must be on the map and clear of HQ")
 
-// ErrNoFreeSlot is returned when every map lot already has a building.
-var ErrNoFreeSlot = errors.New("every map lot is taken")
+// ErrSpotTaken is returned when a building would overlap another one.
+var ErrSpotTaken = errors.New("another building is in the way")
 
 // ErrBadPattern is returned by NormalizePattern for unusable input.
 var ErrBadPattern = errors.New("pattern needs at least 3 digits, e.g. 206-256-* or 206-256-1234")
@@ -26,7 +27,8 @@ type Building struct {
 	ID       int64    `json:"id"`
 	Name     string   `json:"name"`
 	Patterns []string `json:"patterns"`
-	Slot     int      `json:"slot"`
+	X        int      `json:"x"` // top-left tile of the footprint
+	Y        int      `json:"y"`
 	Style    int      `json:"style"`
 }
 
@@ -34,12 +36,13 @@ type buildingRow struct {
 	ID       int64  `db:"id"`
 	Name     string `db:"name"`
 	Patterns string `db:"patterns"`
-	Slot     int    `db:"slot"`
+	X        int    `db:"x"`
+	Y        int    `db:"y"`
 	Style    int    `db:"style"`
 }
 
 func (r buildingRow) building() Building {
-	b := Building{ID: r.ID, Name: r.Name, Slot: r.Slot, Style: r.Style, Patterns: []string{}}
+	b := Building{ID: r.ID, Name: r.Name, X: r.X, Y: r.Y, Style: r.Style, Patterns: []string{}}
 	_ = json.Unmarshal([]byte(r.Patterns), &b.Patterns)
 	if b.Patterns == nil {
 		b.Patterns = []string{}
@@ -82,14 +85,14 @@ func NormalizePattern(s string) (string, error) {
 	return d, nil
 }
 
-// ListBuildings returns every building, ordered by lot.
+// ListBuildings returns every building, top to bottom.
 func (db *DB) ListBuildings(ctx context.Context) ([]Building, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	var rows []buildingRow
 	err := db.SelectContext(ctx, &rows,
-		`SELECT id, name, patterns, slot, style FROM map_buildings ORDER BY slot`)
+		`SELECT id, name, patterns, x, y, style FROM map_buildings ORDER BY y, x, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +103,7 @@ func (db *DB) ListBuildings(ctx context.Context) ([]Building, error) {
 	return buildings, nil
 }
 
-// CreateBuilding adds a building in the lowest free lot.
+// CreateBuilding adds a building in the first default lot that is clear.
 func (db *DB) CreateBuilding(ctx context.Context, name string, patterns []string, style int) (Building, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
@@ -119,29 +122,28 @@ func (db *DB) CreateBuilding(ctx context.Context, name string, patterns []string
 	}
 	defer tx.Rollback()
 
-	var used []int
-	if err := tx.SelectContext(ctx, &used, `SELECT slot FROM map_buildings ORDER BY slot`); err != nil {
+	used, err := buildingRects(ctx, tx, 0)
+	if err != nil {
 		return Building{}, err
 	}
-	taken := make(map[int]bool, len(used))
-	for _, s := range used {
-		taken[s] = true
+	if len(used) >= MapBuildingLimit {
+		return Building{}, ErrMapFull
 	}
-	slot := -1
-	for i := range MapSlotCount {
-		if !taken[i] {
-			slot = i
+	spot, found := MapRect{}, false
+	for _, lot := range DefaultLots() {
+		if !overlapsAny(lot, used) {
+			spot, found = lot, true
 			break
 		}
 	}
-	if slot < 0 {
-		return Building{}, ErrNoFreeSlot
+	if !found {
+		return Building{}, ErrMapFull
 	}
 
 	ts := now()
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO map_buildings (name, patterns, slot, style, created_on, updated_on) VALUES (?, ?, ?, ?, ?, ?)`,
-		name, string(encoded), slot, style, ts, ts)
+		`INSERT INTO map_buildings (name, patterns, slot, x, y, style, created_on, updated_on) VALUES (?, ?, 0, ?, ?, ?, ?, ?)`,
+		name, string(encoded), spot.X, spot.Y, style, ts, ts)
 	if err != nil {
 		return Building{}, err
 	}
@@ -152,11 +154,75 @@ func (db *DB) CreateBuilding(ctx context.Context, name string, patterns []string
 	if err := tx.Commit(); err != nil {
 		return Building{}, err
 	}
-	return Building{ID: id, Name: name, Patterns: patterns, Slot: slot, Style: style}, nil
+	return Building{ID: id, Name: name, Patterns: patterns, X: spot.X, Y: spot.Y, Style: style}, nil
 }
 
-// UpdateBuilding changes a building's name, patterns and style. Its lot
-// stays the same. found is false when there is no building with that id.
+// MoveBuilding puts a building's top-left corner at tile x, y. found is
+// false when there is no building with that id.
+func (db *DB) MoveBuilding(ctx context.Context, id int64, x, y int) (Building, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	if !ValidBuildingSpot(x, y) {
+		return Building{}, false, ErrBadSpot
+	}
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return Building{}, false, err
+	}
+	defer tx.Rollback()
+
+	others, err := buildingRects(ctx, tx, id)
+	if err != nil {
+		return Building{}, false, err
+	}
+	if overlapsAny(BuildingRect(x, y), others) {
+		return Building{}, false, ErrSpotTaken
+	}
+	res, err := tx.ExecContext(ctx, `UPDATE map_buildings SET x = ?, y = ?, updated_on = ? WHERE id = ?`, x, y, now(), id)
+	if err != nil {
+		return Building{}, false, err
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 0 {
+		return Building{}, false, err
+	}
+	var row buildingRow
+	if err := tx.GetContext(ctx, &row, `SELECT id, name, patterns, x, y, style FROM map_buildings WHERE id = ?`, id); err != nil {
+		return Building{}, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Building{}, false, err
+	}
+	return row.building(), true, nil
+}
+
+// buildingRects returns the footprints of every building except skipID.
+func buildingRects(ctx context.Context, q sqlx.QueryerContext, skipID int64) ([]MapRect, error) {
+	var rows []struct {
+		X int `db:"x"`
+		Y int `db:"y"`
+	}
+	if err := sqlx.SelectContext(ctx, q, &rows, `SELECT x, y FROM map_buildings WHERE id != ?`, skipID); err != nil {
+		return nil, err
+	}
+	rects := make([]MapRect, len(rows))
+	for i, r := range rows {
+		rects[i] = BuildingRect(r.X, r.Y)
+	}
+	return rects, nil
+}
+
+func overlapsAny(r MapRect, rects []MapRect) bool {
+	for _, o := range rects {
+		if r.overlaps(o) {
+			return true
+		}
+	}
+	return false
+}
+
+// UpdateBuilding changes a building's name, patterns and style. Its
+// position stays the same. found is false when there is no building with that id.
 func (db *DB) UpdateBuilding(ctx context.Context, id int64, name string, patterns []string, style int) (Building, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
@@ -179,7 +245,7 @@ func (db *DB) UpdateBuilding(ctx context.Context, id int64, name string, pattern
 	}
 
 	var row buildingRow
-	err = db.GetContext(ctx, &row, `SELECT id, name, patterns, slot, style FROM map_buildings WHERE id = ?`, id)
+	err = db.GetContext(ctx, &row, `SELECT id, name, patterns, x, y, style FROM map_buildings WHERE id = ?`, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Building{}, false, nil
 	}
@@ -189,7 +255,7 @@ func (db *DB) UpdateBuilding(ctx context.Context, id int64, name string, pattern
 	return row.building(), true, nil
 }
 
-// DeleteBuilding removes a building and frees its lot.
+// DeleteBuilding removes a building.
 func (db *DB) DeleteBuilding(ctx context.Context, id int64) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()

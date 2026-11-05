@@ -68,7 +68,42 @@ func migrate(ctx context.Context, db *sqlx.DB) error {
 	if err != nil {
 		return err
 	}
+	if err := migrateBuildings(ctx, db); err != nil {
+		return err
+	}
 	return migratePermissions(ctx, db)
+}
+
+// migrateBuildings moves buildings from the old fixed lots (slot) to x, y
+// positions on the bigger map: lot n becomes the nth default lot.
+func migrateBuildings(ctx context.Context, db *sqlx.DB) error {
+	for _, col := range []string{"x", "y"} {
+		if err := ensureColumn(ctx, db, "map_buildings", col, "INTEGER NOT NULL DEFAULT -1"); err != nil {
+			return err
+		}
+	}
+	if _, err := db.ExecContext(ctx, `DROP INDEX IF EXISTS ix_map_buildings_slot`); err != nil {
+		return err
+	}
+	var rows []struct {
+		ID   int64 `db:"id"`
+		Slot int   `db:"slot"`
+	}
+	if err := db.SelectContext(ctx, &rows, `SELECT id, slot FROM map_buildings WHERE x < 0 OR y < 0 ORDER BY slot`); err != nil {
+		return err
+	}
+	lots := DefaultLots()
+	for i, r := range rows {
+		lot := lots[min(max(r.Slot, 0), len(lots)-1)]
+		if r.Slot >= len(lots) || r.Slot < 0 {
+			lot = lots[min(i, len(lots)-1)]
+		}
+		_, err := db.ExecContext(ctx, `UPDATE map_buildings SET x = ?, y = ? WHERE id = ?`, lot.X, lot.Y, r.ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // migratePermissions converts the old user_permissions levels (0 standard,

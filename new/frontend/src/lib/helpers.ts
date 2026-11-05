@@ -94,3 +94,10 @@ export function agentSideline(): boolean {
   const notRoutable = state.type === connect.AgentStateType.NOT_ROUTABLE || name === STATUS_AFTERCALL;
   return notRoutable && !EXCLUDED_STATUSES.has(name);
 }
+
+const INCIDENT_SEARCH_URL = 'https://seattleschools.service-now.com/text_search_exact_match.do?sysparm_search=';
+
+/** ServiceNow exact-match search URL for an incident number. */
+export function incidentUrl(incident: string): string {
+  return INCIDENT_SEARCH_URL + encodeURIComponent(incident.trim());
+}

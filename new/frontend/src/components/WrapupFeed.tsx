@@ -4,7 +4,7 @@ import { LOADING_CLASS } from '../lib/const';
 import { agentName, formatCallTime } from '../lib/helpers';
 import { $can, $wrapups, type Wrapup } from '../lib/stores';
 import { MOODS } from '../lib/wrapups';
-import { Icon } from './ui';
+import { Icon, IncidentLink } from './ui';
 
 function Entry({ wrapup }: { wrapup: Wrapup }) {
   const mood = MOODS.find((m) => m.value === wrapup.mood);
@@ -19,9 +19,10 @@ function Entry({ wrapup }: { wrapup: Wrapup }) {
           <time dateTime={new Date(wrapup.timestamp).toISOString()}>{formatCallTime(wrapup.timestamp)}</time>
           {showNames && <span>· {agentName(wrapup.agent)}</span>}
           {wrapup.incident && (
-            <span className="rounded-md bg-secondary-100 px-1.5 py-0.5 font-mono font-medium text-base-content dark:bg-secondary-800">
-              {wrapup.incident}
-            </span>
+            <IncidentLink
+              incident={wrapup.incident}
+              className="rounded-md bg-secondary-100 px-1.5 py-0.5 font-mono font-medium text-base-content dark:bg-secondary-800"
+            />
           )}
         </p>
         {wrapup.thoughts && <p className="mt-0.5 text-sm break-words whitespace-pre-wrap">{wrapup.thoughts}</p>}
