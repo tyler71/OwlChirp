@@ -7,9 +7,11 @@ import CallerTimeline from './CallerTimeline';
 import CallFlow from './CallFlow';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
+import VoiceTranscript from './VoiceTranscript';
 
 const CARDS: Record<PhoneCard, { label: string; render: () => ReactNode; desktopOnly?: boolean }> = {
   call: { label: 'Call', render: () => <CallPanel /> },
+  transcript: { label: 'Voice transcription', render: () => <VoiceTranscript /> },
   functions: { label: 'Functions', render: () => <TabbedFunctions /> },
   flow: { label: 'Call flow', render: () => <CallFlow />, desktopOnly: true },
   timeline: { label: 'Caller timeline', render: () => <CallerTimeline />, desktopOnly: true },

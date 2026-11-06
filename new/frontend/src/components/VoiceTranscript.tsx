@@ -20,7 +20,7 @@ function formatOffset(seconds: number): string {
  * Live transcript of what the caller says on the current call, read from its
  * Kinesis Video Stream by the backend. The agent's voice isn't transcribed. Held in memory only; it clears when the call changes.
  */
-export default function VoiceTranscript({ embedded = false }: { embedded?: boolean }) {
+export default function VoiceTranscript() {
   const canTranscribe = useStore($can('transcription'));
   const contact = useStore($contactSnapshot);
   const transcript = useStore($transcript);
@@ -42,6 +42,10 @@ export default function VoiceTranscript({ embedded = false }: { embedded?: boole
   const segments = mine ? transcript.segments : [];
   const running = status === 'live' || status === 'starting';
   const connected = contact.status === CS.CONNECTED;
+
+  // Its own card now, so stay out of the way while a call rings, is missed or
+  // fails: only show for a connected call, after-call work, or existing text.
+  if (!connected && contact.status !== CS.ENDED && segments.length === 0) return null;
   const canStart = connected && wsStatus === 'open' && !running;
 
   const actions = running ? (
@@ -111,19 +115,6 @@ export default function VoiceTranscript({ embedded = false }: { embedded?: boole
       )}
     </>
   );
-
-  // Inside the call card, under the notes form.
-  if (embedded) {
-    return (
-      <div className="border-t border-secondary-100 dark:border-secondary-800">
-        <div className="flex items-center justify-between gap-2 px-4 py-3">
-          <h3 className="text-sm font-semibold">Voice transcription</h3>
-          {actions}
-        </div>
-        {body}
-      </div>
-    );
-  }
 
   return (
     <Card title="Voice transcription" actions={actions}>

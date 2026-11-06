@@ -95,13 +95,13 @@ export function setPhoneEditMode(enabled: boolean): void {
 
 // Phone tab cards the agent can rearrange, by column. Kept in this file with
 // the other synced settings.
-export const PHONE_CARDS = ['call', 'functions', 'flow', 'timeline'] as const;
+export const PHONE_CARDS = ['call', 'transcript', 'functions', 'flow', 'timeline'] as const;
 export type PhoneCard = (typeof PHONE_CARDS)[number];
 export type PhoneColumn = 'left' | 'right';
 export type PhoneLayout = Record<PhoneColumn, PhoneCard[]>;
 
 export const DEFAULT_PHONE_LAYOUT: PhoneLayout = {
-  left: ['call', 'functions'],
+  left: ['call', 'transcript', 'functions'],
   right: ['flow', 'timeline'],
 };
 
