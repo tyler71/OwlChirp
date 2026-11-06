@@ -11,8 +11,10 @@ import (
 	"github.com/tyler71/owlchirp/app/internal/features"
 )
 
-// hardcodedAdmins always have every feature, whatever the database says, and
-// can't be changed from the Admin section.
+// hardcodedAdmins always keep the Admin feature and can't be changed by other
+// admins. They have every feature until they save their own set from the Admin
+// section (to try out what each feature does); resetting brings back every
+// feature.
 var hardcodedAdmins = map[string]bool{
 	"tyyeager@seattleschools.org": true,
 }
@@ -34,12 +36,16 @@ func newPermissionStore(sets map[string][]string) *permissionStore {
 
 // get returns username's features and where they come from.
 func (s *permissionStore) get(username string) ([]string, string) {
-	if hardcodedAdmins[username] {
-		return slices.Clone(features.All), sourceHardcoded
-	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if list, ok := s.sets[username]; ok {
+	list, ok := s.sets[username]
+	if hardcodedAdmins[username] {
+		if !ok {
+			return slices.Clone(features.All), sourceHardcoded
+		}
+		return withAdmin(list), sourceHardcoded
+	}
+	if ok {
 		return slices.Clone(list), sourceDB
 	}
 	return []string{}, sourceDefault
@@ -53,12 +59,19 @@ func (s *permissionStore) features(username string) []string {
 
 // has reports whether username has feature.
 func (s *permissionStore) has(username, feature string) bool {
-	if hardcodedAdmins[username] {
-		return true
-	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return slices.Contains(s.sets[username], feature)
+	list, ok := s.sets[username]
+	if hardcodedAdmins[username] && (!ok || feature == features.Admin) {
+		return true
+	}
+	return slices.Contains(list, feature)
+}
+
+// withAdmin returns list plus the Admin feature, in display order.
+func withAdmin(list []string) []string {
+	out, _ := features.Normalize(append(slices.Clone(list), features.Admin))
+	return out
 }
 
 func (s *permissionStore) set(username string, list []string) {
@@ -109,17 +122,15 @@ func (app *application) wsListUsers(ctx context.Context, _ connect.RegisteredUse
 	return users, nil
 }
 
-// requireOtherUser checks that username is a registered Connect user other
-// than the caller; admins can't change their own features so they can't lock
-// themselves out.
-func (app *application) requireOtherUser(ctx context.Context, caller connect.RegisteredUser, username string) error {
+// requireEditable checks that username is a registered Connect user the caller
+// may change. Admins may change themselves (they always keep Admin, so they
+// can't lock themselves out), but only a hardcoded admin may change their own
+// features.
+func (app *application) requireEditable(ctx context.Context, caller connect.RegisteredUser, username string) error {
 	if err := requireField("username", username); err != nil {
 		return err
 	}
-	if username == caller.Username {
-		return clientError("you can't change your own permissions")
-	}
-	if hardcodedAdmins[username] {
+	if hardcodedAdmins[username] && username != caller.Username {
 		return clientError("this user is always an admin")
 	}
 
@@ -148,8 +159,11 @@ func (app *application) wsSetFeatures(ctx context.Context, user connect.Register
 	if !ok {
 		return nil, clientError("unknown feature")
 	}
-	if err := app.requireOtherUser(ctx, user, input.Username); err != nil {
+	if err := app.requireEditable(ctx, user, input.Username); err != nil {
 		return nil, err
+	}
+	if input.Username == user.Username {
+		list = withAdmin(list)
 	}
 
 	if err := app.db.SetFeatures(ctx, input.Username, list); err != nil {
@@ -162,7 +176,8 @@ func (app *application) wsSetFeatures(ctx context.Context, user connect.Register
 	return updated, nil
 }
 
-// wsResetFeatures removes a user's saved features, leaving them with none.
+// wsResetFeatures removes a user's saved features, leaving them with none (or,
+// for a hardcoded admin, every feature).
 func (app *application) wsResetFeatures(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
 	var input struct {
 		Username string `json:"username"`
@@ -170,8 +185,11 @@ func (app *application) wsResetFeatures(ctx context.Context, user connect.Regist
 	if err := decode(data, &input); err != nil {
 		return nil, err
 	}
-	if err := app.requireOtherUser(ctx, user, input.Username); err != nil {
+	if err := app.requireEditable(ctx, user, input.Username); err != nil {
 		return nil, err
+	}
+	if input.Username == user.Username && !hardcodedAdmins[input.Username] {
+		return nil, clientError("you can't remove your own admin access")
 	}
 
 	if _, err := app.db.DeleteFeatures(ctx, input.Username); err != nil {

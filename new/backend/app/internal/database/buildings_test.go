@@ -120,23 +120,42 @@ func TestMapDesign(t *testing.T) {
 	assert.Nil(t, db.PaintTiles(ctx, []MapTile{{X: 1, Y: 1, Tile: "sand"}}))
 	tiles, err := db.ListTiles(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, tiles, []MapTile{{X: 1, Y: 1, Tile: "sand"}, {X: 2, Y: 1, Tile: "road"}})
+	assert.Equal(t, tiles, []MapTile{{Scene: SceneTown, X: 1, Y: 1, Tile: "sand"}, {Scene: SceneTown, X: 2, Y: 1, Tile: "road"}})
 
 	for _, bad := range []MapTile{{X: -1, Y: 0, Tile: "road"}, {X: MapHQ.X, Y: MapHQ.Y, Tile: "road"}, {X: 0, Y: 0, Tile: "lava"}} {
 		assert.ErrorIs(t, db.PaintTiles(ctx, []MapTile{bad}), ErrBadTile)
 	}
 
-	p, err := db.CreateProp(ctx, "bench", 5, 5)
+	p, err := db.CreateProp(ctx, "", "bench", 5, 5)
 	assert.Nil(t, err)
-	_, err = db.CreateProp(ctx, "lamp", 5, 5)
+	_, err = db.CreateProp(ctx, "", "lamp", 5, 5)
 	assert.ErrorIs(t, err, ErrTileTaken)
-	_, err = db.CreateProp(ctx, "dragon", 6, 5)
+	_, err = db.CreateProp(ctx, "", "dragon", 6, 5)
 	assert.ErrorIs(t, err, ErrBadProp)
 	props, err := db.ListProps(ctx)
 	assert.Nil(t, err)
-	assert.Equal(t, props, []MapProp{p})
+	assert.Equal(t, townProps(props), []MapProp{p})
 
-	found, err := db.DeleteProp(ctx, p.ID)
+	other, err := db.CreateProp(ctx, "", "lamp", 7, 5)
+	assert.Nil(t, err)
+	moved, found, err := db.MoveProp(ctx, p.ID, 6, 5)
+	assert.Nil(t, err)
+	assert.True(t, found)
+	assert.Equal(t, moved, MapProp{ID: p.ID, Scene: SceneTown, Kind: "bench", X: 6, Y: 5})
+	_, _, err = db.MoveProp(ctx, p.ID, other.X, other.Y)
+	assert.ErrorIs(t, err, ErrTileTaken)
+	_, _, err = db.MoveProp(ctx, p.ID, -1, 5)
+	assert.ErrorIs(t, err, ErrBadProp)
+	_, _, err = db.MoveProp(ctx, p.ID, MapHQ.X, MapHQ.Y)
+	assert.ErrorIs(t, err, ErrBadProp)
+	_, found, err = db.MoveProp(ctx, 99999, 8, 5)
+	assert.Nil(t, err)
+	assert.False(t, found)
+	p = moved
+	_, err = db.DeleteProp(ctx, other.ID)
+	assert.Nil(t, err)
+
+	found, err = db.DeleteProp(ctx, p.ID)
 	assert.Nil(t, err)
 	assert.True(t, found)
 	found, err = db.DeleteProp(ctx, p.ID)
@@ -240,4 +259,95 @@ func TestSyncSchoolBuilding(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, len(list), 1)
 	assert.Equal(t, list[0].ID, other.ID)
+}
+
+func townProps(props []MapProp) []MapProp {
+	var out []MapProp
+	for _, p := range props {
+		if p.Scene == SceneTown {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func TestOfficeScene(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+
+	// The office starts furnished.
+	props, err := db.ListProps(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(props), len(officeFurniture()))
+	for _, p := range props {
+		assert.Equal(t, p.Scene, SceneOffice)
+		assert.True(t, InScene(SceneOffice, p.X, p.Y) && !SceneLocked(SceneOffice, p.X, p.Y))
+	}
+
+	// The same tile in each scene is painted separately.
+	assert.Nil(t, db.PaintTiles(ctx, []MapTile{{X: 3, Y: 3, Tile: "road"}, {Scene: SceneOffice, X: 3, Y: 3, Tile: "wood"}}))
+	tiles, err := db.ListTiles(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, tiles, []MapTile{{Scene: SceneOffice, X: 3, Y: 3, Tile: "wood"}, {Scene: SceneTown, X: 3, Y: 3, Tile: "road"}})
+
+	for _, bad := range []MapTile{
+		{Scene: SceneOffice, X: 0, Y: 5, Tile: "wood"},               // outer wall
+		{Scene: SceneOffice, X: 11, Y: OfficeRows - 1, Tile: "wood"}, // exit
+		{Scene: SceneOffice, X: OfficeCols, Y: 5, Tile: "wood"},      // off the office
+		{Scene: SceneOffice, X: 5, Y: 5, Tile: "road"},               // a town tile
+		{Scene: "moon", X: 5, Y: 5, Tile: "wood"},
+	} {
+		assert.ErrorIs(t, db.PaintTiles(ctx, []MapTile{bad}), ErrBadTile)
+	}
+
+	// Decorations: per scene, office kinds only in the office.
+	_, err = db.CreateProp(ctx, SceneOffice, "desk", 3, 3)
+	assert.Nil(t, err)
+	_, err = db.CreateProp(ctx, "", "bench", 3, 3)
+	assert.Nil(t, err)
+	_, err = db.CreateProp(ctx, SceneOffice, "bench", 4, 3)
+	assert.ErrorIs(t, err, ErrBadProp)
+	_, err = db.CreateProp(ctx, "", "desk", 4, 3)
+	assert.ErrorIs(t, err, ErrBadProp)
+	_, err = db.CreateProp(ctx, SceneOffice, "plant", 0, 3)
+	assert.ErrorIs(t, err, ErrBadProp)
+
+	// Clearing the office out doesn't bring the furniture back.
+	_, err = db.ExecContext(ctx, `DELETE FROM map_props WHERE scene = ?`, SceneOffice)
+	assert.Nil(t, err)
+	assert.Nil(t, seedOffice(ctx, db.DB))
+	props, err = db.ListProps(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(props), 1)
+}
+
+func TestMigrateScenes(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	// An old-style database: tiles keyed by (x, y), props without a scene.
+	for _, q := range []string{
+		`DROP TABLE map_tiles`,
+		`CREATE TABLE map_tiles (x INTEGER NOT NULL, y INTEGER NOT NULL, tile VARCHAR(20) NOT NULL, PRIMARY KEY (x, y))`,
+		`INSERT INTO map_tiles (x, y, tile) VALUES (1, 2, 'road')`,
+		`DROP TABLE map_props`,
+		`CREATE TABLE map_props (id INTEGER NOT NULL PRIMARY KEY, kind VARCHAR(20) NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL)`,
+		`CREATE UNIQUE INDEX ix_map_props_xy ON map_props (x, y)`,
+		`INSERT INTO map_props (kind, x, y) VALUES ('bench', 4, 4)`,
+	} {
+		_, err := db.ExecContext(ctx, q)
+		assert.Nil(t, err)
+	}
+	assert.Nil(t, migrateScenes(ctx, db.DB))
+	assert.Nil(t, migrateScenes(ctx, db.DB)) // runs again harmlessly
+
+	tiles, err := db.ListTiles(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, tiles, []MapTile{{Scene: SceneTown, X: 1, Y: 2, Tile: "road"}})
+	props, err := db.ListProps(ctx)
+	assert.Nil(t, err)
+	assert.Equal(t, len(props), 1)
+	assert.Equal(t, props[0].Scene, SceneTown)
+	_, err = db.CreateProp(ctx, SceneOffice, "desk", 4, 4) // same spot, other scene
+	assert.Nil(t, err)
+	assert.Nil(t, db.PaintTiles(ctx, []MapTile{{Scene: SceneOffice, X: 1, Y: 2, Tile: "wood"}}))
 }

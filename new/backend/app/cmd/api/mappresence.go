@@ -35,6 +35,20 @@ const (
 // Spawn area: the plaza in front of Techline HQ.
 var mapSpawn = struct{ minX, maxX, minY, maxY float64 }{57 * 16, 72 * 16, 52 * 16, 55 * 16}
 
+// Where someone lands going through a door, in pixels: just inside the
+// office's exit, or back in town a little below HQ's glass doors. Mirrors
+// the doors in the frontend's components/map/world.ts and office.ts.
+var sceneArrivals = map[string][2]float64{
+	database.SceneOffice: {12 * 16, 13*16 + 12},
+	database.SceneTown:   {65 * 16, 52*16 + 14},
+}
+
+// sceneBounds is scene's size in pixels.
+func sceneBounds(scene string) (w, h float64) {
+	cols, rows := database.SceneSize(scene)
+	return float64(cols * 16), float64(rows * 16)
+}
+
 // Pets that follow a character, and what they ride.
 var (
 	validPets  = map[string]bool{"": true, "dog": true, "cat": true}
@@ -45,11 +59,15 @@ var (
 // on the map, in every tab they have open at the same spot.
 type mapPlayer struct {
 	Username string  `json:"username"`
+	Scene    string  `json:"scene"` // "town" or "office"
 	X        float64 `json:"x"`
 	Y        float64 `json:"y"`
 	Dir      string  `json:"dir"`
 	Pet      string  `json:"pet"`  // "", "dog" or "cat"
 	Ride     string  `json:"ride"` // "walk", "bike" or "car"
+	// Look is nil until they design one; the frontend derives one from
+	// their username.
+	Look *database.MapLook `json:"look"`
 
 	conns    int
 	lastMove time.Time
@@ -63,8 +81,8 @@ type mapPresence struct {
 }
 
 // join adds a connection for username. joined is true for the user's first
-// connection, when they appear on the map.
-func (p *mapPresence) join(username string) (player mapPlayer, joined bool) {
+// connection, when they appear on the map wearing saved.
+func (p *mapPresence) join(username string, saved database.MapGear) (player mapPlayer, joined bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.players == nil {
@@ -74,10 +92,19 @@ func (p *mapPresence) join(username string) (player mapPlayer, joined bool) {
 	if !ok {
 		pl = &mapPlayer{
 			Username: username,
+			Scene:    database.SceneTown,
 			X:        mapSpawn.minX + rand.Float64()*(mapSpawn.maxX-mapSpawn.minX),
 			Y:        mapSpawn.minY + rand.Float64()*(mapSpawn.maxY-mapSpawn.minY),
 			Dir:      "down",
-			Ride:     "walk",
+			Pet:      saved.Pet,
+			Ride:     saved.Ride,
+			Look:     saved.Look,
+		}
+		if !validPets[pl.Pet] {
+			pl.Pet = ""
+		}
+		if !validRides[pl.Ride] {
+			pl.Ride = "walk"
 		}
 		p.players[username] = pl
 	}
@@ -111,7 +138,27 @@ func (p *mapPresence) move(username string, x, y float64, dir string, now time.T
 	if !found || now.Sub(pl.lastMove) < mapMoveInterval {
 		return mapPlayer{}, false
 	}
-	pl.X, pl.Y, pl.Dir, pl.lastMove = clamp(x, 0, mapWidth), clamp(y, 0, mapHeight), dir, now
+	w, h := sceneBounds(pl.Scene)
+	pl.X, pl.Y, pl.Dir, pl.lastMove = clamp(x, 0, w), clamp(y, 0, h), dir, now
+	return *pl, true
+}
+
+// enter moves username through a door into scene, at its arrival point. ok
+// is false when the user isn't on the map.
+func (p *mapPresence) enter(username, scene string, now time.Time) (mapPlayer, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	pl, found := p.players[username]
+	if !found {
+		return mapPlayer{}, false
+	}
+	at := sceneArrivals[scene]
+	pl.Scene, pl.X, pl.Y, pl.lastMove = scene, at[0], at[1], now
+	if scene == database.SceneOffice {
+		pl.Dir = "up"
+	} else {
+		pl.Dir = "down"
+	}
 	return *pl, true
 }
 
@@ -128,15 +175,34 @@ func (p *mapPresence) gear(username, pet, ride string) (mapPlayer, bool) {
 	return *pl, true
 }
 
-// positions returns where each of names is, leaving out anyone not on the
-// map.
-func (p *mapPresence) positions(names []string) map[string][2]float64 {
+// setLook sets username's look (nil for the default). ok is false when the
+// user isn't on the map.
+func (p *mapPresence) setLook(username string, look *database.MapLook) (mapPlayer, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	out := make(map[string][2]float64, len(names))
+	pl, found := p.players[username]
+	if !found {
+		return mapPlayer{}, false
+	}
+	pl.Look = look
+	return *pl, true
+}
+
+// mapSpot is where someone is: their scene and pixel position.
+type mapSpot struct {
+	Scene string
+	X, Y  float64
+}
+
+// positions returns where each of names is, leaving out anyone not on the
+// map.
+func (p *mapPresence) positions(names []string) map[string]mapSpot {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make(map[string]mapSpot, len(names))
 	for _, n := range names {
 		if pl, ok := p.players[n]; ok {
-			out[n] = [2]float64{pl.X, pl.Y}
+			out[n] = mapSpot{pl.Scene, pl.X, pl.Y}
 		}
 	}
 	return out
@@ -158,10 +224,15 @@ func clamp(v, lo, hi float64) float64 {
 
 var validDirs = map[string]bool{"up": true, "down": true, "left": true, "right": true}
 
-// mapJoin puts user on the map for one connection and returns the matching
-// leave, to defer.
-func (app *application) mapJoin(user connect.RegisteredUser) func() {
-	if player, joined := app.presence.join(user.Username); joined {
+// mapJoin puts user on the map for one connection, in their saved pet, ride
+// and look, and returns the matching leave, to defer.
+func (app *application) mapJoin(ctx context.Context, user connect.RegisteredUser) func() {
+	saved, err := app.db.GetMapGear(ctx, user.Username)
+	if err != nil {
+		app.logger.Warn("load map gear", "user", user.Username, "error", err)
+		saved = database.MapGear{Ride: "walk"}
+	}
+	if player, joined := app.presence.join(user.Username, saved); joined {
 		app.broadcast("map.joined", player)
 	}
 	return func() {
@@ -222,6 +293,26 @@ func (app *application) wsMapMove(_ context.Context, user connect.RegisteredUser
 	}
 	app.broadcast("map.moved", player)
 	return map[string]bool{"accepted": true}, nil
+}
+
+// wsMapEnter takes the user through a door into another scene. The server
+// picks where they land.
+func (app *application) wsMapEnter(_ context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		Scene string `json:"scene"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	if !database.ValidScene(input.Scene) {
+		return nil, clientError("scene must be town or office")
+	}
+	player, ok := app.presence.enter(user.Username, input.Scene, time.Now())
+	if !ok {
+		return nil, clientError("not on the map")
+	}
+	app.broadcast("map.moved", player)
+	return player, nil
 }
 
 type buildingInput struct {
@@ -325,8 +416,8 @@ func (app *application) wsDeleteBuilding(ctx context.Context, _ connect.Register
 	return map[string]int64{"id": input.ID}, nil
 }
 
-// wsMapGear sets the user's pet and ride, seen by everyone.
-func (app *application) wsMapGear(_ context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+// wsMapGear sets the user's pet and ride, seen by everyone, and saves them.
+func (app *application) wsMapGear(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
 	var input struct {
 		Pet  string `json:"pet"`
 		Ride string `json:"ride"`
@@ -341,6 +432,33 @@ func (app *application) wsMapGear(_ context.Context, user connect.RegisteredUser
 		return nil, clientError("ride must be walk, bike or car")
 	}
 	player, ok := app.presence.gear(user.Username, input.Pet, input.Ride)
+	if !ok {
+		return nil, clientError("not on the map")
+	}
+	if err := app.db.SaveMapGear(ctx, user.Username, input.Pet, input.Ride); err != nil {
+		return nil, err
+	}
+	app.broadcast("map.moved", player)
+	return player, nil
+}
+
+// wsMapLook sets how the user's character, vehicles and pets look, seen by
+// everyone, and saves it. null goes back to the look derived from their
+// username.
+func (app *application) wsMapLook(ctx context.Context, user connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var look *database.MapLook
+	if err := decode(data, &look); err != nil {
+		return nil, err
+	}
+	if look != nil {
+		if err := look.Validate(); err != nil {
+			return nil, clientError(err.Error())
+		}
+	}
+	if err := app.db.SaveMapLook(ctx, user.Username, look); err != nil {
+		return nil, err
+	}
+	player, ok := app.presence.setLook(user.Username, look)
 	if !ok {
 		return nil, clientError("not on the map")
 	}
@@ -386,6 +504,9 @@ func (app *application) wsMapPaint(ctx context.Context, _ connect.RegisteredUser
 	if len(input.Tiles) > maxPaintTiles {
 		return nil, clientError(fmt.Sprintf("at most %d tiles at a time", maxPaintTiles))
 	}
+	for i := range input.Tiles {
+		input.Tiles[i].Scene = database.SceneOr(input.Tiles[i].Scene)
+	}
 	err := app.db.PaintTiles(ctx, input.Tiles)
 	if errors.Is(err, database.ErrBadTile) {
 		return nil, clientError(err.Error())
@@ -400,14 +521,15 @@ func (app *application) wsMapPaint(ctx context.Context, _ connect.RegisteredUser
 // wsCreateProp places a decoration.
 func (app *application) wsCreateProp(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
 	var input struct {
-		Kind string `json:"kind"`
-		X    int    `json:"x"`
-		Y    int    `json:"y"`
+		Scene string `json:"scene"`
+		Kind  string `json:"kind"`
+		X     int    `json:"x"`
+		Y     int    `json:"y"`
 	}
 	if err := decode(data, &input); err != nil {
 		return nil, err
 	}
-	prop, err := app.db.CreateProp(ctx, input.Kind, input.X, input.Y)
+	prop, err := app.db.CreateProp(ctx, input.Scene, input.Kind, input.X, input.Y)
 	if errors.Is(err, database.ErrBadProp) || errors.Is(err, database.ErrTileTaken) {
 		return nil, clientError(err.Error())
 	}
@@ -415,6 +537,30 @@ func (app *application) wsCreateProp(ctx context.Context, _ connect.RegisteredUs
 		return nil, err
 	}
 	app.broadcast("map.prop.created", prop)
+	return prop, nil
+}
+
+// wsMoveProp moves a decoration to another tile.
+func (app *application) wsMoveProp(ctx context.Context, _ connect.RegisteredUser, data json.RawMessage) (any, error) {
+	var input struct {
+		ID int64 `json:"id"`
+		X  int   `json:"x"`
+		Y  int   `json:"y"`
+	}
+	if err := decode(data, &input); err != nil {
+		return nil, err
+	}
+	prop, found, err := app.db.MoveProp(ctx, input.ID, input.X, input.Y)
+	if errors.Is(err, database.ErrBadProp) || errors.Is(err, database.ErrTileTaken) {
+		return nil, clientError(err.Error())
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, clientError("decoration not found")
+	}
+	app.broadcast("map.prop.updated", prop)
 	return prop, nil
 }
 

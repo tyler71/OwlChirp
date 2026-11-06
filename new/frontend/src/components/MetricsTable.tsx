@@ -25,7 +25,7 @@ export default function MetricsTable() {
   const agents = agentCountLabel(metrics);
 
   return (
-    <Card title="Queue">
+    <Card className={"lg:hidden"} title="Queue">
       <table id="metrics" className="w-full text-sm">
         <tbody className="divide-y divide-secondary-100 dark:divide-secondary-800">
           <tr id="queueCount" className={queueLoaded && queue_count >= MAX_QUEUE_COUNT ? TABLE_ALERT_CLASS : undefined}>

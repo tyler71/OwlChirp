@@ -20,7 +20,7 @@ function formatOffset(seconds: number): string {
  * Live transcript of what the caller says on the current call, read from its
  * Kinesis Video Stream by the backend. The agent's voice isn't transcribed. Held in memory only; it clears when the call changes.
  */
-export default function VoiceTranscript() {
+export default function VoiceTranscript({ embedded = false }: { embedded?: boolean }) {
   const canTranscribe = useStore($can('transcription'));
   const contact = useStore($contactSnapshot);
   const transcript = useStore($transcript);
@@ -73,8 +73,8 @@ export default function VoiceTranscript() {
     </Button>
   );
 
-  return (
-    <Card title="Voice transcription" actions={actions}>
+  const body = (
+    <>
       {status === 'error' && (
         <p className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
           {transcript.error}
@@ -109,6 +109,25 @@ export default function VoiceTranscript() {
           )}
         </div>
       )}
+    </>
+  );
+
+  // Inside the call card, under the notes form.
+  if (embedded) {
+    return (
+      <div className="border-t border-secondary-100 dark:border-secondary-800">
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <h3 className="text-sm font-semibold">Voice transcription</h3>
+          {actions}
+        </div>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Card title="Voice transcription" actions={actions}>
+      {body}
     </Card>
   );
 }

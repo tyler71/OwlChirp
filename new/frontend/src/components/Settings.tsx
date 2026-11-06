@@ -2,20 +2,103 @@ import { useStore } from '@nanostores/react';
 import { useState } from 'react';
 
 import { downloadCcpLog } from '../lib/ccp';
-import { $view } from '../lib/stores';
+import { $can, $view } from '../lib/stores';
+import { $voiceLevel } from '../lib/voice';
 import {
   $followTeamMeeting,
+  $autoTranscribe,
   $helpQueueThreshold,
   $hideCallerIds,
+  $proximityChat,
+  $voiceModeDefault,
+  $voiceThreshold,
+  $phoneEditMode,
+  $phoneLayout,
   $theme,
+  DEFAULT_PHONE_LAYOUT,
+  DEFAULT_VOICE_THRESHOLD,
+  MAX_VOICE_THRESHOLD,
+  MIN_VOICE_THRESHOLD,
+  resetPhoneLayout,
   setFollowTeamMeeting,
+  setAutoTranscribe,
   setHelpQueueThreshold,
   setHideCallerIds,
+  setPhoneEditMode,
+  setProximityChat,
+  setVoiceModeDefault,
+  setVoiceThreshold,
   setTheme,
   THEMES,
   type ThemeChoice,
+  type VoiceMode,
 } from '../lib/theme';
 import { Button, Card, Icon } from './ui';
+
+/** Position (0-100%) of a dBFS level on the voice threshold slider's scale. */
+function levelPercent(db: number): number {
+  const p = ((db - MIN_VOICE_THRESHOLD) / (MAX_VOICE_THRESHOLD - MIN_VOICE_THRESHOLD)) * 100;
+  return Math.min(100, Math.max(0, p));
+}
+
+/** Slider for the mic level that opens map voice, with a live level meter. */
+function VoiceThresholdSetting({ disabled }: { disabled: boolean }) {
+  const threshold = useStore($voiceThreshold);
+  const level = useStore($voiceLevel);
+  // Drags apply live; the account is saved once the slider is let go.
+  const commit = () => void setVoiceThreshold($voiceThreshold.get());
+  const open = level != null && level > threshold;
+  return (
+    <div className="flex items-start gap-3 px-4 pb-4">
+      <div className="flex w-44 shrink-0 flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            aria-label="Voice threshold"
+            min={MIN_VOICE_THRESHOLD}
+            max={MAX_VOICE_THRESHOLD}
+            step={1}
+            className="range range-xs range-primary grow"
+            value={threshold}
+            disabled={disabled}
+            onChange={(e) => $voiceThreshold.set(e.target.valueAsNumber)}
+            onPointerUp={commit}
+            onKeyUp={commit}
+            onBlur={commit}
+          />
+          <span className="w-12 text-right text-xs tabular-nums">{threshold} dB</span>
+        </div>
+        <div
+          className="relative h-1.5 overflow-hidden rounded-full bg-secondary-200 dark:bg-secondary-700"
+          title={level == null ? 'Open the Map to see your mic level' : `Mic level ${Math.round(level)} dB`}
+        >
+          {level != null && (
+            <div
+              className={`h-full transition-[width] duration-100 ${open ? 'bg-success' : 'bg-secondary-400'}`}
+              style={{ width: `${levelPercent(level)}%` }}
+            />
+          )}
+          <div className="absolute inset-y-0 w-0.5 bg-primary-500" style={{ left: `${levelPercent(threshold)}%` }} />
+        </div>
+      </div>
+      <span className="flex grow flex-col gap-0.5">
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          Voice threshold
+          {threshold !== DEFAULT_VOICE_THRESHOLD && (
+            <Button size="sm" onClick={() => void setVoiceThreshold(DEFAULT_VOICE_THRESHOLD)}>
+              Reset
+            </Button>
+          )}
+        </span>
+        <span className="text-xs text-secondary-500 dark:text-secondary-400">
+          How loud you must be for your mic to open. Move left to pick up quieter speech, right if background noise
+          opens it. The bar shows your mic level while map voice is running and turns green above the threshold.
+          {disabled && ' Only used in Voice threshold mode.'}
+        </span>
+      </span>
+    </div>
+  );
+}
 
 function ThemeTile({ choice, selected }: { choice: ThemeChoice; selected: boolean }) {
   // Each tile carries its own data-theme so it previews that theme's colors.
@@ -54,6 +137,14 @@ export default function Settings() {
   const followTeamMeeting = useStore($followTeamMeeting);
   const hideCallerIds = useStore($hideCallerIds);
   const helpQueueThreshold = useStore($helpQueueThreshold);
+  const proximityChat = useStore($proximityChat);
+  const voiceMode = useStore($voiceModeDefault);
+  const autoTranscribe = useStore($autoTranscribe);
+  const phoneLayout = useStore($phoneLayout);
+  const phoneEditMode = useStore($phoneEditMode);
+  const customLayout = JSON.stringify(phoneLayout) !== JSON.stringify(DEFAULT_PHONE_LAYOUT);
+  const canMap = useStore($can('map'));
+  const canTranscribe = useStore($can('transcription'));
   const [showThemes, setShowThemes] = useState(false)
   return (
     <>
@@ -70,6 +161,33 @@ export default function Settings() {
             ))}
           </div>
         }
+      </div>
+    </Card>
+    <Card title="Phone layout">
+      <label className="flex cursor-pointer items-start gap-3 p-4">
+        <input
+          type="checkbox"
+          className="toggle toggle-primary mt-0.5"
+          checked={phoneEditMode}
+          onChange={(e) => setPhoneEditMode(e.target.checked)}
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold">Phone Edit Mode</span>
+          <span className="text-xs text-secondary-500 dark:text-secondary-400">
+            Enable to rearrange cards on the Phone tab.
+          </span>
+        </span>
+      </label>
+      <div className="flex items-start justify-between gap-3 px-4 pb-4">
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold">Card arrangement</span>
+          <span className="text-xs text-secondary-500 dark:text-secondary-400">
+            While Phone Edit Mode is on, drag the grip at the top of a Phone card to move it, or click the grip for move options.
+          </span>
+        </span>
+        <Button size="sm" disabled={!customLayout} onClick={() => void resetPhoneLayout()}>
+          Reset
+        </Button>
       </div>
     </Card>
     <Card title="Status">
@@ -122,6 +240,61 @@ export default function Settings() {
         </span>
       </label>
     </Card>
+    {canMap && (
+      <Card title="Map">
+        <label className="flex cursor-pointer items-start gap-3 p-4">
+          <input
+            type="checkbox"
+            className="toggle toggle-primary mt-0.5"
+            checked={proximityChat}
+            onChange={(e) => void setProximityChat(e.target.checked)}
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold">Proximity chat</span>
+            <span className="text-xs text-secondary-500 dark:text-secondary-400">
+              When off, map voice starts with your mic and speakers muted every time; unmute both to talk and listen.
+              When on, your mute choices are remembered.
+            </span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-3 px-4 pb-4">
+          <select
+            className="select select-sm w-44"
+            value={voiceMode}
+            onChange={(e) => void setVoiceModeDefault(e.target.value as VoiceMode)}
+          >
+            <option value="threshold">Voice threshold</option>
+            <option value="ptt">Push to talk</option>
+          </select>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold">Voice activation</span>
+            <span className="text-xs text-secondary-500 dark:text-secondary-400">
+              Voice threshold sends your mic whenever you speak. Push to talk sends only while you hold Space (anywhere
+              except text fields) or the Hold to talk button. The map toolbar can switch modes until voice restarts.
+            </span>
+          </span>
+        </label>
+        <VoiceThresholdSetting disabled={voiceMode !== 'threshold'} />
+      </Card>
+    )}
+    {canTranscribe && (
+      <Card title="Transcription">
+        <label className="flex cursor-pointer items-start gap-3 p-4">
+          <input
+            type="checkbox"
+            className="toggle toggle-primary mt-0.5"
+            checked={autoTranscribe}
+            onChange={(e) => void setAutoTranscribe(e.target.checked)}
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold">Auto start transcription</span>
+            <span className="text-xs text-secondary-500 dark:text-secondary-400">
+              Start transcribing the caller as soon as a call connects.
+            </span>
+          </span>
+        </label>
+      </Card>
+    )}
     <Card title="Troubleshooting">
       <div className="flex flex-col items-start gap-2 p-4">
         <div className="flex flex-wrap gap-2">

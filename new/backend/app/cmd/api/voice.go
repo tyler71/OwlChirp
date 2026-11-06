@@ -19,9 +19,9 @@ import (
 // only to listeners standing near the speaker. Listeners set the volume
 // themselves from the live distance; the relay just decides who gets it.
 const (
-	// voiceRange is how far a voice carries, in world pixels (10 tiles).
+	// voiceRange is how far a voice carries, in world pixels (5 tiles).
 	// Mirrors VOICE_RANGE in the frontend's lib/voice.ts.
-	voiceRange = 10 * 16
+	voiceRange = 5 * 16
 	// voiceRelayRange adds a tile of slack: positions here lag the clients'
 	// by up to a move interval, and the client fades to silence at the edge.
 	voiceRelayRange = voiceRange + 16
@@ -174,7 +174,7 @@ func (app *application) relayVoice(speaker *voiceConn, frame []byte) {
 	copy(out[2:], frame)
 	for _, l := range listeners {
 		to, ok := pos[l.username]
-		if ok && math.Hypot(to[0]-from[0], to[1]-from[1]) <= voiceRelayRange {
+		if ok && to.Scene == from.Scene && math.Hypot(to.X-from.X, to.Y-from.Y) <= voiceRelayRange {
 			l.trySend(voiceMsg{binary: true, data: out})
 		}
 	}

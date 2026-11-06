@@ -73,9 +73,12 @@ func (app *application) wsHandlers() map[string]wsHandler {
 		"map.state":           app.wsMapState,
 		"map.move":            app.wsMapMove,
 		"map.gear":            app.wsMapGear,
+		"map.look":            app.wsMapLook,
+		"map.enter":           app.wsMapEnter,
 		"map.paint":           app.wsMapPaint,
 		"map.props.create":    app.wsCreateProp,
 		"map.props.delete":    app.wsDeleteProp,
+		"map.props.move":      app.wsMoveProp,
 		"buildings.move":      app.wsMoveBuilding,
 		"buildings.list":      app.wsListBuildings,
 		"buildings.create":    app.wsCreateBuilding,
@@ -94,11 +97,12 @@ var requestFeature = map[string]string{
 	"flowcalls.number": features.CallerHistory,
 	"callerid.list":    features.CallerIDs, "callerid.delete": features.CallerIDs,
 	"users.list": features.Admin, "users.setFeatures": features.Admin, "users.resetFeatures": features.Admin,
-	"map.state": features.Map, "map.move": features.Map, "map.gear": features.Map, "buildings.list": features.Map,
+	"map.state": features.Map, "map.move": features.Map, "map.gear": features.Map, "map.look": features.Map, "map.enter": features.Map, "buildings.list": features.Map,
 	"buildings.create": features.MapEdit, "buildings.update": features.MapEdit, "buildings.delete": features.MapEdit,
 	"buildings.import": features.MapEdit,
 	"buildings.move":   features.MapDesign, "map.paint": features.MapDesign,
 	"map.props.create": features.MapDesign, "map.props.delete": features.MapDesign,
+	"map.props.move":   features.MapDesign,
 	"transcribe.start": features.Transcription, "transcribe.stop": features.Transcription,
 }
 
@@ -387,7 +391,47 @@ func (app *application) wsSaveSettings(ctx context.Context, user connect.Registe
 	if !validTheme.MatchString(input.Theme) {
 		return nil, clientError("theme is invalid")
 	}
+	switch input.VoiceMode {
+	case "", "threshold", "ptt":
+	default:
+		return nil, clientError("voiceMode is invalid")
+	}
+	if t := input.VoiceThreshold; t != nil && (*t < minVoiceThreshold || *t > maxVoiceThreshold) {
+		return nil, clientError("voiceThreshold is invalid")
+	}
+	if !validPhoneLayout(input.PhoneLayout) {
+		return nil, clientError("phoneLayout is invalid")
+	}
 	return app.db.SaveSettings(ctx, user.Username, input)
+}
+
+// Bounds of the map voice threshold in dBFS. Mirror the client's range in
+// frontend/src/lib/theme.ts.
+const (
+	minVoiceThreshold = -80
+	maxVoiceThreshold = -20
+)
+
+// maxPhoneCards bounds a saved layout; the client has far fewer cards.
+const maxPhoneCards = 20
+
+var validCardID = regexp.MustCompile(`^[a-z]{1,20}$`)
+
+// validPhoneLayout checks card ids are short and plain. Unknown ids are
+// allowed so older and newer clients can share a saved layout.
+func validPhoneLayout(l *database.PhoneLayout) bool {
+	if l == nil {
+		return true
+	}
+	if len(l.Left)+len(l.Right) > maxPhoneCards {
+		return false
+	}
+	for _, id := range append(append([]string{}, l.Left...), l.Right...) {
+		if !validCardID.MatchString(id) {
+			return false
+		}
+	}
+	return true
 }
 
 // truncate shortens s to at most n runes.

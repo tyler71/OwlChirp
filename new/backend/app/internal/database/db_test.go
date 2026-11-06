@@ -247,6 +247,15 @@ func TestSettings(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, s.HelpQueueThreshold)
 	assert.Equal(t, *s.HelpQueueThreshold, 0)
+	assert.Nil(t, s.VoiceThreshold)
+
+	quiet := -65
+	_, err = db.SaveSettings(ctx, "alice", Settings{Theme: "nord", VoiceThreshold: &quiet})
+	assert.Nil(t, err)
+	s, err = db.GetSettings(ctx, "alice")
+	assert.Nil(t, err)
+	assert.NotNil(t, s.VoiceThreshold)
+	assert.Equal(t, *s.VoiceThreshold, -65)
 
 	s, err = db.GetSettings(ctx, "bob")
 	assert.Nil(t, err)

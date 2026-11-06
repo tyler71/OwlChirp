@@ -15,6 +15,9 @@ const TH_CLASS =
 
 const CUSTOM = 'custom';
 
+// Admins always keep Admin on their own row so they can't lock themselves out.
+const SELF_KEEPS: Feature = 'admin';
+
 // The preset whose features match list exactly, or CUSTOM.
 function presetOf(list: Feature[]): string {
   const match = PRESETS.find((p) => p.features.length === list.length && p.features.every((f) => list.includes(f)));
@@ -154,13 +157,12 @@ export default function AdminUsers() {
               <tbody>
                 {visible.map((u) => {
                   const self = u.username === me;
-                  const locked = self || u.source === 'hardcoded';
+                  const locked = !self && u.source === 'hardcoded';
                   const busy = saving === u.username;
-                  const lockedTitle = self
-                    ? "You can't change your own permissions"
-                    : u.source === 'hardcoded'
-                      ? 'This user is always an admin'
-                      : undefined;
+                  const lockedTitle = locked ? 'This user is always an admin' : undefined;
+                  const keep = (list: Feature[]) => (self && !list.includes(SELF_KEEPS) ? [...list, SELF_KEEPS] : list);
+                  const canReset =
+                    (u.source === 'db' && !self) || (self && u.source === 'hardcoded' && u.features.length < FEATURES.length);
                   const preset = presetOf(u.features);
                   return (
                     <tr key={u.username} className="border-b border-secondary-100 dark:border-secondary-700/50">
@@ -178,7 +180,7 @@ export default function AdminUsers() {
                           title={lockedTitle}
                           onChange={(e) => {
                             const p = PRESETS.find((x) => x.key === e.target.value);
-                            if (p) void change(u.username, () => setFeatures(u.username, p.features));
+                            if (p) void change(u.username, () => setFeatures(u.username, keep(p.features)));
                           }}
                           aria-label={`Preset for ${u.username}`}
                           className={`${INPUT_CLASS} w-32`}
@@ -195,31 +197,36 @@ export default function AdminUsers() {
                           )}
                         </select>
                       </td>
-                      {FEATURES.map((f) => (
-                        <td key={f.key} className="p-3 text-center">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-sm checkbox-primary"
-                            checked={u.features.includes(f.key)}
-                            disabled={locked || busy}
-                            title={lockedTitle ?? f.detail}
-                            aria-label={`${f.label} for ${u.username}`}
-                            onChange={(e) =>
-                              void change(u.username, () => setFeatures(u.username, toggled(u.features, f.key, e.target.checked)))
-                            }
-                          />
-                        </td>
-                      ))}
+                      {FEATURES.map((f) => {
+                        const kept = self && f.key === SELF_KEEPS;
+                        return (
+                          <td key={f.key} className="p-3 text-center">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm checkbox-primary"
+                              checked={u.features.includes(f.key)}
+                              disabled={locked || kept || busy}
+                              title={kept ? "You can't remove your own admin access" : (lockedTitle ?? f.detail)}
+                              aria-label={`${f.label} for ${u.username}`}
+                              onChange={(e) =>
+                                void change(u.username, () =>
+                                  setFeatures(u.username, keep(toggled(u.features, f.key, e.target.checked))),
+                                )
+                              }
+                            />
+                          </td>
+                        );
+                      })}
                       <td className="p-3">
                         <SourceBadge source={u.source} />
                       </td>
                       <td className="py-3 pl-3 text-right">
-                        {u.source === 'db' && !self && (
+                        {canReset && (
                           <Button
                             size="sm"
                             icon="refresh"
                             disabled={busy}
-                            title="Remove all features (Phone and Settings only)"
+                            title={self ? 'Restore all features' : 'Remove all features (Phone and Settings only)'}
                             onClick={() => void change(u.username, () => resetFeatures(u.username))}
                           >
                             Reset

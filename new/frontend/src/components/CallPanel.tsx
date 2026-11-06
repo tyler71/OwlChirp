@@ -18,6 +18,7 @@ import { $agentSnapshot, $contactSnapshot, type ConnectionSnapshot, type Contact
 import { openCallLog } from '../lib/systemLog';
 import { $wrapupStatus, saveDraft } from '../lib/wrapups';
 import { Button, Card, Icon, PhoneLabel, formatElapsed, useNow } from './ui';
+import VoiceTranscript from './VoiceTranscript';
 import WrapupFeed from './WrapupFeed';
 import WrapupForm from './WrapupForm';
 
@@ -104,6 +105,7 @@ function AfterCallWork({ contact, name }: { contact: ContactSnapshot; name: stri
         </Button>
       </div>
       {contact.phoneNumber && <WrapupForm contactId={contact.contactId} phoneNumber={contact.phoneNumber} />}
+      <VoiceTranscript embedded />
       <WrapupFeed phoneNumber={contact.phoneNumber} collapsible />
     </Card>
   );
@@ -252,6 +254,8 @@ export default function CallPanel() {
 
       {/* Without a number (e.g. an internal transfer) there's nothing to attach notes to. */}
       {contact.phoneNumber && <WrapupForm contactId={contact.contactId} phoneNumber={contact.phoneNumber} />}
+
+      <VoiceTranscript embedded />
 
       <WrapupFeed phoneNumber={contact.phoneNumber} collapsible />
 

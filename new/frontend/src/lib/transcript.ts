@@ -1,7 +1,8 @@
 import { atom } from 'nanostores';
 
 import { onEvent, request } from './realtime';
-import { $contactSnapshot, $wsStatus } from './stores';
+import { $can, $contactSnapshot, $wsStatus } from './stores';
+import { $autoTranscribe } from './theme';
 
 // Live transcription of the caller's side of the call. The backend reads the
 // call's Kinesis Video Stream, runs the caller's audio through Amazon
@@ -106,3 +107,22 @@ $wsStatus.subscribe((status) => {
     $transcript.set({ ...state, status: 'ended', segments: state.segments.filter((s) => !s.partial) });
   }
 });
+
+// With the Auto start transcription setting on, transcribe each call once it
+// connects. Only once per contact: after Stop it stays stopped.
+let autoStartedFor: string | null = null;
+
+function maybeAutoStart(): void {
+  const contact = $contactSnapshot.get();
+  if (!contact || contact.status !== connect.ContactStateType.CONNECTED) return;
+  if (autoStartedFor === contact.contactId) return;
+  if (!$autoTranscribe.get() || !$can('transcription').get() || $wsStatus.get() !== 'open') return;
+  const state = $transcript.get();
+  if (state.contactId === contact.contactId && (state.status === 'live' || state.status === 'starting')) return;
+  autoStartedFor = contact.contactId;
+  void startTranscript(contact.contactId);
+}
+
+$contactSnapshot.subscribe(maybeAutoStart);
+$wsStatus.subscribe(maybeAutoStart);
+$can('transcription').subscribe(maybeAutoStart);

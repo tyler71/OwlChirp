@@ -93,7 +93,7 @@ func (app *application) socket(w http.ResponseWriter, r *http.Request) {
 	client := app.hub.Subscribe()
 	defer app.hub.Unsubscribe(client)
 
-	defer app.mapJoin(user)()
+	defer app.mapJoin(ctx, user)()
 
 	// coder/websocket allows one concurrent writer, so request handlers hand
 	// their replies to the write loop below.

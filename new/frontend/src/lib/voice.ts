@@ -1,8 +1,15 @@
-// Map proximity voice. While the Map is open, the mic streams (Opus, only
-// while talking) to the backend relay, which forwards it to people nearby.
+// Map proximity voice. Once the Map has been opened, the mic streams (Opus,
+// only while talking) to the backend relay, which forwards it to people
+// nearby; it keeps running while other sections are shown.
 // Each listener sets every speaker's volume from the live distance: 100
 // side by side, fading on a log curve to silence at VOICE_RANGE. While on a
 // phone call nothing is sent and everyone else is silenced.
+// Mute self stops sending; Mute all silences everyone else. With the
+// Proximity chat setting off, both start on each time voice starts.
+// The mic either opens on its own above a level threshold (set in Settings,
+// applied live), or only while
+// Space (or the toolbar's hold button) is held: push to talk. Each session
+// starts in the mode chosen in Settings; the toolbar can switch it.
 import { persistentAtom } from '@nanostores/persistent';
 import { atom, computed } from 'nanostores';
 
@@ -10,9 +17,10 @@ import { apiKey } from './auth';
 import { API } from './const';
 import { $mapPlayers } from './map';
 import { $contactSnapshot } from './stores';
+import { $proximityChat, $voiceModeDefault, $voiceThreshold, type VoiceMode } from './theme';
 
-/** How far a voice carries, in world px (10 tiles). Mirrors voiceRange in backend voice.go. */
-export const VOICE_RANGE = 10 * 16;
+/** How far a voice carries, in world px (5 tiles). Mirrors voiceRange in backend voice.go. */
+export const VOICE_RANGE = 5 * 16;
 
 /** Volume (0-100) of a speaker distancePx away: log falloff to 0 at VOICE_RANGE. */
 export function volumeAt(distancePx: number): number {
@@ -27,7 +35,31 @@ export const $voiceMuted = persistentAtom<boolean>('owlchirp:voice:muted', false
   encode: (v) => (v ? '1' : ''),
   decode: (v) => v === '1',
 });
-/** True while this user's mic is above the talk threshold and being sent. */
+/** Mute all: hear nobody on the map. */
+export const $voiceDeafened = persistentAtom<boolean>('owlchirp:voice:deafened', false, {
+  encode: (v) => (v ? '1' : ''),
+  decode: (v) => v === '1',
+});
+/** How the mic opens this session: level threshold or push to talk. */
+export const $voiceMode = atom<VoiceMode>('threshold');
+/** True while push to talk is held (Space or the toolbar button). */
+export const $voicePttHeld = atom(false);
+
+/** Hold or release push to talk. */
+export function setPttHeld(on: boolean): void {
+  if ($voicePttHeld.get() !== on) $voicePttHeld.set(on);
+}
+
+/** Whether a key press is going into a text field rather than the page. */
+function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
+}
+
+/** Recent mic level in dBFS while voice is capturing, or null (for the Settings meter). */
+export const $voiceLevel = atom<number | null>(null);
+
+/** True while this user's mic is open (by level or push to talk) and being sent. */
 export const $voiceTalking = atom(false);
 
 // Contact states that count as being on a call (hold keeps the contact connected).
@@ -37,7 +69,7 @@ export const $voiceOnCall = computed($contactSnapshot, (c) => !!c && ON_CALL_STA
 const SAMPLE_RATE = 48000;
 const FRAME = 960; // 20ms
 const FRAME_US = 20_000;
-const TALK_DB = -50; // RMS threshold that opens the gate
+const LEVEL_EVERY_MS = 100;
 const HANGOVER_MS = 300;
 const PREROLL_FRAMES = 2;
 const JITTER_S = 0.06;
@@ -112,6 +144,12 @@ export function voiceSupported(): boolean {
 export function startVoice(me: string): void {
   if (session && !session.stopped && session.me === me) return;
   stopVoice();
+  if (!$proximityChat.get()) {
+    $voiceMuted.set(true);
+    $voiceDeafened.set(true);
+  }
+  $voiceMode.set($voiceModeDefault.get());
+  setPttHeld(false);
   if (!voiceSupported()) {
     $voiceStatus.set('unsupported');
     return;
@@ -134,18 +172,39 @@ export function startVoice(me: string): void {
     s.cleanups.push(() => window.removeEventListener(ev, resume, { capture: true }));
   }
 
+  const applyGain = () => {
+    master.gain.setTargetAtTime($voiceOnCall.get() || $voiceDeafened.get() ? 0 : 1, ctx.currentTime, 0.05);
+  };
+  applyGain();
   const applyOnCall = (onCall: boolean) => {
-    master.gain.setTargetAtTime(onCall ? 0 : 1, ctx.currentTime, 0.05);
+    applyGain();
     sendJSON(s, { type: 'onCall', on: onCall });
     if (onCall) $voiceTalking.set(false);
   };
   s.cleanups.push($voiceOnCall.listen(applyOnCall));
+  s.cleanups.push($voiceDeafened.listen(applyGain));
   s.cleanups.push(
     $voiceMuted.listen((muted) => {
       if (muted) $voiceTalking.set(false);
     }),
   );
   s.timers.push(setInterval(() => updateGains(s), GAIN_EVERY_MS));
+
+  // Push to talk: hold Space anywhere in the app, except while typing.
+  const onPttKey = (e: KeyboardEvent) => {
+    if (e.code !== 'Space' || $voiceMode.get() !== 'ptt' || isTyping(e.target)) return;
+    e.preventDefault();
+    setPttHeld(e.type === 'keydown');
+  };
+  const releasePtt = () => setPttHeld(false);
+  for (const ev of ['keydown', 'keyup'] as const) {
+    window.addEventListener(ev, onPttKey, { capture: true });
+    s.cleanups.push(() => window.removeEventListener(ev, onPttKey, { capture: true }));
+  }
+  window.addEventListener('blur', releasePtt);
+  s.cleanups.push(() => window.removeEventListener('blur', releasePtt));
+  s.cleanups.push($voiceMode.listen(releasePtt));
+  s.cleanups.push(releasePtt);
 
   void startMic(s);
   void connectLoop(s);
@@ -166,6 +225,7 @@ export function stopVoice(): void {
   s.speakers.clear();
   s.ctx.close().catch(() => undefined);
   heardAt.clear();
+  $voiceLevel.set(null);
   $voiceTalking.set(false);
   $voiceStatus.set('off');
 }
@@ -243,19 +303,29 @@ async function startMic(s: Session): Promise<void> {
   });
 
   let ts = 0;
+  let levelAt = 0;
+  let peakDb = -Infinity;
   node.port.onmessage = (ev: MessageEvent<Float32Array<ArrayBuffer>>) => {
     const pcm = ev.data;
     if (s.stopped || encoder.state !== 'configured') return;
+    let sum = 0;
+    for (let i = 0; i < pcm.length; i++) sum += pcm[i] * pcm[i];
+    const db = 10 * Math.log10(sum / pcm.length + 1e-12);
+    const now = performance.now();
+    // Report the loudest frame of each interval so short words register.
+    peakDb = Math.max(peakDb, db);
+    if (now - levelAt >= LEVEL_EVERY_MS) {
+      $voiceLevel.set(peakDb);
+      peakDb = -Infinity;
+      levelAt = now;
+    }
     if ($voiceMuted.get() || $voiceOnCall.get()) {
       sendUntil = 0;
       preroll.length = 0;
       return;
     }
-    let sum = 0;
-    for (let i = 0; i < pcm.length; i++) sum += pcm[i] * pcm[i];
-    const db = 10 * Math.log10(sum / pcm.length + 1e-12);
-    const now = performance.now();
-    if (db > TALK_DB) sendUntil = now + HANGOVER_MS;
+    const open = $voiceMode.get() === 'ptt' ? $voicePttHeld.get() : db > $voiceThreshold.get();
+    if (open) sendUntil = now + HANGOVER_MS;
     const talking = now < sendUntil;
     if ($voiceTalking.get() !== talking) $voiceTalking.set(talking);
     if (talking) heardAt.set(s.me, Date.now());
@@ -374,7 +444,7 @@ function dropSpeaker(sp: Speaker): void {
 }
 
 function onAudio(s: Session, buf: ArrayBuffer): void {
-  if (buf.byteLength < 3 || $voiceOnCall.get()) return;
+  if (buf.byteLength < 3 || $voiceOnCall.get() || $voiceDeafened.get()) return;
   const id = new DataView(buf).getUint16(0);
   const sp = s.speakers.get(id);
   if (!sp?.decoder || sp.decoder.state !== 'configured') return;
@@ -412,7 +482,9 @@ function updateGains(s: Session): void {
   const me = players[s.me];
   for (const sp of s.speakers.values()) {
     const p = players[sp.username];
-    const v = me && p ? volumeAt(Math.hypot(p.x - me.x, p.y - me.y)) : 0;
+    // Only people in the same scene (town or office) can hear each other.
+    const sameScene = me && p && (p.scene || 'town') === (me.scene || 'town');
+    const v = sameScene ? volumeAt(Math.hypot(p.x - me.x, p.y - me.y)) : 0;
     sp.gain.gain.setTargetAtTime(v / 100, s.ctx.currentTime, 0.05);
   }
 }

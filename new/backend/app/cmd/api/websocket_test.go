@@ -254,15 +254,21 @@ func TestSocketSettings(t *testing.T) {
 
 	reply := c.call("settings.get", nil)
 	assert.Equal(t, reply.Type, "result")
-	assert.Equal(t, string(reply.Data), `{"theme":"","followTeamMeeting":false,"hideCallerIds":false}`)
+	assert.Equal(t, string(reply.Data), `{"theme":"","followTeamMeeting":false,"hideCallerIds":false,"proximityChat":false}`)
 
-	reply = c.call("settings.save", map[string]any{"theme": "dracula", "followTeamMeeting": true, "hideCallerIds": true})
+	reply = c.call("settings.save", map[string]any{"theme": "dracula", "followTeamMeeting": true, "hideCallerIds": true, "proximityChat": true, "autoTranscribe": false, "voiceMode": "ptt", "voiceThreshold": -60,
+		"phoneLayout": map[string]any{"left": []string{"flow", "call"}, "right": []string{"functions", "timeline"}}})
 	assert.Equal(t, reply.Type, "result")
 
 	// A second connection for the same user sees the saved settings.
 	other := dial(t, srv, validToken())
 	reply = other.call("settings.get", nil)
-	assert.Equal(t, string(reply.Data), `{"theme":"dracula","followTeamMeeting":true,"hideCallerIds":true}`)
+	assert.Equal(t, string(reply.Data), `{"theme":"dracula","followTeamMeeting":true,"hideCallerIds":true,"proximityChat":true,"autoTranscribe":false,"voiceMode":"ptt","voiceThreshold":-60,"phoneLayout":{"left":["flow","call"],"right":["functions","timeline"]}}`)
+
+	for _, bad := range []int{-81, -19} {
+		reply = c.call("settings.save", map[string]any{"theme": "dracula", "voiceThreshold": bad})
+		assert.Equal(t, reply.Type, "error")
+	}
 }
 
 func TestSocketCallLogs(t *testing.T) {
@@ -350,6 +356,7 @@ func TestSocketValidation(t *testing.T) {
 		{"callerid.delete", map[string]any{}, "phoneNumber is required"},
 		{"callerid.delete", map[string]any{"phoneNumber": "+1"}, "caller id not found"},
 		{"settings.save", map[string]any{"theme": "Dracula!"}, "theme is invalid"},
+		{"settings.save", map[string]any{"phoneLayout": map[string]any{"left": []string{"<script>"}}}, "phoneLayout is invalid"},
 		{"syslog.append", map[string]any{"outcome": "failed"}, "contactId is required"},
 		{"syslog.append", map[string]any{"contactId": "c-1", "outcome": "weird"}, "outcome must be failed or missed"},
 		{"syslog.get", map[string]any{"contactId": "missing"}, "log not found"},
@@ -482,8 +489,14 @@ func TestSocketPermissions(t *testing.T) {
 		return c.call("users.setFeatures", map[string]any{"username": username, "features": list})
 	}
 
-	reply = set(admin, testAgent.Username)
-	assert.Equal(t, reply.Error, "you can't change your own permissions")
+	reply = admin.call("users.resetFeatures", map[string]any{"username": testAgent.Username})
+	assert.Equal(t, reply.Error, "you can't remove your own admin access")
+	// Admins can change their own features but always keep Admin.
+	reply = set(admin, testAgent.Username, features.Feed)
+	assert.Equal(t, reply.Type, "result")
+	var self managedUser
+	assert.Nil(t, json.Unmarshal(reply.Data, &self))
+	assert.Equal(t, strings.Join(self.Features, ","), "feed,admin")
 	reply = set(admin, "nobody@example.com", features.Feed)
 	assert.Equal(t, reply.Error, "user not found")
 	reply = set(admin, standardUser.Username, "bogus")
@@ -501,7 +514,8 @@ func TestSocketPermissions(t *testing.T) {
 	reply = set(admin, standardUser.Username, features.Admin)
 	assert.Equal(t, reply.Type, "result")
 	event := standard.readUntil(func(m testMessage) bool {
-		return m.Type == "permission.updated" && strings.Contains(string(m.Data), `"admin"`)
+		return m.Type == "permission.updated" && strings.Contains(string(m.Data), standardUser.Username) &&
+			strings.Contains(string(m.Data), `"admin"`)
 	})
 	assert.Nil(t, json.Unmarshal(event.Data, &updated))
 	assert.Equal(t, updated.Username, standardUser.Username)
@@ -547,4 +561,21 @@ func TestHardcodedAdmin(t *testing.T) {
 	assert.Nil(t, json.Unmarshal(reply.Data, &users))
 	assert.Equal(t, users[1].Source, sourceHardcoded)
 	assert.Equal(t, len(users[1].Features), len(features.All))
+
+	// A hardcoded admin can narrow their own features but always keeps Admin.
+	reply = c.call("users.setFeatures", map[string]any{"username": standardUser.Username, "features": []string{features.Feed}})
+	assert.Equal(t, reply.Type, "result")
+	var updated managedUser
+	assert.Nil(t, json.Unmarshal(reply.Data, &updated))
+	assert.Equal(t, strings.Join(updated.Features, ","), "feed,admin")
+	assert.Equal(t, updated.Source, sourceHardcoded)
+	assert.Equal(t, c.call("callerid.list", nil).Error, "permission denied")
+	assert.Equal(t, c.call("users.list", nil).Type, "result")
+
+	// Resetting brings back every feature.
+	reply = c.call("users.resetFeatures", map[string]any{"username": standardUser.Username})
+	assert.Equal(t, reply.Type, "result")
+	assert.Nil(t, json.Unmarshal(reply.Data, &updated))
+	assert.Equal(t, len(updated.Features), len(features.All))
+	assert.Equal(t, c.call("callerid.list", nil).Type, "result")
 }

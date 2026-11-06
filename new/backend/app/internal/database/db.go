@@ -71,6 +71,12 @@ func migrate(ctx context.Context, db *sqlx.DB) error {
 	if err := migrateBuildings(ctx, db); err != nil {
 		return err
 	}
+	if err := migrateScenes(ctx, db); err != nil {
+		return err
+	}
+	if err := seedOffice(ctx, db); err != nil {
+		return err
+	}
 	return migratePermissions(ctx, db)
 }
 
@@ -527,6 +533,27 @@ type Settings struct {
 	// HelpQueueThreshold is the queue count at which a non-routable agent is
 	// alerted to help as the queue grows. nil means the client default; 0 is off.
 	HelpQueueThreshold *int `json:"helpQueueThreshold,omitempty"`
+	// ProximityChat keeps map voice mute choices between sessions; when off,
+	// map voice starts with the mic and speakers muted.
+	ProximityChat bool `json:"proximityChat"`
+	// AutoTranscribe starts live transcription when a call connects. nil
+	// means the client default (on).
+	AutoTranscribe *bool `json:"autoTranscribe,omitempty"`
+	// VoiceMode is how map voice decides when to send by default: "threshold"
+	// (voice activated) or "ptt" (push to talk). Empty means threshold.
+	VoiceMode string `json:"voiceMode,omitempty"`
+	// VoiceThreshold is the mic level in dBFS that opens map voice in
+	// threshold mode. nil means the client default.
+	VoiceThreshold *int `json:"voiceThreshold,omitempty"`
+	// PhoneLayout is the agent's arrangement of the Phone tab cards. nil means
+	// the client default; the client fills in cards missing from it.
+	PhoneLayout *PhoneLayout `json:"phoneLayout,omitempty"`
+}
+
+// PhoneLayout lists Phone tab card ids per column, top to bottom.
+type PhoneLayout struct {
+	Left  []string `json:"left"`
+	Right []string `json:"right"`
 }
 
 // GetSettings returns zero Settings when the user has saved none.

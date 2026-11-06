@@ -36,7 +36,10 @@ var mapReserve = MapRect{X: 45, Y: 32, W: 40, H: 30}
 var MapTiles = []string{"grass", "flowers", "road", "path", "plaza", "sand", "water", "lot"}
 
 // MapPropKinds are the decorations that can be placed.
-var MapPropKinds = []string{"tree", "pine", "bush", "rock", "flowerpot", "bench", "lamp", "fountain", "fence", "sign"}
+var MapPropKinds = []string{
+	"tree", "pine", "bush", "rock", "flowerpot", "bench", "lamp", "fountain", "fence", "sign",
+	"fruittree", "stump", "boulder", "ruin", "wildflowers",
+}
 
 var defaultLots = sync.OnceValue(func() []MapRect {
 	var lots []MapRect

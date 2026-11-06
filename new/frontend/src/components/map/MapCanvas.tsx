@@ -1,12 +1,14 @@
-// The Map canvas: one requestAnimationFrame loop draws the part of town
-// around you (the camera follows your character), everyone's character, pet
-// and ride, and pulses for incoming calls, plus a minimap of the whole town.
+// The Map canvas: one requestAnimationFrame loop draws the part of the scene
+// you're in around you (the camera follows your character), everyone in it
+// with their pet and ride, and in town pulses for incoming calls, plus a
+// minimap of the whole scene. Walking into a door (HQ's glass doors, the
+// office's doormat) takes you to the other scene, and the loop starts over.
 // With Map design it also paints ground, places and removes decorations, and
 // drags buildings. Stores are read through refs so React never re-renders
 // per frame.
 import { persistentAtom } from '@nanostores/persistent';
 import { useStore } from '@nanostores/react';
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { STATUS_LUNCH, STATUS_OFFLINE, STATUS_ON_CALL, STATUS_TICKET_BREAK } from '../../lib/const';
 import { $queuedCount } from '../../lib/flowCalls';
@@ -21,11 +23,16 @@ import {
   $mapProps,
   $mapTiles,
   $myGear,
+  $myLook,
+  $myScene,
   createProp,
+  enterScene,
   deleteProp,
+  callAgent,
   liveCalls,
   matchBuilding,
   moveBuilding,
+  moveProp,
   onCallEnd,
   onCallPulse,
   paintTiles,
@@ -33,6 +40,7 @@ import {
   type CallPulse,
   type Dir,
   type MapTile,
+  type MapLook,
   type Pet,
   type Ride,
 } from '../../lib/map';
@@ -54,31 +62,28 @@ import {
   renderGround,
   type Pose,
 } from './sprites';
+import { assetsReady, loadMapAssets } from './assets';
+import { sceneOf } from './scenes';
 import {
   BUILDING_SIZE,
-  COLS,
   EDGE_ENTRIES,
   HQ,
-  ROWS,
   TILE,
-  WORLD_H,
-  WORLD_W,
   World,
   buildingRect,
-  inMap,
   inRect,
   overlaps,
   pathLength,
   pointAlong,
-  tileKey,
+  type Door,
   type Point,
+  type Prop,
   type Rect,
 } from './world';
 
 const SPEED: Record<Ride, number> = { walk: 72, bike: 140, car: 220 }; // px per second
 // Half-width of the box at a character's feet used for collisions.
 const FOOT_W: Record<Ride, number> = { walk: 4, bike: 5, car: 9 };
-const FOOT_H = 3;
 const SEND_INTERVAL_MS = 100;
 const PAINT_FLUSH_MS = 150;
 const MAX_PAINT_BATCH = 400;
@@ -86,11 +91,20 @@ const PULSE_TRAVEL_MS = 3200;
 const PULSE_GAP_MS = 5000; // pause between laps of a live call
 const RING_MS = 1200;
 const BUILDING_FLASH_MS = 3500;
-const MINIMAP_SCALE = 1.5; // css px per tile
+const MINIMAP_SCALE = 1.5; // css px per tile; small scenes get bigger tiles
+const minimapScale = (cols: number) => Math.max(MINIMAP_SCALE, Math.min(6, 120 / cols));
+const FADE_MS = 350; // fade in after going through a door
 const ZOOMS = [1, 2, 3, 4];
+const TOWN_AVATAR_SCALE = 2 / 3; // people and pets are drawn smaller outside
 
 /** Map zoom (world px → css px), remembered across reloads. */
 const $zoom = persistentAtom<string>('owlchirp:map:zoom', '2');
+
+/** Move the zoom up (+1) or down (-1) one level, clamped to ZOOMS. */
+const stepZoom = (step: number) => {
+  const i = ZOOMS.indexOf(Number($zoom.get()) || 2);
+  $zoom.set(String(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? 1 : i) + step))]));
+};
 
 const KEY_DIRS: Record<string, Dir> = {
   ArrowUp: 'up',
@@ -119,15 +133,21 @@ type Sprite = {
   movingUntil: number;
   pet: Pet;
   ride: Ride;
+  look: MapLook | null;
   petState: PetState;
 };
 
-/** A live call's pulse, lapping from its building to HQ until the call ends. */
+/**
+ * A live call's pulse, lapping from its building to HQ (or, once answered,
+ * to the answering agent if they're on the map) until the call ends.
+ */
 type ActivePulse = {
   pulse: CallPulse;
   route: Point[];
   length: number;
   start: number;
+  /** Sprite name this lap runs to, or '' for HQ. */
+  target: string;
   /** The call disconnected: finish this lap, then stop. */
   ended: boolean;
 };
@@ -173,15 +193,25 @@ function tilesBetween(a: Point, b: Point): Point[] {
   return out.length ? out : [b];
 }
 
-export default function MapCanvas({ me }: { me: string }) {
+/** `children` go in the bottom-right corner, under the minimap. */
+export default function MapCanvas({ me, children }: { me: string; children?: ReactNode }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const miniRef = useRef<HTMLCanvasElement>(null);
   const followRef = useRef<() => void>(() => undefined);
   const zoom = Number(useStore($zoom)) || 2;
   const mode = useStore($mapMode);
+  const scene = useStore($myScene);
+  const def = sceneOf(scene);
+  const miniScale = minimapScale(def.cols);
+  // Sprites and tiles are images: hold off drawing until they've loaded.
+  const [ready, setReady] = useState(assetsReady);
+  useEffect(() => {
+    if (!ready) void loadMapAssets().then(() => setReady(true));
+  }, [ready]);
 
   useEffect(() => {
+    if (!ready) return;
     const canvas = canvasRef.current!;
     const mini = miniRef.current!;
     const wrap = wrapRef.current!;
@@ -190,21 +220,39 @@ export default function MapCanvas({ me }: { me: string }) {
     const reduced = prefersReducedMotion();
 
     // ---- World ----
-    const world = new World();
-    for (const t of $mapTiles.get()) world.setTile(t.x, t.y, t.tile);
-    world.setProps($mapProps.get());
-    const syncBuildings = () => (world.buildings = ($buildings.get() ?? []).map((b) => ({ id: b.id, x: b.x, y: b.y })));
+    const world = new World(sceneOf(scene));
+    // Bikes and cars stay outside: in a scene without rides everyone walks.
+    const rideHere = (r: Ride): Ride => (world.def.rides ? r : 'walk');
+    const isTown = world.def.id === 'town';
+    const avatarScale = isTown ? TOWN_AVATAR_SCALE : 1;
+    /** Draw a person or pet scaled about their feet at (x, y). */
+    const scaledAt = (x: number, y: number, draw: () => void) => {
+      if (avatarScale === 1) return draw();
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(avatarScale, avatarScale);
+      ctx.translate(-x, -y);
+      draw();
+      ctx.restore();
+    };
+    const { w: WORLD_W, h: WORLD_H } = world;
+    const here = <T extends { scene?: string }>(rows: readonly T[]) => rows.filter((r) => (r.scene || 'town') === scene);
+    for (const t of here($mapTiles.get())) world.setTile(t.x, t.y, t.tile);
+    world.setProps(here($mapProps.get()));
+    const sceneBuildings = () => (isTown ? ($buildings.get() ?? []) : []);
+    const syncBuildings = () => (world.buildings = sceneBuildings().map((b) => ({ id: b.id, x: b.x, y: b.y })));
     syncBuildings();
     const ground = renderGround(world);
     const repaint = (x: number, y: number) => paintGround(ground, world, x - 2, y - 2, x + 2, y + 2);
 
     const offTiles = $mapTiles.listen((tiles) => {
-      const changed: MapTile[] = tiles.filter((t) => world.setTile(t.x, t.y, t.tile));
-      if (changed.length > 300) paintGround(ground, world, 0, 0, COLS - 1, ROWS - 1);
+      const changed: MapTile[] = here(tiles).filter((t) => world.setTile(t.x, t.y, t.tile));
+      if (changed.length > 300) paintGround(ground, world, 0, 0, world.cols - 1, world.rows - 1);
       else for (const t of changed) repaint(t.x, t.y);
     });
-    const offProps = $mapProps.listen((props) => world.setProps(props));
+    const offProps = $mapProps.listen((props) => world.setProps(here(props)));
     const offBuildings = $buildings.listen(syncBuildings);
+    const enteredAt = performance.now();
 
     // ---- Camera ----
     let dpr = 1;
@@ -227,14 +275,28 @@ export default function MapCanvas({ me }: { me: string }) {
       scale = zoomNow * dpr;
       viewW = canvas.width / scale;
       viewH = canvas.height / scale;
-      mini.width = Math.round(COLS * MINIMAP_SCALE * dpr);
-      mini.height = Math.round(ROWS * MINIMAP_SCALE * dpr);
+      mini.width = Math.round(world.cols * miniScale * dpr);
+      mini.height = Math.round(world.rows * miniScale * dpr);
       snap = true;
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(wrap);
     const offZoom = $zoom.listen(() => requestAnimationFrame(resize));
+
+    // Ctrl/Cmd + wheel (and trackpad pinch, which arrives as ctrl+wheel) steps
+    // the map zoom instead of zooming the page. Deltas accumulate so a pinch's
+    // many tiny events don't race through every level at once.
+    let wheelAcc = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      wheelAcc += e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      if (Math.abs(wheelAcc) < 50) return;
+      stepZoom(wheelAcc < 0 ? 1 : -1);
+      wheelAcc = 0;
+    };
+    wrap.addEventListener('wheel', onWheel, { passive: false });
 
     const clampCam = (x: number, y: number): Point => ({
       x: viewW >= WORLD_W ? (WORLD_W - viewW) / 2 : Math.max(0, Math.min(WORLD_W - viewW, x)),
@@ -250,19 +312,59 @@ export default function MapCanvas({ me }: { me: string }) {
     };
 
     const offFocus = $mapFocus.listen((f) => {
-      if (!f) return;
+      if (!f || !isTown) return;
       lookAtPoint({ x: (f.x + BUILDING_SIZE / 2) * TILE, y: (f.y + BUILDING_SIZE / 2) * TILE });
     });
 
     // ---- Characters ----
     const sprites = new Map<string, Sprite>();
     const keys: Dir[] = [];
-    let target: Point | null = null; // click-to-walk
+    // Click-to-walk: the spot clicked and the waypoints left to get there.
+    let goal: Point | null = null;
+    let route: Point[] = [];
+    let routeFootW = 0;
+    let routeRoads = false;
+    let replanned = false;
+    // A door clicked on: going through it once there, whichever way we face.
+    let doorGoal: Door | null = null;
+    let leaving = false;
+
+    // Cars keep to the roads; walkers and bikes go anywhere open.
+    const planTo = (s: Sprite, p: Point, footW: number) => {
+      goal = p;
+      routeFootW = footW;
+      routeRoads = rideHere($myGear.get().ride) === 'car';
+      route = world.findPath({ x: s.x, y: s.y }, p, footW, routeRoads) ?? [p];
+    };
+    const stopRoute = () => {
+      goal = null;
+      route = [];
+      doorGoal = null;
+    };
+
+    /** Go through a door when my feet are in it, heading its way (or I clicked it). */
+    const tryDoor = (s: Sprite, heading: Dir | null) => {
+      for (const door of world.def.doors) {
+        if (!inRect(door.trigger, s.x, s.y)) continue;
+        if (heading !== door.dir && doorGoal !== door) continue;
+        leaving = true;
+        keys.length = 0;
+        stopRoute();
+        sendMove(s.x, s.y, s.dir);
+        enterScene(door.to).catch((err) => {
+          console.error('map.enter', err);
+          leaving = false;
+        });
+        return;
+      }
+    };
     let lastSent = 0;
     let sentMoving = false;
 
     const syncPlayers = () => {
-      const players = $mapPlayers.get() ?? {};
+      const all = $mapPlayers.get() ?? {};
+      // Only people in this scene; the rest are elsewhere.
+      const players = Object.fromEntries(Object.entries(all).filter(([, p]) => (p.scene || 'town') === scene));
       for (const name of sprites.keys()) if (!players[name]) sprites.delete(name);
       for (const p of Object.values(players)) {
         const s = sprites.get(p.username);
@@ -275,12 +377,14 @@ export default function MapCanvas({ me }: { me: string }) {
             dir: p.dir,
             movingUntil: 0,
             pet: p.pet ?? '',
-            ride: p.ride ?? 'walk',
+            ride: rideHere(p.ride ?? 'walk'),
+            look: p.look ?? null,
             petState: { x: p.x + 12, y: p.y + 1, dir: 'down', movingUntil: 0 },
           });
         } else {
           s.pet = p.pet ?? '';
-          s.ride = p.ride ?? 'walk';
+          s.ride = rideHere(p.ride ?? 'walk');
+          s.look = p.look ?? null;
           if (p.username !== me) {
             if (p.x !== s.tx || p.y !== s.ty) s.movingUntil = performance.now() + 250;
             s.tx = p.x;
@@ -293,18 +397,16 @@ export default function MapCanvas({ me }: { me: string }) {
     syncPlayers();
     const offPlayers = $mapPlayers.listen(syncPlayers);
 
-    const blocked = (x: number, y: number, footW: number) =>
-      world.isSolid(x - footW, y - FOOT_H) ||
-      world.isSolid(x + footW, y - FOOT_H) ||
-      world.isSolid(x - footW, y - 1) ||
-      world.isSolid(x + footW, y - 1);
+    const blocked = (x: number, y: number, footW: number) => world.blocked(x, y, footW);
 
     const moveMe = (dt: number, now: number) => {
       const s = sprites.get(me);
-      if (!s) return;
+      if (!s || leaving) return;
       const gear = $myGear.get();
       s.pet = gear.pet;
-      s.ride = gear.ride;
+      const ride = rideHere(gear.ride);
+      s.ride = ride;
+      s.look = $myLook.get();
       let dx = 0;
       let dy = 0;
       const keyDir = keys[keys.length - 1];
@@ -320,24 +422,29 @@ export default function MapCanvas({ me }: { me: string }) {
           dx *= Math.SQRT1_2;
           dy *= Math.SQRT1_2;
         }
-      } else if (target) {
-        const ddx = target.x - s.x;
-        const ddy = target.y - s.y;
-        const dist = Math.hypot(ddx, ddy);
-        if (dist < 2) {
-          target = null;
+      } else if (goal) {
+        // A new ride has different-sized feet: plan again for them.
+        if (FOOT_W[ride] !== routeFootW || (ride === 'car') !== routeRoads) planTo(s, goal, FOOT_W[ride]);
+        while (route.length && Math.hypot(route[0].x - s.x, route[0].y - s.y) < 2) {
+          route.shift();
+          replanned = false;
+        }
+        const next = route[0];
+        if (!next) {
+          stopRoute();
         } else {
-          dx = ddx / dist;
-          dy = ddy / dist;
+          const dist = Math.hypot(next.x - s.x, next.y - s.y);
+          dx = (next.x - s.x) / dist;
+          dy = (next.y - s.y) / dist;
         }
       }
 
       const moving = dx !== 0 || dy !== 0;
       if (moving) {
-        const footW = FOOT_W[gear.ride];
+        const footW = FOOT_W[ride];
         // Someone may have built on top of us: walk out freely.
         const stuck = blocked(s.x, s.y, footW);
-        const step = Math.min(SPEED[gear.ride] * dt, 8);
+        const step = Math.min(SPEED[ride] * dt, 8);
         const nx = s.x + dx * step;
         const ny = s.y + dy * step;
         // Slide along walls: try each axis on its own.
@@ -350,13 +457,29 @@ export default function MapCanvas({ me }: { me: string }) {
           s.y = Math.max(1, Math.min(WORLD_H - 1, ny));
           moved = true;
         }
-        if (!moved) target = null;
+        if (!moved && goal) {
+          // Something went up in the way: plan around it once, else give up.
+          if (replanned) stopRoute();
+          else {
+            planTo(s, goal, footW);
+            replanned = true;
+          }
+        }
         s.dir = keyDir
           ? keyDir
           : Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
         s.tx = s.x;
         s.ty = s.y;
         s.movingUntil = moved ? now + 50 : 0;
+        if (moved) {
+          const heading: Dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
+          tryDoor(s, heading);
+          if (leaving) return;
+        } else if (!stuck) {
+          // Pushing against a wall right in a door still goes through it.
+          tryDoor(s, s.dir);
+          if (leaving) return;
+        }
         if (moved && now - lastSent >= SEND_INTERVAL_MS) {
           sendMove(s.x, s.y, s.dir);
           lastSent = now;
@@ -374,8 +497,10 @@ export default function MapCanvas({ me }: { me: string }) {
     const movePet = (s: Sprite, dt: number, now: number) => {
       const p = s.petState;
       const moving = now < s.movingUntil;
-      const behind: Record<Dir, [number, number]> = { left: [14, 1], right: [-14, 1], up: [8, 8], down: [8, -6] };
-      const [ox, oy] = moving ? behind[s.dir] : [12, 1];
+      const behind: Record<Dir, [number, number]> = { left: [20, 1], right: [-20, 1], up: [12, 10], down: [12, -8] };
+      const [bx, by] = moving ? behind[s.dir] : [16, 1];
+      const ox = bx * avatarScale;
+      const oy = by * avatarScale;
       const tx = s.x + ox;
       const ty = s.y + oy;
       const dx = tx - p.x;
@@ -391,7 +516,8 @@ export default function MapCanvas({ me }: { me: string }) {
         p.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
         if (step > 0.3) p.movingUntil = now + 80;
       } else if (!moving) {
-        p.dir = 'down';
+        // Settled beside their owner: face the way the owner is facing.
+        p.dir = s.dir;
       }
     };
 
@@ -409,6 +535,7 @@ export default function MapCanvas({ me }: { me: string }) {
     let lastTile: Point | null = null;
     let painting = false;
     let drag: { id: number; offX: number; offY: number; at: Point; from: Point } | null = null;
+    let propDrag: { prop: Prop; at: Point } | null = null;
     const pendingPaint = new Map<number, MapTile>();
     let lastFlush = 0;
     let nextTempId = -1;
@@ -424,30 +551,37 @@ export default function MapCanvas({ me }: { me: string }) {
     };
 
     const queuePaint = (x: number, y: number) => {
-      pendingPaint.set(tileKey(x, y), { x, y, tile: world.tile(x, y)! });
+      pendingPaint.set(world.key(x, y), { scene, x, y, tile: world.tile(x, y)! });
       repaint(x, y);
     };
 
+    /** Whether a decoration can go on this tile: free ground, nothing on it. */
+    const canPlaceProp = (x: number, y: number) => {
+      if (!world.has(x, y) || world.def.locked(x, y) || world.buildingAt(x, y)) return false;
+      const k = world.key(x, y);
+      return !world.props.has(k) && !world.trees.has(k) && !world.def.solid.has(world.tile(x, y)!);
+    };
+
     const createAt = (x: number, y: number) => {
-      if (!inMap(x, y) || inRect(HQ, x, y) || world.buildingAt(x, y)) return;
+      if (!world.has(x, y) || world.def.locked(x, y) || world.buildingAt(x, y)) return;
       const brush = $mapBrush.get();
-      const k = tileKey(x, y);
+      const k = world.key(x, y);
       if (brush.type === 'tile') {
-        if (world.setTile(x, y, brush.tile)) queuePaint(x, y);
+        if (world.def.tileKinds.includes(brush.tile) && world.setTile(x, y, brush.tile)) queuePaint(x, y);
         return;
       }
-      if (world.props.has(k) || world.trees.has(k) || world.tile(x, y) === 'water') return;
-      const temp = { id: nextTempId--, kind: brush.kind, x, y };
+      if (!world.def.propKinds.includes(brush.kind) || !canPlaceProp(x, y)) return;
+      const temp = { id: nextTempId--, scene, kind: brush.kind, x, y };
       world.props.set(k, temp);
-      createProp(brush.kind, x, y).catch((err) => {
+      createProp(scene, brush.kind, x, y).catch((err) => {
         console.error('map.props.create', err);
         if (world.props.get(k) === temp) world.props.delete(k);
       });
     };
 
     const destroyAt = (x: number, y: number) => {
-      if (!inMap(x, y) || inRect(HQ, x, y)) return;
-      const k = tileKey(x, y);
+      if (!world.has(x, y) || world.def.locked(x, y)) return;
+      const k = world.key(x, y);
       const prop = world.props.get(k);
       if (prop) {
         world.props.delete(k);
@@ -460,7 +594,8 @@ export default function MapCanvas({ me }: { me: string }) {
         queuePaint(x, y);
         return;
       }
-      if (world.tile(x, y) !== 'grass' && !world.buildingAt(x, y) && world.setTile(x, y, 'grass')) queuePaint(x, y);
+      const base = world.def.baseTile;
+      if (world.tile(x, y) !== base && !world.buildingAt(x, y) && world.setTile(x, y, base)) queuePaint(x, y);
     };
 
     const applyTool = (tile: Point) => {
@@ -483,7 +618,7 @@ export default function MapCanvas({ me }: { me: string }) {
       const dir = KEY_DIRS[e.key];
       if (!dir) return;
       e.preventDefault();
-      target = null;
+      stopRoute();
       follow = true;
       lookAt = null;
       if (!keys.includes(dir)) keys.push(dir);
@@ -501,7 +636,15 @@ export default function MapCanvas({ me }: { me: string }) {
       const tile = toTile(p);
       const mode = $mapMode.get();
       if (mode === 'walk') {
-        target = p;
+        const s = sprites.get(me);
+        if (s && !leaving) {
+          replanned = false;
+          // Clicking a door walks into it and through.
+          const door = world.def.doors.find((d) => inRect(d.click, p.x, p.y) || inRect(d.trigger, p.x, p.y));
+          const to = door ? { x: door.trigger.x + door.trigger.w / 2, y: door.trigger.y + door.trigger.h / 2 } : p;
+          planTo(s, to, FOOT_W[rideHere($myGear.get().ride)]);
+          doorGoal = door ?? null;
+        }
         follow = true;
         lookAt = null;
         return;
@@ -510,6 +653,11 @@ export default function MapCanvas({ me }: { me: string }) {
       if (mode === 'move') {
         const b = world.buildingAt(tile.x, tile.y);
         if (b) drag = { id: b.id, offX: p.x / TILE - b.x, offY: p.y / TILE - b.y, at: { x: b.x, y: b.y }, from: { x: b.x, y: b.y } };
+        else {
+          const prop = world.has(tile.x, tile.y) ? world.props.get(world.key(tile.x, tile.y)) : undefined;
+          // Ones still being saved have no id yet.
+          if (prop && prop.id > 0) propDrag = { prop, at: tile };
+        }
         return;
       }
       painting = true;
@@ -520,12 +668,26 @@ export default function MapCanvas({ me }: { me: string }) {
       const p = toWorld(e);
       hover = toTile(p);
       if (drag) drag.at = ghostAt(p)!;
+      else if (propDrag) propDrag.at = hover;
       else if (painting) applyTool(hover);
     };
     const onPointerUp = () => {
       painting = false;
       lastTile = null;
       flushPaint(Infinity);
+      if (propDrag) {
+        const { prop, at } = propDrag;
+        propDrag = null;
+        if ((at.x === prop.x && at.y === prop.y) || !canPlaceProp(at.x, at.y)) return;
+        // Move it here now; put it back if the server says no.
+        const before = $mapProps.get();
+        $mapProps.set(before.map((p) => (p.id === prop.id ? { ...p, x: at.x, y: at.y } : p)));
+        moveProp(prop.id, at.x, at.y).catch((err) => {
+          console.error('map.props.move', err);
+          $mapProps.set(before);
+        });
+        return;
+      }
       if (!drag) return;
       const { id, at, from } = drag;
       drag = null;
@@ -551,6 +713,7 @@ export default function MapCanvas({ me }: { me: string }) {
     const offMode = $mapMode.listen(() => {
       painting = false;
       drag = null;
+      propDrag = null;
       flushPaint(Infinity);
     });
 
@@ -576,30 +739,43 @@ export default function MapCanvas({ me }: { me: string }) {
     const pulses: ActivePulse[] = [];
     const rings: number[] = []; // start times
     const flashes = new Map<number, number>(); // building id → start time
+    const agentRings = new Map<string, number>(); // sprite name → start time
+    /** Where a pulse meets an agent: their middle, not their feet. */
+    const agentSpot = (s: Sprite): Point => ({ x: s.x, y: s.y - 12 * avatarScale });
 
-    /** Route the next lap (re-matched each time, so moved or new buildings count) and flash its building. */
+    /**
+     * Route the next lap (re-matched each time, so moved or new buildings and
+     * a newly answered call count) and flash its building. An answered call
+     * runs to its agent when they're on the map, otherwise to HQ.
+     */
     const lap = (p: ActivePulse, start: number) => {
+      const agent = callAgent(p.pulse.contactId);
+      const found = agent ? [...sprites].find(([name]) => name.toLowerCase() === agent) : undefined;
+      p.target = found?.[0] ?? '';
+      const dest = found && agentSpot(found[1]);
       const building = matchBuilding(p.pulse.phoneNumber, $buildings.get() ?? []);
       if (building) {
         flashes.set(building.id, performance.now());
-        p.route = world.routeFromBuilding(building);
+        p.route = world.routeFromBuilding(building, dest);
       } else {
         let h = 0;
         for (const ch of p.pulse.contactId) h = (h * 31 + ch.charCodeAt(0)) | 0;
         const edge = EDGE_ENTRIES[Math.abs(h) % EDGE_ENTRIES.length];
-        p.route = world.routeToHQ(edge, { x: edge.x === 0 ? -8 : WORLD_W + 8, y: edge.y * TILE + TILE / 2 });
+        const from = { x: edge.x === 0 ? -8 : WORLD_W + 8, y: edge.y * TILE + TILE / 2 };
+        p.route = dest ? world.routeTo(dest, edge, from) : world.routeToHQ(edge, from);
       }
       p.length = pathLength(p.route);
       p.start = start;
     };
     const startPulse = (pulse: CallPulse) => {
       if (pulses.some((p) => p.pulse.contactId === pulse.contactId)) return;
-      const p: ActivePulse = { pulse, route: [], length: 0, start: 0, ended: false };
+      const p: ActivePulse = { pulse, route: [], length: 0, start: 0, target: '', ended: false };
       lap(p, performance.now());
       pulses.push(p);
     };
-    for (const pulse of liveCalls()) startPulse(pulse);
-    const offPulse = onCallPulse(startPulse);
+    // Calls only show in town.
+    if (isTown) for (const pulse of liveCalls()) startPulse(pulse);
+    const offPulse = isTown ? onCallPulse(startPulse) : () => undefined;
     const offEnd = onCallEnd((contactId) => {
       for (const p of pulses) if (p.pulse.contactId === contactId) p.ended = true;
     });
@@ -615,9 +791,11 @@ export default function MapCanvas({ me }: { me: string }) {
       mctx.setTransform(1, 0, 0, 1, 0, 0);
       mctx.imageSmoothingEnabled = true;
       mctx.drawImage(ground, 0, 0, mini.width, mini.height);
-      mctx.fillStyle = '#e8edf2';
-      mctx.fillRect(HQ.x * TILE * k, HQ.y * TILE * k, HQ.w * TILE * k, HQ.h * TILE * k);
-      for (const b of $buildings.get() ?? []) {
+      if (isTown) {
+        mctx.fillStyle = '#e8edf2';
+        mctx.fillRect(HQ.x * TILE * k, HQ.y * TILE * k, HQ.w * TILE * k, HQ.h * TILE * k);
+      }
+      for (const b of sceneBuildings()) {
         mctx.fillStyle = BUILDING_STYLES[b.style % BUILDING_STYLES.length].roof;
         mctx.fillRect(b.x * TILE * k, b.y * TILE * k, BUILDING_SIZE * TILE * k, BUILDING_SIZE * TILE * k);
       }
@@ -675,21 +853,23 @@ export default function MapCanvas({ me }: { me: string }) {
         h: Math.ceil(viewH / TILE) + 3,
       };
 
-      const buildings = $buildings.get() ?? [];
+      const buildings = sceneBuildings();
       const highlight = $highlightBuilding.get();
       const statuses = new Map(
         ($metrics.get().user_list ?? []).map((u) => [u.user.username.toLowerCase(), u.status.name.toLowerCase()]),
       );
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = '#5c5f6b';
+      ctx.fillStyle = world.def.backdrop;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, -ox, -oy);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(ground, 0, 0);
       drawWater(ctx, world, viewTiles, motion);
-      for (const lot of emptyLots(world)) {
-        if (overlaps(lot, viewTiles)) drawEmptyLot(ctx, lot);
+      if (isTown) {
+        for (const lot of emptyLots(world)) {
+          if (overlaps(lot, viewTiles)) drawEmptyLot(ctx, lot);
+        }
       }
 
       // Everything with height, back to front.
@@ -701,14 +881,18 @@ export default function MapCanvas({ me }: { me: string }) {
 
       const drawables: { y: number; draw: () => void }[] = [];
       for (const k of world.trees) {
-        const x = k % COLS;
-        const y = Math.floor(k / COLS);
+        const x = k % world.cols;
+        const y = Math.floor(k / world.cols);
         if (!inRect(viewTiles, x, y) || world.buildingAt(x, y)) continue;
         drawables.push({ y: (y + 1) * TILE, draw: () => drawTree(ctx, x, y) });
       }
       for (const p of world.props.values()) {
+        if (p.id === propDrag?.prop.id) continue;
         if (!inRect(viewTiles, p.x, p.y) || world.buildingAt(p.x, p.y)) continue;
-        drawables.push({ y: (p.y + 1) * TILE - (p.kind === 'flowerpot' ? 8 : 0), draw: () => drawProp(ctx, p.kind, p.x, p.y, motion) });
+        // Flat things (rugs, flowers) go under whoever stands on them.
+        const flat = p.kind === 'rug' ? -1e6 : p.kind === 'flowerpot' || p.kind === 'wildflowers' ? -8 : 0;
+        const same = (dx: number) => world.props.get(world.key(p.x + dx, p.y))?.kind === p.kind;
+        drawables.push({ y: (p.y + 1) * TILE + flat, draw: () => drawProp(ctx, p.kind, p.x, p.y, motion, same) });
       }
       for (const b of buildings) {
         if (drag?.id === b.id) continue;
@@ -717,7 +901,7 @@ export default function MapCanvas({ me }: { me: string }) {
         const glow = b.id === highlight ? 1 : flashAge < BUILDING_FLASH_MS ? 1 - flashAge / BUILDING_FLASH_MS : 0;
         drawables.push({ y: (b.y + BUILDING_SIZE) * TILE, draw: () => drawBuilding(ctx, b.x, b.y, b.style, glow, motion) });
       }
-      if (overlaps(HQ, viewTiles)) {
+      if (isTown && overlaps(HQ, viewTiles)) {
         drawables.push({ y: (HQ.y + HQ.h) * TILE, draw: () => drawHQ(ctx, Math.max(hqGlow, ring * 0.8), reduced ? 0 : ring, motion) });
       }
 
@@ -728,23 +912,31 @@ export default function MapCanvas({ me }: { me: string }) {
         const walking = now < s.movingUntil;
         const pose = walking ? 'walk' : poseFor(status);
         people.push({ name, s, status, pose });
-        drawables.push({ y: s.y, draw: () => drawCharacter(ctx, name, s.x, s.y, s.dir, pose, motion, s.ride) });
+        drawables.push({ y: s.y, draw: () => scaledAt(s.x, s.y, () => drawCharacter(ctx, name, s.look, s.x, s.y, s.dir, pose, motion, s.ride)) });
         if (s.pet) {
           const pet = s.pet;
           const p = s.petState;
-          drawables.push({ y: p.y, draw: () => drawPet(ctx, pet, p.x, p.y, p.dir, now < p.movingUntil, motion) });
+          drawables.push({ y: p.y, draw: () => scaledAt(p.x, p.y, () => drawPet(ctx, pet, name, s.look, p.x, p.y, p.dir, now < p.movingUntil, motion)) });
         }
       }
       drawables.sort((a, b) => a.y - b.y);
       for (const d of drawables) d.draw();
 
-      // Pulses travel the roads to HQ, ring it, and go again until the call ends.
+      // Pulses travel the roads to HQ (or their agent), ring it, and go again
+      // until the call ends.
       for (let i = pulses.length - 1; i >= 0; i--) {
         const p = pulses[i];
         const f = (now - p.start) / PULSE_TRAVEL_MS;
         if (f < 0) continue; // between laps
+        // Chase an agent who's walking; if they left, finish on the old route.
+        const chased = p.target ? sprites.get(p.target) : undefined;
+        if (chased && p.route.length) {
+          p.route[p.route.length - 1] = agentSpot(chased);
+          p.length = pathLength(p.route);
+        }
         if (f >= 1) {
-          rings.push(now);
+          if (p.target) agentRings.set(p.target, now);
+          else rings.push(now);
           if (p.ended) pulses.splice(i, 1);
           else lap(p, now + PULSE_GAP_MS);
           continue;
@@ -770,6 +962,28 @@ export default function MapCanvas({ me }: { me: string }) {
         ctx.restore();
       }
 
+      // An agent a pulse reached rings like HQ does.
+      const agentRingMs = reduced ? BUILDING_FLASH_MS : RING_MS;
+      for (const [name, startedAt] of agentRings) {
+        const age = (now - startedAt) / agentRingMs;
+        const s = sprites.get(name);
+        if (age >= 1 || !s) {
+          agentRings.delete(name);
+          continue;
+        }
+        if (!inView(s.x, s.y)) continue;
+        const grow = reduced ? 0.5 : age;
+        const alpha = reduced ? 0.8 : 1 - age;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(255, 196, 40, ${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 2, (6 + 12 * grow) * avatarScale, (3 + 6 * grow) * avatarScale, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Tool overlays.
       const mode = $mapMode.get();
       if (drag) {
@@ -785,6 +999,34 @@ export default function MapCanvas({ me }: { me: string }) {
         ctx.strokeStyle = ok ? '#3fbf5f' : '#e5484d';
         ctx.lineWidth = 1;
         ctx.strokeRect(drag.at.x * TILE + 0.5, drag.at.y * TILE + 0.5, BUILDING_SIZE * TILE - 1, BUILDING_SIZE * TILE - 1);
+      } else if (propDrag) {
+        const { prop, at } = propDrag;
+        const ok = (at.x === prop.x && at.y === prop.y) || canPlaceProp(at.x, at.y);
+        ctx.globalAlpha = 0.7;
+        drawProp(ctx, prop.kind, at.x, at.y, motion, () => false);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = ok ? 'rgba(63, 191, 95, 0.3)' : 'rgba(229, 72, 77, 0.35)';
+        ctx.fillRect(at.x * TILE, at.y * TILE, TILE, TILE);
+        ctx.strokeStyle = ok ? '#3fbf5f' : '#e5484d';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(at.x * TILE + 0.5, at.y * TILE + 0.5, TILE - 1, TILE - 1);
+      } else if (mode === 'walk' && goal && route.length) {
+        // Where click-to-walk is heading.
+        const s = sprites.get(me);
+        const end = route[route.length - 1];
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(s ? s.x : route[0].x, s ? s.y - 1 : route[0].y);
+        for (const p of route) ctx.lineTo(p.x, p.y - 1);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.ellipse(end.x, end.y - 1, 4, 2.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       } else if (hover && mode !== 'walk') {
         const b = mode === 'move' ? world.buildingAt(hover.x, hover.y) : undefined;
         const r = b ? buildingRect(b) : { ...hover, w: 1, h: 1 };
@@ -801,14 +1043,15 @@ export default function MapCanvas({ me }: { me: string }) {
       ctx.textBaseline = 'bottom';
       for (const { name, s, status, pose } of people) {
         const riding = s.ride !== 'walk' && (pose === 'stand' || pose === 'walk' || pose === 'phone');
-        const height = pose === 'sleeping' ? 10 : riding ? (s.ride === 'car' ? 14 : 22) : 17;
+        const height = (riding ? (s.ride === 'car' ? 29 : 34) : 25) * avatarScale;
         const x = sx(s.x);
         const top = sy(s.y - height);
         if (pose === 'sleeping') {
-          ctx.font = `bold ${10 * dpr}px ui-monospace, monospace`;
+          ctx.font = `${12 * dpr}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
           const bob = reduced ? 0 : (t * 0.8) % 1;
-          ctx.fillStyle = `rgba(255,255,255,${1 - bob * 0.7})`;
-          ctx.fillText('z Z', x + 10 * scale, top - bob * 8 * scale);
+          ctx.globalAlpha = 0.9;
+          ctx.fillText('💤', x + 10 * avatarScale * scale, top - bob * 8 * scale);
+          ctx.globalAlpha = 1;
         }
         const isMe = name === me;
         if (isSpeaking(name)) {
@@ -816,17 +1059,17 @@ export default function MapCanvas({ me }: { me: string }) {
           const wave = reduced ? 0.5 : (t * 2) % 1;
           ctx.lineWidth = 1.5 * dpr;
           for (let i = 0; i < 3; i++) {
-            const r = (3 + i * 3 + wave * 3) * scale;
+            const r = (3 + i * 3 + wave * 3) * avatarScale * scale;
             ctx.strokeStyle = `rgba(255,255,255,${0.9 - i * 0.25 - wave * 0.2})`;
             ctx.beginPath();
-            ctx.arc(x + 5 * scale, top + 4 * scale, r, -Math.PI / 4, Math.PI / 4);
+            ctx.arc(x + 7 * avatarScale * scale, top + 7 * avatarScale * scale, r, -Math.PI / 4, Math.PI / 4);
             ctx.stroke();
           }
           if (isMe) {
             ctx.strokeStyle = 'rgba(41, 182, 168, 0.35)';
             ctx.setLineDash([4 * dpr, 4 * dpr]);
             ctx.beginPath();
-            ctx.arc(x, sy(s.y - 8), VOICE_RANGE * scale, 0, Math.PI * 2);
+            ctx.arc(x, sy(s.y - 12 * avatarScale), VOICE_RANGE * scale, 0, Math.PI * 2);
             ctx.stroke();
             ctx.setLineDash([]);
           }
@@ -873,6 +1116,13 @@ export default function MapCanvas({ me }: { me: string }) {
         ctx.fillText(b.name, cx, y + 1.5 * dpr);
       }
 
+      // Fade in after coming through a door.
+      const fade = reduced ? 0 : 1 - (now - enteredAt) / FADE_MS;
+      if (fade > 0) {
+        ctx.fillStyle = `rgba(20, 16, 26, ${fade})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
       if (frameNo % 4 === 0) drawMinimap();
     };
     raf = requestAnimationFrame(frame);
@@ -882,6 +1132,7 @@ export default function MapCanvas({ me }: { me: string }) {
       flushPaint(Infinity);
       observer.disconnect();
       offZoom();
+      wrap.removeEventListener('wheel', onWheel);
       offFocus();
       offPlayers();
       offPulse();
@@ -903,42 +1154,49 @@ export default function MapCanvas({ me }: { me: string }) {
       mini.removeEventListener('pointerup', onMiniUp);
       mini.removeEventListener('pointercancel', onMiniUp);
     };
-  }, [me]);
+  }, [me, scene, miniScale, ready]);
 
-  const setZoom = (step: number) => {
-    const i = ZOOMS.indexOf(zoom);
-    $zoom.set(String(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? 1 : i) + step))]));
-  };
+  // Take the keyboard as soon as the map opens so walking works right away.
+  useEffect(() => canvasRef.current?.focus({ preventScroll: true }), []);
+
   const overlayButton =
     'flex size-8 items-center justify-center rounded-md bg-white/85 text-base font-bold text-secondary-800 shadow-sm hover:bg-white disabled:opacity-40 dark:bg-secondary-900/85 dark:text-secondary-100 dark:hover:bg-secondary-900';
   const cursor = mode === 'move' ? 'cursor-grab' : mode === 'walk' ? 'cursor-pointer' : 'cursor-crosshair';
 
   return (
-    <div ref={wrapRef} className="relative h-[min(70vh,760px)] min-h-80 w-full overflow-hidden rounded-lg bg-[#5c5f6b]">
+    <div ref={wrapRef} className="absolute inset-0 overflow-hidden" style={{ background: def.backdrop }}>
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        aria-label="Team map. Click the map, then use the arrow keys or WASD to walk, or click where you want to go."
+        aria-label={`Team map: ${def.name}. Click the map, then use the arrow keys or WASD to walk, or click where you want to go. ${
+          scene === 'town' ? 'Walk into the Techline HQ doors to go inside.' : 'Walk onto the doormat to go back outside.'
+        }`}
         className={`block touch-none outline-none focus-visible:ring-3 focus-visible:ring-primary-500/60 ${cursor}`}
         style={{ imageRendering: 'pixelated' }}
       />
-      <div className="absolute top-2 right-2 flex flex-col gap-1">
-        <button type="button" className={overlayButton} onClick={() => setZoom(1)} disabled={zoom >= ZOOMS[ZOOMS.length - 1]} aria-label="Zoom in" title="Zoom in">
+      {/* Mousedown would take focus off the canvas and stop walking. */}
+      <div className="absolute top-2 right-2 flex flex-col gap-1" onMouseDown={(e) => e.preventDefault()}>
+        <button type="button" tabIndex={-1} className={overlayButton} onClick={() => stepZoom(1)} disabled={zoom >= ZOOMS[ZOOMS.length - 1]} aria-label="Zoom in" title="Zoom in">
           +
         </button>
-        <button type="button" className={overlayButton} onClick={() => setZoom(-1)} disabled={zoom <= ZOOMS[0]} aria-label="Zoom out" title="Zoom out">
+        <button type="button" tabIndex={-1} className={overlayButton} onClick={() => stepZoom(-1)} disabled={zoom <= ZOOMS[0]} aria-label="Zoom out" title="Zoom out">
           −
         </button>
-        <button type="button" className={overlayButton} onClick={() => followRef.current()} aria-label="Back to me" title="Back to me">
+        <button type="button" tabIndex={-1} className={overlayButton} onClick={() => followRef.current()} aria-label="Back to me" title="Back to me">
           <Icon name="user" className="size-4" />
         </button>
       </div>
-      <canvas
-        ref={miniRef}
-        aria-label="Minimap. Click to look around the town."
-        className="absolute right-2 bottom-2 hidden cursor-pointer touch-none rounded border-2 border-white/80 shadow-md sm:block"
-        style={{ width: COLS * MINIMAP_SCALE, height: ROWS * MINIMAP_SCALE }}
-      />
+      {/* z-10 keeps the corner above MapView's buildings editor. */}
+      <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-end gap-2">
+        <canvas
+          ref={miniRef}
+          onMouseDown={(e) => e.preventDefault()}
+          aria-label={`Minimap of ${def.name}. Click to look around.`}
+          className="pointer-events-auto hidden shrink-0 cursor-pointer touch-none rounded border-2 border-white/80 shadow-md sm:block"
+          style={{ width: def.cols * miniScale, height: def.rows * miniScale }}
+        />
+        {children}
+      </div>
     </div>
   );
 }

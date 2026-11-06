@@ -47,11 +47,116 @@ export const $helpQueueThreshold = persistentAtom<number>('owlchirp:helpQueueThr
   },
 });
 
+// Map proximity voice: when off, voice starts with mic and speakers muted
+// each session (see voice.ts); when on, mute choices are remembered.
+export const $proximityChat = persistentAtom<boolean>('owlchirp:proximityChat', false, {
+  encode: JSON.stringify,
+  decode: (v) => v === 'true',
+});
+
+// How map voice decides when to send, by default: voice threshold or push to talk.
+export type VoiceMode = 'threshold' | 'ptt';
+export const $voiceModeDefault = persistentAtom<VoiceMode>('owlchirp:voiceMode', 'threshold', {
+  encode: String,
+  decode: (v) => (v === 'ptt' ? 'ptt' : 'threshold'),
+});
+
+// Mic level (dBFS) that opens map voice in threshold mode. The range mirrors
+// minVoiceThreshold/maxVoiceThreshold in backend ws_handlers.go.
+export const DEFAULT_VOICE_THRESHOLD = -50;
+export const MIN_VOICE_THRESHOLD = -80;
+export const MAX_VOICE_THRESHOLD = -20;
+
+export function clampVoiceThreshold(db: number): number {
+  if (!Number.isFinite(db)) return DEFAULT_VOICE_THRESHOLD;
+  return Math.min(MAX_VOICE_THRESHOLD, Math.max(MIN_VOICE_THRESHOLD, Math.round(db)));
+}
+
+export const $voiceThreshold = persistentAtom<number>('owlchirp:voiceThreshold', DEFAULT_VOICE_THRESHOLD, {
+  encode: String,
+  decode: (v) => (v === '' ? DEFAULT_VOICE_THRESHOLD : clampVoiceThreshold(Number(v))),
+});
+
+// Start live call transcription automatically when a call connects.
+export const $autoTranscribe = persistentAtom<boolean>('owlchirp:autoTranscribe', true, {
+  encode: JSON.stringify,
+  decode: (v) => v !== 'false',
+});
+
+// Phone tab edit mode: cards can only be rearranged while on. Local only.
+export const $phoneEditMode = persistentAtom<boolean>('owlchirp:phoneEditMode', false, {
+  encode: JSON.stringify,
+  decode: (v) => v === 'true',
+});
+
+export function setPhoneEditMode(enabled: boolean): void {
+  $phoneEditMode.set(enabled);
+}
+
+// Phone tab cards the agent can rearrange, by column. Kept in this file with
+// the other synced settings.
+export const PHONE_CARDS = ['call', 'functions', 'flow', 'timeline'] as const;
+export type PhoneCard = (typeof PHONE_CARDS)[number];
+export type PhoneColumn = 'left' | 'right';
+export type PhoneLayout = Record<PhoneColumn, PhoneCard[]>;
+
+export const DEFAULT_PHONE_LAYOUT: PhoneLayout = {
+  left: ['call', 'functions'],
+  right: ['flow', 'timeline'],
+};
+
+function isPhoneCard(id: unknown): id is PhoneCard {
+  return (PHONE_CARDS as readonly unknown[]).includes(id);
+}
+
+/**
+ * Drops unknown and repeated cards and puts any missing ones back in their
+ * default column, so a saved layout survives cards being added or removed.
+ */
+export function normalizePhoneLayout(raw: unknown): PhoneLayout {
+  const seen = new Set<PhoneCard>();
+  const out: PhoneLayout = { left: [], right: [] };
+  const src = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<PhoneColumn, unknown>>;
+  for (const col of ['left', 'right'] as const) {
+    const ids = Array.isArray(src[col]) ? (src[col] as unknown[]) : [];
+    for (const id of ids) {
+      if (isPhoneCard(id) && !seen.has(id)) {
+        seen.add(id);
+        out[col].push(id);
+      }
+    }
+  }
+  for (const col of ['left', 'right'] as const) {
+    for (const id of DEFAULT_PHONE_LAYOUT[col]) if (!seen.has(id)) out[col].push(id);
+  }
+  return out;
+}
+
+function isDefaultPhoneLayout(layout: PhoneLayout): boolean {
+  return JSON.stringify(layout) === JSON.stringify(DEFAULT_PHONE_LAYOUT);
+}
+
+export const $phoneLayout = persistentAtom<PhoneLayout>('owlchirp:phoneLayout', DEFAULT_PHONE_LAYOUT, {
+  encode: JSON.stringify,
+  decode: (v) => {
+    try {
+      return normalizePhoneLayout(JSON.parse(v));
+    } catch {
+      return DEFAULT_PHONE_LAYOUT;
+    }
+  },
+});
+
 type Settings = {
   theme: string;
+  phoneLayout?: PhoneLayout;
   followTeamMeeting?: boolean;
   hideCallerIds?: boolean;
   helpQueueThreshold?: number;
+  proximityChat?: boolean;
+  autoTranscribe?: boolean;
+  voiceMode?: VoiceMode;
+  voiceThreshold?: number;
 };
 
 function isThemeChoice(name: string): name is ThemeChoice {
@@ -66,6 +171,11 @@ async function saveSettings(what: string): Promise<void> {
       followTeamMeeting: $followTeamMeeting.get(),
       hideCallerIds: $hideCallerIds.get(),
       helpQueueThreshold: $helpQueueThreshold.get(),
+      proximityChat: $proximityChat.get(),
+      autoTranscribe: $autoTranscribe.get(),
+      voiceMode: $voiceModeDefault.get(),
+      voiceThreshold: $voiceThreshold.get(),
+      phoneLayout: $phoneLayout.get(),
     });
   } catch (e) {
     console.error('save settings', e);
@@ -93,6 +203,36 @@ export function setHelpQueueThreshold(count: number): Promise<void> {
   return saveSettings('Help alert setting');
 }
 
+export function setProximityChat(enabled: boolean): Promise<void> {
+  $proximityChat.set(enabled);
+  return saveSettings('Proximity chat setting');
+}
+
+export function setVoiceModeDefault(mode: VoiceMode): Promise<void> {
+  $voiceModeDefault.set(mode);
+  return saveSettings('Voice setting');
+}
+
+/** Set the map voice threshold (dBFS) and save it to the account. */
+export function setVoiceThreshold(db: number): Promise<void> {
+  $voiceThreshold.set(clampVoiceThreshold(db));
+  return saveSettings('Voice threshold');
+}
+
+export function setAutoTranscribe(enabled: boolean): Promise<void> {
+  $autoTranscribe.set(enabled);
+  return saveSettings('Transcription setting');
+}
+
+export function setPhoneLayout(layout: PhoneLayout): Promise<void> {
+  $phoneLayout.set(normalizePhoneLayout(layout));
+  return saveSettings('Card layout');
+}
+
+export function resetPhoneLayout(): Promise<void> {
+  return setPhoneLayout(DEFAULT_PHONE_LAYOUT);
+}
+
 // On each (re)connect the server's settings win. An account with none saved
 // adopts this browser's choices, carrying over themes picked before settings
 // moved to the server.
@@ -104,11 +244,21 @@ async function syncSettings(): Promise<void> {
       $followTeamMeeting.set(settings.followTeamMeeting ?? false);
       $hideCallerIds.set(settings.hideCallerIds ?? false);
       $helpQueueThreshold.set(settings.helpQueueThreshold ?? DEFAULT_HELP_QUEUE_THRESHOLD);
+      $proximityChat.set(settings.proximityChat ?? false);
+      $autoTranscribe.set(settings.autoTranscribe ?? true);
+      $voiceModeDefault.set(settings.voiceMode === 'ptt' ? 'ptt' : 'threshold');
+      $voiceThreshold.set(settings.voiceThreshold == null ? DEFAULT_VOICE_THRESHOLD : clampVoiceThreshold(settings.voiceThreshold));
+      $phoneLayout.set(normalizePhoneLayout(settings.phoneLayout));
     } else if (
       $theme.get() !== 'system' ||
       $followTeamMeeting.get() ||
       $hideCallerIds.get() ||
-      $helpQueueThreshold.get() !== DEFAULT_HELP_QUEUE_THRESHOLD
+      $helpQueueThreshold.get() !== DEFAULT_HELP_QUEUE_THRESHOLD ||
+      $proximityChat.get() ||
+      !$autoTranscribe.get() ||
+      $voiceModeDefault.get() !== 'threshold' ||
+      $voiceThreshold.get() !== DEFAULT_VOICE_THRESHOLD ||
+      !isDefaultPhoneLayout($phoneLayout.get())
     ) {
       await saveSettings('Settings');
     }

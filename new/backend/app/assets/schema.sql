@@ -119,19 +119,37 @@ CREATE TABLE IF NOT EXISTS map_buildings (
 	updated_on DATETIME
 );
 
--- Map ground painted over the default layout, one row per tile.
+-- Map ground painted over each scene's default layout ("town" or "office"),
+-- one row per tile.
 CREATE TABLE IF NOT EXISTS map_tiles (
+	scene VARCHAR(10) NOT NULL DEFAULT 'town',
 	x INTEGER NOT NULL,
 	y INTEGER NOT NULL,
 	tile VARCHAR(20) NOT NULL,
-	PRIMARY KEY (x, y)
+	PRIMARY KEY (scene, x, y)
 );
 
--- Map decorations, at most one per tile.
+-- Map decorations, at most one per tile of a scene. The (scene, x, y) index
+-- is made in migrate, after older databases gain the scene column.
 CREATE TABLE IF NOT EXISTS map_props (
 	id INTEGER NOT NULL PRIMARY KEY,
+	scene VARCHAR(10) NOT NULL DEFAULT 'town',
 	kind VARCHAR(20) NOT NULL,
 	x INTEGER NOT NULL,
 	y INTEGER NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ix_map_props_xy ON map_props (x, y);
+
+-- Scenes whose starting decorations have been placed, so they're placed once.
+CREATE TABLE IF NOT EXISTS map_seeds (
+	scene VARCHAR(10) NOT NULL PRIMARY KEY
+);
+
+-- How each user looks on the map: their pet, ride, and (when they've
+-- designed one) a JSON MapLook. Users without a row get the defaults.
+CREATE TABLE IF NOT EXISTS map_looks (
+	username VARCHAR(100) NOT NULL PRIMARY KEY,
+	pet VARCHAR(10) NOT NULL DEFAULT '',
+	ride VARCHAR(10) NOT NULL DEFAULT 'walk',
+	look TEXT,
+	updated_on DATETIME
+);

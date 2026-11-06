@@ -197,6 +197,18 @@ func TestVoiceRelay(t *testing.T) {
 	speaker.audio(frame)
 	_, _, ok = listener.nextAudio(time.Second)
 	assert.True(t, ok)
+
+	// Both in the office, side by side: heard. Only one of them: not.
+	assert.Equal(t, admin.call("map.enter", map[string]any{"scene": "office"}).Type, "result")
+	assert.Equal(t, other.call("map.enter", map[string]any{"scene": "office"}).Type, "result")
+	speaker.audio(frame)
+	_, _, ok = listener.nextAudio(time.Second)
+	assert.True(t, ok)
+	assert.Equal(t, other.call("map.enter", map[string]any{"scene": "town"}).Type, "result")
+	place(other, 12*16, 13*16+12) // the office arrival spot, but in town
+	speaker.audio(frame)
+	_, _, ok = listener.nextAudio(200 * time.Millisecond)
+	assert.False(t, ok)
 }
 
 func TestVoiceReplacedByNewTab(t *testing.T) {
