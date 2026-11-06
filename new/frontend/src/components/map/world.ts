@@ -23,7 +23,15 @@ export type Tile = (typeof TILE_KINDS)[number] | (typeof OFFICE_TILE_KINDS)[numb
 export const PROP_KINDS = [
   'tree', 'pine', 'bush', 'rock', 'flowerpot', 'bench', 'lamp', 'fountain', 'fence', 'sign',
   'fruittree', 'stump', 'boulder', 'ruin', 'wildflowers',
+  'bluebells', 'lilies', 'alliums', 'starflowers', 'poppies', 'phlox', 'tulips',
+  'daisies', 'irises', 'violets', 'buttercups', 'heather', 'lavender', 'forgetmenots',
 ] as const;
+/** Flower beds from flowers/Flowers.png, one family each. */
+export const FLOWER_KINDS = [
+  'bluebells', 'lilies', 'alliums', 'starflowers', 'poppies', 'phlox', 'tulips',
+  'daisies', 'irises', 'violets', 'buttercups', 'heather', 'lavender', 'forgetmenots',
+] as const satisfies readonly PropKind[];
+export type FlowerKind = (typeof FLOWER_KINDS)[number];
 export const OFFICE_PROP_KINDS = [
   'desk', 'table', 'chair', 'plant', 'couch', 'whiteboard', 'watercooler', 'coffee', 'printer', 'bookshelf',
   'globe', 'rug',
@@ -31,7 +39,7 @@ export const OFFICE_PROP_KINDS = [
 export type PropKind = (typeof PROP_KINDS)[number] | (typeof OFFICE_PROP_KINDS)[number];
 
 /** Decorations you can walk over; everything else blocks. */
-const WALK_THROUGH: ReadonlySet<PropKind> = new Set(['flowerpot', 'chair', 'wildflowers', 'rug']);
+const WALK_THROUGH: ReadonlySet<PropKind> = new Set<PropKind>(['flowerpot', 'chair', 'wildflowers', 'rug', ...FLOWER_KINDS]);
 
 export type SceneId = 'town' | 'office';
 

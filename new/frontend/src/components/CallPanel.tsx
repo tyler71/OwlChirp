@@ -19,7 +19,6 @@ import { openCallLog } from '../lib/systemLog';
 import { $wrapupStatus, saveDraft } from '../lib/wrapups';
 import { Button, Card, Icon, PhoneLabel, formatElapsed, useNow } from './ui';
 import WrapupFeed from './WrapupFeed';
-import WrapupForm from './WrapupForm';
 
 const CS = connect.ContactStateType;
 const HOLD = connect.ConnectionStateType.HOLD;
@@ -103,7 +102,6 @@ function AfterCallWork({ contact, name }: { contact: ContactSnapshot; name: stri
           {saving ? 'Saving notes…' : 'Finish call'}
         </Button>
       </div>
-      {contact.phoneNumber && <WrapupForm contactId={contact.contactId} phoneNumber={contact.phoneNumber} />}
       <WrapupFeed phoneNumber={contact.phoneNumber} collapsible />
     </Card>
   );
@@ -249,9 +247,6 @@ export default function CallPanel() {
           ))}
         </ul>
       )}
-
-      {/* Without a number (e.g. an internal transfer) there's nothing to attach notes to. */}
-      {contact.phoneNumber && <WrapupForm contactId={contact.contactId} phoneNumber={contact.phoneNumber} />}
 
       <WrapupFeed phoneNumber={contact.phoneNumber} collapsible />
 

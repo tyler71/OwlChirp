@@ -38,17 +38,17 @@ import Segmented, { ROW_LABEL } from "./Segmented";
 import { GROUND, PROP_INFO } from "./sprites";
 import { SCENES } from "./scenes";
 
-const PETS: { value: Pet; label: string }[] = [
+export const PETS: { value: Pet; label: string }[] = [
   { value: "", label: "None" },
   { value: "dog", label: "🐶 Dog" },
   { value: "cat", label: "🐱 Cat" },
 ];
-const RIDES: { value: Ride; label: string }[] = [
+export const RIDES: { value: Ride; label: string }[] = [
   { value: "walk", label: "🚶 Walk" },
   { value: "bike", label: "🚲 Bike" },
   { value: "car", label: "🚗 Car" },
 ];
-const MODES: { value: MapMode; label: string; hint: string }[] = [
+export const MODES: { value: MapMode; label: string; hint: string }[] = [
   {
     value: "create",
     label: "✏️ Create",
@@ -249,8 +249,8 @@ function VoiceControl() {
             onClick={() => $voiceMuted.set(!muted)}
             title={
               muted
-                ? "Your mic is muted: click so people nearby can hear you"
-                : "Mute your mic"
+                ? "Your mic is muted: click so people nearby can hear you (M unmutes mic and sound)"
+                : "Mute your mic (M mutes mic and sound)"
             }
           >
             {muted ? "🔇 Mic off" : "🎙️ Mic on"}
@@ -292,8 +292,8 @@ function VoiceControl() {
             onClick={() => $voiceDeafened.set(!deafened)}
             title={
               deafened
-                ? "Everyone is muted: click to hear people nearby"
-                : "Mute everyone else"
+                ? "Everyone is muted: click to hear people nearby (M unmutes mic and sound)"
+                : "Mute everyone else (M mutes mic and sound)"
             }
           >
             {deafened ? "🔈 Sound off" : "🔊 Sound on"}
@@ -414,6 +414,7 @@ export default function MapToolbar({
           <Segmented
             row
             label="Pet"
+            title="Press P to switch pets"
             options={PETS}
             value={gear.pet}
             onChange={(pet) => sendGear(pet, gear.ride)}
@@ -422,6 +423,7 @@ export default function MapToolbar({
             <Segmented
               row
               label="Ride"
+              title="Press T to switch rides"
               options={RIDES}
               value={gear.ride}
               onChange={(ride) => sendGear(gear.pet, ride)}
@@ -480,6 +482,7 @@ export default function MapToolbar({
                         type="button"
                         tabIndex={-1}
                         aria-pressed={mode === m.value}
+                        title="Press B to cycle build tools"
                         onClick={() =>
                           $mapMode.set(mode === m.value ? "walk" : m.value)
                         }
@@ -512,7 +515,7 @@ export default function MapToolbar({
         </div>
         {canDesign && hint && (
           <p className="border-t border-secondary-100 px-4 py-2 text-xs text-secondary-500 dark:border-secondary-800 dark:text-secondary-400">
-            {hint} Press Esc to go back to walking.
+            {hint} Press B to switch tools, Esc to go back to walking.
           </p>
         )}
         {canDesign && mode === "create" && <Palette />}

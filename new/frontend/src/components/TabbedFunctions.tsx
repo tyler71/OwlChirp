@@ -1,7 +1,8 @@
-import { Fragment, useState } from "react";
+import { Fragment, useContext, useState } from "react";
 
 import DialPad from './DialPad';
 import QuickConnects from './QuickConnects';
+import { CardMinimize, MinimizeButton } from './ui';
 
 // Headless UI 2.x for React, for more info and examples you can check out https://github.com/tailwindlabs/headlessui
 import { Tab, TabGroup, TabList, TabPanels, TabPanel } from "@headlessui/react";
@@ -19,7 +20,14 @@ const tabs = [
 
 export default function TabbedFunctions() {
     const [activeTab, setActiveTab] = useState(0)
-    const [collapsed, setCollapsed] = useState(true)
+    // On the Phone tab, collapsing is the card's (remembered) minimized state.
+    const minimize = useContext(CardMinimize)
+    const [localCollapsed, setLocalCollapsed] = useState(true)
+    const collapsed = minimize ? minimize.minimized : localCollapsed
+    const setCollapsed = (next: boolean) => {
+        if (!minimize) setLocalCollapsed(next)
+        else if (next !== minimize.minimized) minimize.toggle()
+    }
     return (
         <>
             {/* Tabs: Default with Icons */}
@@ -34,7 +42,7 @@ export default function TabbedFunctions() {
                 <TabList className="flex items-center border-b border-secondary-200/75 text-sm">
                 {
                     tabs.map(t => (
-                        <Tab as={Fragment}>
+                        <Tab key={t.name} as={Fragment}>
                             {({ selected }) => (
                                 <button
                                     type="button"
@@ -43,7 +51,7 @@ export default function TabbedFunctions() {
                                             ? "border-primary-500 text-primary-600"
                                             : "border-transparent text-secondary-600 hover:border-secondary-200 hover:text-primary-500"
                                     }`}
-                                    onClick={() => selected && setCollapsed(c => !c)}
+                                    onClick={() => selected && setCollapsed(!collapsed)}
                                 >
                                     {t.icon}
                                     <span className="hidden sm:inline-block">{t.name}</span>
@@ -52,6 +60,11 @@ export default function TabbedFunctions() {
                         </Tab>
                     ))
                 }
+                {minimize && (
+                    <div className="ml-auto pr-3">
+                        <MinimizeButton minimized={collapsed} toggle={() => setCollapsed(!collapsed)} />
+                    </div>
+                )}
                 </TabList>
                 {/* END Nav Tabs */}
 

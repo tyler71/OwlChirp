@@ -13,6 +13,7 @@ import {
   PET_COLORS,
   VEHICLE_COLORS,
   defaultLook,
+  baseAvatar,
   randomAvatar,
   resolveLook,
   drawCharacter,
@@ -285,7 +286,13 @@ export default function DesignPanel({ username, onClose }: { username: string; o
                   />
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => set({ avatar: baseAvatar('masculine') })} title="A masculine starting look (click again for another)">
+                  ♂ Masculine
+                </Button>
+                <Button size="sm" onClick={() => set({ avatar: baseAvatar('feminine') })} title="A feminine starting look (click again for another)">
+                  ♀ Feminine
+                </Button>
                 <Button size="sm" onClick={() => set({ avatar: randomAvatar() })}>
                   🎲 Randomize
                 </Button>

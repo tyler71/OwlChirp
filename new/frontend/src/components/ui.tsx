@@ -1,6 +1,6 @@
 // Small shared UI pieces in the Tailkit style: Heroicons (mini, 20px), buttons,
 // cards and a ticking clock for call/status timers.
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 import { usePhoneLabel } from '../lib/callerId';
 import { formatPhoneNumber, incidentUrl } from '../lib/helpers';
@@ -115,18 +115,48 @@ export function Button({ variant = 'default', size = 'md', icon, className = '',
   );
 }
 
+/**
+ * Set by a container (the Phone tab cards) to let the Card inside it be
+ * minimized to its title row. Without it, Cards can't be minimized.
+ */
+export const CardMinimize = createContext<{ minimized: boolean; toggle: () => void } | null>(null);
+
+export function MinimizeButton({ minimized, toggle }: { minimized: boolean; toggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      title={minimized ? 'Expand' : 'Minimize'}
+      aria-label={minimized ? 'Expand' : 'Minimize'}
+      aria-expanded={!minimized}
+      className="-m-1 flex-none rounded-md p-1 text-secondary-400 hover:bg-secondary-100 hover:text-secondary-700 dark:hover:bg-secondary-800 dark:hover:text-secondary-200"
+    >
+      <Icon name="chevronDown" className={`size-4 transition-transform ${minimized ? '-rotate-90' : ''}`} />
+    </button>
+  );
+}
+
 export function Card({ title, actions, children, className = '' }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
+  const minimize = useContext(CardMinimize);
+  const minimized = minimize?.minimized ?? false;
   return (
     <section
       className={`flex flex-col overflow-hidden rounded-lg border border-secondary-200 bg-base-100 text-base-content dark:border-secondary-800 dark:bg-secondary-900 ${className}`}
     >
-      {(title || actions) && (
-        <div className="flex items-center justify-between gap-2 border-b border-secondary-100 px-4 py-3 dark:border-secondary-800">
+      {(title || actions || minimize) && (
+        <div
+          className={`flex items-center justify-between gap-2 px-4 py-3 ${
+            minimized ? '' : 'border-b border-secondary-100 dark:border-secondary-800'
+          }`}
+        >
           <h2 className="text-sm font-semibold">{title}</h2>
-          {actions}
+          <div className="flex items-center gap-2">
+            {!minimized && actions}
+            {minimize && <MinimizeButton {...minimize} />}
+          </div>
         </div>
       )}
-      {children}
+      {!minimized && children}
     </section>
   );
 }

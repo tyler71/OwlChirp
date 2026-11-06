@@ -4,7 +4,7 @@
 // scheme to an offscreen canvas and cached.
 import type { MapLook, Pet, Ride } from '../../lib/map';
 import { AVATAR_PARTS, LAYERS, REQUIRED_PARTS, SHEET_FRAME, SHEET_ROWS, img, type AvatarPart } from './assets';
-import { BUILDING_SIZE, DEFAULT_LOTS, HQ, TILE, hash, type PropKind, type Rect, type Tile, type World } from './world';
+import { BUILDING_SIZE, DEFAULT_LOTS, HQ, TILE, hash, type FlowerKind, type PropKind, type Rect, type Tile, type World } from './world';
 
 type Grid = readonly string[];
 type Palette = Record<string, string>;
@@ -157,6 +157,41 @@ export function randomAvatar(): MapLook['avatar'] {
     const skip = optional && Math.random() < (part === 'hair' || part === 'brows' || part === 'outfit' ? 0.15 : 0.8);
     out[part] = skip ? -1 : Math.floor(Math.random() * n);
   }
+  return out;
+}
+
+export type AvatarBase = 'masculine' | 'feminine';
+
+/** Hair layers that suit each base (indexes into LAYERS.hair, manifest order). */
+const BASE_HAIR: Record<AvatarBase, number[]> = {
+  // Short, spiked and curtain.
+  masculine: [0, 1, 7, 8, 14, 15, 16, 17, 18, 19, 20, 21],
+  // Ponytails, long, messy long and curtain.
+  feminine: [2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 17, 18, 19, 20, 21],
+};
+
+/** The brows layer matching each hair layer's colour (gray 0, blonde 1, brown 2, black 3, red 4). */
+const HAIR_BROW = [1, 4, 0, 1, 4, 2, 3, 2, 3, 3, 4, 2, 3, 3, 3, 1, 3, 3, 3, 4, 1, 0];
+
+/** The beard layer matching each brows layer's colour. */
+const BROW_BEARD = [3, 2, 0, 4, 1];
+
+/** A random starting design in a masculine or feminine style, from everyday picks. */
+export function baseAvatar(base: AvatarBase): MapLook['avatar'] {
+  const pick = (list: readonly number[]) => list[Math.floor(Math.random() * list.length)];
+  const hair = pick(BASE_HAIR[base]);
+  const brows = HAIR_BROW[hair] ?? 2;
+  const out: MapLook['avatar'] = Object.fromEntries(AVATAR_PARTS.map((p) => [p, -1]));
+  Object.assign(out, {
+    skin: pick([0, 1, 2, 3]),
+    eyes: pick([0, 1, 2, 3, 6]),
+    pants: pick([0, 1, 2]),
+    outfit: pick([1, 3, 4, 5]),
+    hair,
+    brows,
+  });
+  if (base === 'masculine' && Math.random() < 0.5) out.beard = BROW_BEARD[brows];
+  if (base === 'feminine' && Math.random() < 0.25) out.accessory = 6; // Ruby Necklace
   return out;
 }
 
@@ -556,13 +591,31 @@ export function drawPet(
 
 // ---- Buildings ----
 
-type BuildingStyle = { wall: string; wallDark: string; roof: string; roofDark: string; trim: string };
+/** crop: the sprite's opaque bounding box [x0, y0, x1, y1] in sprite px. */
+type BuildingStyle = { label: string; file: string; color: string; crop: readonly [number, number, number, number] };
 
-export const BUILDING_STYLES: (BuildingStyle & { label: string })[] = [
-  { label: 'Brick', wall: '#c8644b', wallDark: '#9e4a37', roof: '#5a4a6b', roofDark: '#463955', trim: '#f4e4c1' },
-  { label: 'Teal', wall: '#e9e2cf', wallDark: '#c8bfa8', roof: '#2a9d8f', roofDark: '#1f7a6f', trim: '#ffffff' },
-  { label: 'Sky', wall: '#dfe8f2', wallDark: '#b8c6d6', roof: '#3d6fb6', roofDark: '#2e558c', trim: '#ffffff' },
-  { label: 'Sunset', wall: '#f3d9a4', wallDark: '#d9b97c', roof: '#d9534f', roofDark: '#ad3e3b', trim: '#fff6e0' },
+const BUILDING_DIR = 'medieval-village-buildings/PNG/Houses and Warehouses_';
+
+/** Building sprites, indexed by MapBuilding.style. Mirrors MapStyleCount in
+ * internal/database/mapworld.go. Each is cropped to its opaque area and scaled
+ * to the footprint's width, so higher levels stand taller; color is the minimap swatch. */
+export const BUILDING_STYLES: BuildingStyle[] = [
+  { label: 'Brick House I', file: `${BUILDING_DIR}Brick House - Level 1.png`, color: '#8a5a44', crop: [20, 24, 282, 394] },
+  { label: 'Wooden House I', file: `${BUILDING_DIR}Wooden House - Level 1.png`, color: '#9c6b3f', crop: [20, 30, 281, 382] },
+  { label: 'Brick Warehouse I', file: `${BUILDING_DIR}Brick Warehouse - Level 1.png`, color: '#7d4f45', crop: [36, 57, 293, 385] },
+  { label: 'Wooden Warehouse I', file: `${BUILDING_DIR}Wooden Warehouse - Level 1.png`, color: '#b0705a', crop: [36, 57, 280, 377] },
+  { label: 'Brick House II', file: `${BUILDING_DIR}Brick House - Level 2.png`, color: '#8a5a44', crop: [30, 14, 332, 434] },
+  { label: 'Wooden House II', file: `${BUILDING_DIR}Wooden House - Level 2.png`, color: '#9c6b3f', crop: [20, 4, 326, 423] },
+  { label: 'Brick Warehouse II', file: `${BUILDING_DIR}Brick Warehouse - Level 2.png`, color: '#7d4f45', crop: [35, 17, 326, 425] },
+  { label: 'Wooden Warehouse II', file: `${BUILDING_DIR}Wooden Warehouse - Level 2.png`, color: '#b0705a', crop: [31, 17, 319, 417] },
+  { label: 'Brick House III', file: `${BUILDING_DIR}Brick House - Level 3.png`, color: '#8a5a44', crop: [43, 13, 426, 561] },
+  { label: 'Wooden House III', file: `${BUILDING_DIR}Wooden House - Level 3.png`, color: '#9c6b3f', crop: [43, 19, 426, 575] },
+  { label: 'Brick Warehouse III', file: `${BUILDING_DIR}Brick Warehouse - Level 3.png`, color: '#7d4f45', crop: [6, 86, 429, 568] },
+  { label: 'Wooden Warehouse III', file: `${BUILDING_DIR}Wooden Warehouse - Level 3.png`, color: '#b0705a', crop: [6, 95, 425, 557] },
+  { label: 'Brick House IV', file: `${BUILDING_DIR}Brick House - Level 4.png`, color: '#8a5a44', crop: [8, 31, 592, 621] },
+  { label: 'Wooden House IV', file: `${BUILDING_DIR}Wooden House - Level 4.png`, color: '#9c6b3f', crop: [8, 31, 592, 635] },
+  { label: 'Brick Warehouse IV', file: `${BUILDING_DIR}Brick Warehouse - Level 4.png`, color: '#7d4f45', crop: [45, 13, 621, 628] },
+  { label: 'Wooden Warehouse IV', file: `${BUILDING_DIR}Wooden Warehouse - Level 4.png`, color: '#b0705a', crop: [45, 13, 621, 617] },
 ];
 
 function px(r: Rect) {
@@ -579,57 +632,54 @@ function windowAt(ctx: CanvasRenderingContext2D, x: number, y: number, lit: bool
   ctx.fillRect(x, y + 3, 6, 1);
 }
 
+/** Procedural stand-in while the building sprites load. */
+function drawBuildingFallback(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) {
+  const bx = x + 4;
+  const bw = w - 8;
+  const wallTop = y + 22;
+  const wallH = h - 24;
+  ctx.fillStyle = '#2b2233';
+  ctx.fillRect(bx - 1, wallTop - 1, bw + 2, wallH + 2);
+  ctx.fillStyle = '#d8cdb4';
+  ctx.fillRect(bx, wallTop, bw, wallH);
+  ctx.fillStyle = '#2b2233';
+  ctx.fillRect(bx - 4, wallTop - 5, bw + 8, 5);
+  ctx.fillStyle = color;
+  ctx.fillRect(bx - 3, wallTop - 4, bw + 6, 3);
+}
+
 /** A school/office whose footprint's top-left tile is (tx, ty). glow (0..1) lights it up. */
 export function drawBuilding(ctx: CanvasRenderingContext2D, tx: number, ty: number, style: number, glow: number, t: number) {
   const s = BUILDING_STYLES[style % BUILDING_STYLES.length];
   const { x, y, w, h } = px({ x: tx, y: ty, w: BUILDING_SIZE, h: BUILDING_SIZE });
-  const bx = x + 4;
-  const bw = w - 8;
-  const roofH = 22;
-  const wallTop = y + roofH;
-  const wallH = h - roofH - 2;
+  const im = img(s.file);
 
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(bx + 3, y + h - 3, bw, 4);
-
-  // Walls.
-  ctx.fillStyle = '#2b2233';
-  ctx.fillRect(bx - 1, wallTop - 1, bw + 2, wallH + 2);
-  ctx.fillStyle = s.wall;
-  ctx.fillRect(bx, wallTop, bw, wallH);
-  ctx.fillStyle = s.wallDark;
-  ctx.fillRect(bx, wallTop + wallH - 3, bw, 3);
-
-  // Roof: stepped gable.
-  ctx.fillStyle = '#2b2233';
-  ctx.fillRect(bx - 4, wallTop - 4, bw + 8, 5);
-  for (let i = 0; i < 9; i++) {
-    const inset = i * 3;
-    ctx.fillStyle = '#2b2233';
-    ctx.fillRect(bx - 3 + inset - 1, wallTop - 4 - (i + 1) * 2, bw + 6 - inset * 2 + 2, 3);
-    ctx.fillStyle = i % 2 ? s.roofDark : s.roof;
-    ctx.fillRect(bx - 3 + inset, wallTop - 4 - (i + 1) * 2 + 1, bw + 6 - inset * 2, 2);
+  // Sprite bounds: the opaque area spans the footprint's width, sits on its
+  // bottom edge, and may rise above it.
+  const sx = x;
+  const sw = w;
+  let sy = y;
+  let sh = h;
+  if (im) {
+    const [x0, y0, x1, y1] = s.crop;
+    const cw = x1 - x0;
+    const ch = y1 - y0;
+    sh = Math.round((ch * w) / cw);
+    sy = y + h - sh;
+    const smooth = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, x0, y0, cw, ch, sx, sy, sw, sh);
+    ctx.imageSmoothingEnabled = smooth;
+  } else {
+    drawBuildingFallback(ctx, x, y, w, h, s.color);
   }
-  ctx.fillStyle = s.roof;
-  ctx.fillRect(bx - 3, wallTop - 3, bw + 6, 3);
-
-  // Windows and door.
-  const lit = glow > 0.05;
-  windowAt(ctx, bx + 5, wallTop + 7, lit, s.trim);
-  windowAt(ctx, bx + bw - 11, wallTop + 7, lit, s.trim);
-  const doorX = x + w / 2 - 4;
-  ctx.fillStyle = '#2b2233';
-  ctx.fillRect(doorX - 1, y + h - 17, 10, 15);
-  ctx.fillStyle = '#7a4e2d';
-  ctx.fillRect(doorX, y + h - 16, 8, 14);
-  ctx.fillStyle = '#e6a23c';
-  ctx.fillRect(doorX + 6, y + h - 9, 1, 1);
 
   if (glow > 0) {
     const pulse = 0.5 + 0.5 * Math.sin(t * 12);
     ctx.strokeStyle = `rgba(255, 220, 90, ${glow * (0.5 + 0.5 * pulse)})`;
     ctx.lineWidth = 2;
-    ctx.strokeRect(bx - 6, y - 2, bw + 12, h + 2);
+    ctx.strokeRect(sx - 3, sy - 3, sw + 6, sh + 5);
   }
 }
 
@@ -803,12 +853,57 @@ function drawSliced(ctx: CanvasRenderingContext2D, s: Slices, tx: number, ty: nu
   return true;
 }
 
+// Flower beds in flowers/Flowers.png: source rects [x, y, w, h] per family,
+// biggest first. The sheet isn't a strict grid, so each sprite is listed.
+type SrcRect = readonly [number, number, number, number];
+const FLOWER_SHEET = 'flowers/Flowers.png';
+const FLOWER_BEDS: Record<FlowerKind, readonly SrcRect[]> = {
+  bluebells: [[7, 6, 19, 20], [40, 7, 16, 19], [73, 9, 13, 13]],
+  lilies: [[102, 2, 20, 30], [136, 5, 18, 24], [169, 7, 14, 20]],
+  alliums: [[197, 4, 25, 43], [231, 4, 19, 27], [265, 7, 14, 22]],
+  starflowers: [[4, 32, 25, 32], [38, 35, 20, 29], [74, 41, 14, 20]],
+  poppies: [[100, 34, 23, 30], [136, 39, 14, 21], [172, 41, 12, 17]],
+  phlox: [[3, 64, 26, 32], [39, 67, 19, 26], [71, 72, 17, 17]],
+  tulips: [[101, 71, 21, 19], [136, 72, 17, 15], [129, 97, 13, 13]],
+  daisies: [[169, 70, 15, 18], [195, 64, 11, 16], [212, 65, 9, 15], [194, 81, 13, 15], [212, 81, 10, 14]],
+  irises: [[231, 52, 19, 38], [257, 56, 14, 33], [275, 51, 13, 28]],
+  violets: [[241, 33, 13, 13], [259, 35, 10, 10], [275, 36, 9, 8], [193, 96, 14, 16], [209, 99, 14, 12], [228, 99, 8, 11]],
+  buttercups: [[0, 101, 16, 23], [19, 104, 11, 17], [35, 97, 9, 15]],
+  heather: [[35, 113, 11, 15], [48, 103, 16, 20], [66, 103, 13, 19]],
+  lavender: [[81, 104, 14, 19], [98, 96, 13, 16], [115, 98, 10, 13]],
+  forgetmenots: [[146, 97, 13, 14], [163, 98, 12, 12], [180, 99, 8, 11]],
+};
+/** Little flowers for scattering: wildflowers, pots and flower tiles. */
+const SMALL_FLOWERS: readonly SrcRect[] = Object.values(FLOWER_BEDS).flat().filter((r) => r[3] <= 16);
+/** Petal colours per family, for the procedural fallback. */
+const FLOWER_COLORS: Record<FlowerKind, string> = {
+  bluebells: '#5b7be0', lilies: '#e8807a', alliums: '#e45c9a', starflowers: '#d8333f', poppies: '#f08a2c',
+  phlox: '#c040e0', tulips: '#d06a2a', daisies: '#e8f0ff', irises: '#3a6ad8', violets: '#7a3ac0',
+  buttercups: '#ffd23f', heather: '#9a4a7a', lavender: '#5ab8e8', forgetmenots: '#4ab0f0',
+};
+
+/** Draw a sprite from the flower sheet, bottom-centred on (cx, bottom). */
+function flowerArt(ctx: CanvasRenderingContext2D, [sx, sy, sw, sh]: SrcRect, cx: number, bottom: number, scale = 0.5): boolean {
+  const im = img(FLOWER_SHEET);
+  if (!im) return false;
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
+  ctx.drawImage(im, sx, sy, sw, sh, Math.round(cx - w / 2), Math.round(bottom - h), w, h);
+  return true;
+}
+
+const isFlower = (kind: PropKind): kind is FlowerKind => kind in FLOWER_BEDS;
+
 /** Library and grasslands art for a prop, when it has some. */
 function drawPropArt(ctx: CanvasRenderingContext2D, kind: PropKind, tx: number, ty: number, same: (dx: number) => boolean): boolean {
   const cx = tx * TILE + TILE / 2;
   const bottom = (ty + 1) * TILE;
   const slices = SLICED[kind];
   if (slices) return drawSliced(ctx, slices, tx, ty, same, kind === 'rug');
+  if (isFlower(kind)) {
+    const jitter = Math.floor(hash(tx, ty, 8) * 5) - 2;
+    return flowerArt(ctx, pickOf(FLOWER_BEDS[kind], tx, ty, 7), cx + jitter, bottom + 1);
+  }
   const piece = PIECES[kind];
   if (piece) {
     const im = img(INTERIOR);
@@ -835,8 +930,8 @@ function drawPropArt(ctx: CanvasRenderingContext2D, kind: PropKind, tx: number, 
     case 'wildflowers': {
       let ok = true;
       for (let i = 0; i < 3; i++) {
-        const f = `Flower${1 + Math.floor(hash(tx, ty, 50 + i) * 11)}.png`;
-        ok = art(ctx, GRASS + f, tx * TILE + 3 + i * 5, ty * TILE + 8 + (i % 2) * 6) && ok;
+        const f = pickOf(SMALL_FLOWERS, tx, ty, 50 + i);
+        ok = flowerArt(ctx, f, tx * TILE + 3 + i * 5, ty * TILE + 8 + (i % 2) * 6) && ok;
       }
       return ok;
     }
@@ -938,6 +1033,20 @@ export const PROP_INFO: Record<PropKind, { label: string; emoji: string }> = {
   boulder: { label: 'Boulder', emoji: '⛰️' },
   ruin: { label: 'Ruin', emoji: '🏛️' },
   wildflowers: { label: 'Wildflowers', emoji: '🌼' },
+  bluebells: { label: 'Bluebells', emoji: '🔵' },
+  lilies: { label: 'Lilies', emoji: '🌸' },
+  alliums: { label: 'Alliums', emoji: '🎀' },
+  starflowers: { label: 'Star flowers', emoji: '🌺' },
+  poppies: { label: 'Poppies', emoji: '🏵️' },
+  phlox: { label: 'Phlox', emoji: '💮' },
+  tulips: { label: 'Tulips', emoji: '🌷' },
+  daisies: { label: 'Daisies', emoji: '🤍' },
+  irises: { label: 'Irises', emoji: '💙' },
+  violets: { label: 'Violets', emoji: '🪻' },
+  buttercups: { label: 'Buttercups', emoji: '🌼' },
+  heather: { label: 'Heather', emoji: '🍂' },
+  lavender: { label: 'Lavender', emoji: '🌾' },
+  forgetmenots: { label: 'Forget-me-nots', emoji: '🫐' },
   globe: { label: 'Globe', emoji: '🌍' },
   rug: { label: 'Rug', emoji: '🟥' },
 };
@@ -952,6 +1061,13 @@ export function drawProp(ctx: CanvasRenderingContext2D, kind: PropKind, tx: numb
     ctx.fillStyle = c;
     ctx.fillRect(x + rx, y + ry, w, h);
   };
+  if (isFlower(kind)) {
+    rect(O, 7, 6, 2, 9);
+    rect('#3c8d40', 7, 7, 2, 7);
+    rect(O, 4, 3, 8, 5);
+    rect(FLOWER_COLORS[kind], 5, 4, 6, 3);
+    return;
+  }
   switch (kind) {
     case 'tree':
       drawTree(ctx, tx, ty);
@@ -985,6 +1101,7 @@ export function drawProp(ctx: CanvasRenderingContext2D, kind: PropKind, tx: numb
     case 'flowerpot': {
       rect(O, 4, 9, 8, 6);
       rect('#c8644b', 5, 10, 6, 4);
+      if (flowerArt(ctx, pickOf(SMALL_FLOWERS, tx, ty, 9), x + TILE / 2, y + 10)) return;
       rect('#3c8d40', 7, 4, 2, 6);
       const colors = ['#ff6b8b', '#ffd23f', '#b38cff'];
       colors.forEach((c, i) => rect(c, 3 + i * 4, 2 + (i % 2) * 2, 3, 3));
@@ -1195,7 +1312,11 @@ export function paintGround(c: HTMLCanvasElement, world: World, x0: number, y0: 
         const sy = Math.floor(hash(ty, tx, i + 11) * 15);
         ctx.fillRect(x + sx, y + sy, tile === 'grass' || tile === 'flowers' ? 1 : 2, tile === 'grass' ? 2 : 1);
       }
-      if (tile === 'flowers') {
+      if (tile === 'flowers' && img(FLOWER_SHEET)) {
+        for (let i = 0; i < 2; i++) {
+          flowerArt(ctx, pickOf(SMALL_FLOWERS, tx, ty, 20 + i), x + 4 + Math.floor(hash(tx, ty, 30 + i) * 8), y + 6 + Math.floor(hash(tx, ty, 40 + i) * 9));
+        }
+      } else if (tile === 'flowers') {
         const colors = ['#ff6b8b', '#ffd23f', '#ffffff', '#b38cff'];
         for (let i = 0; i < 4; i++) {
           ctx.fillStyle = colors[Math.floor(hash(tx, ty, 20 + i) * colors.length)];

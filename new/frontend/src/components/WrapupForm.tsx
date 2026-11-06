@@ -43,8 +43,7 @@ export default function WrapupForm({ contactId, phoneNumber }: { contactId: stri
   };
 
   return (
-    <div className="space-y-3 border-t border-secondary-100 px-4 py-4 dark:border-secondary-800" onKeyDown={submitOnShortcut}>
-      <h3 className="text-xs font-semibold tracking-wide text-secondary-500 uppercase dark:text-secondary-400">Call notes</h3>
+    <div className="space-y-3 px-4 py-4" onKeyDown={submitOnShortcut}>
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <label htmlFor={`wrapup-incident-${contactId}`} className={LABEL_CLASS}>

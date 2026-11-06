@@ -2,16 +2,29 @@ import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import { useStore } from '@nanostores/react';
 import { useRef, useState, type DragEvent, type ReactNode } from 'react';
 
-import { $phoneEditMode, $phoneLayout, setPhoneLayout, type PhoneCard, type PhoneColumn, type PhoneLayout } from '../lib/theme';
+import {
+  $phoneEditMode,
+  $phoneLayout,
+  $phoneMinimized,
+  setPhoneLayout,
+  togglePhoneMinimized,
+  type PhoneCard,
+  type PhoneColumn,
+  type PhoneLayout,
+} from '../lib/theme';
 import CallerTimeline from './CallerTimeline';
 import CallFlow from './CallFlow';
+import CallNotes from './CallNotes';
 import CallPanel from './CallPanel';
 import TabbedFunctions from './TabbedFunctions';
+import { CardMinimize } from './ui';
 import VoiceTranscript from './VoiceTranscript';
 
-const CARDS: Record<PhoneCard, { label: string; render: () => ReactNode; desktopOnly?: boolean }> = {
-  call: { label: 'Call', render: () => <CallPanel /> },
+// Every card but the call itself can be minimized to its title row.
+const CARDS: Record<PhoneCard, { label: string; render: () => ReactNode; desktopOnly?: boolean; fixed?: boolean }> = {
+  call: { label: 'Call', render: () => <CallPanel />, fixed: true },
   transcript: { label: 'Voice transcription', render: () => <VoiceTranscript /> },
+  notes: { label: 'Call notes', render: () => <CallNotes /> },
   functions: { label: 'Functions', render: () => <TabbedFunctions /> },
   flow: { label: 'Call flow', render: () => <CallFlow />, desktopOnly: true },
   timeline: { label: 'Caller timeline', render: () => <CallerTimeline />, desktopOnly: true },
@@ -146,6 +159,7 @@ function CardSlot({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const card = CARDS[id];
+  const minimized = useStore($phoneMinimized).includes(id);
 
   return (
     <>
@@ -206,7 +220,11 @@ function CardSlot({
         </Menu>
         )}
         <div data-card-body className="contents">
-          {card.render()}
+          {card.fixed ? (
+            card.render()
+          ) : (
+            <CardMinimize.Provider value={{ minimized, toggle: () => togglePhoneMinimized(id) }}>{card.render()}</CardMinimize.Provider>
+          )}
         </div>
       </div>
     </>

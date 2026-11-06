@@ -95,13 +95,13 @@ export function setPhoneEditMode(enabled: boolean): void {
 
 // Phone tab cards the agent can rearrange, by column. Kept in this file with
 // the other synced settings.
-export const PHONE_CARDS = ['call', 'transcript', 'functions', 'flow', 'timeline'] as const;
+export const PHONE_CARDS = ['call', 'transcript', 'notes', 'functions', 'flow', 'timeline'] as const;
 export type PhoneCard = (typeof PHONE_CARDS)[number];
 export type PhoneColumn = 'left' | 'right';
 export type PhoneLayout = Record<PhoneColumn, PhoneCard[]>;
 
 export const DEFAULT_PHONE_LAYOUT: PhoneLayout = {
-  left: ['call', 'transcript', 'functions'],
+  left: ['call', 'transcript', 'notes', 'functions'],
   right: ['flow', 'timeline'],
 };
 
@@ -112,6 +112,8 @@ function isPhoneCard(id: unknown): id is PhoneCard {
 /**
  * Drops unknown and repeated cards and puts any missing ones back in their
  * default column, so a saved layout survives cards being added or removed.
+ * A missing card goes right after the card that precedes it by default (when
+ * that one is in the same column), else at the top of the column.
  */
 export function normalizePhoneLayout(raw: unknown): PhoneLayout {
   const seen = new Set<PhoneCard>();
@@ -127,9 +129,41 @@ export function normalizePhoneLayout(raw: unknown): PhoneLayout {
     }
   }
   for (const col of ['left', 'right'] as const) {
-    for (const id of DEFAULT_PHONE_LAYOUT[col]) if (!seen.has(id)) out[col].push(id);
+    const defaults = DEFAULT_PHONE_LAYOUT[col];
+    defaults.forEach((id, i) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      let at = 0;
+      for (let j = i - 1; j >= 0; j--) {
+        const prev = out[col].indexOf(defaults[j]);
+        if (prev !== -1) {
+          at = prev + 1;
+          break;
+        }
+      }
+      out[col].splice(at, 0, id);
+    });
   }
   return out;
+}
+
+// Phone cards minimized to their title row. Local to this browser. Dialpad /
+// Transfers start minimized, as they did before cards could be minimized.
+export const $phoneMinimized = persistentAtom<PhoneCard[]>('owlchirp:phoneMinimized', ['functions'], {
+  encode: JSON.stringify,
+  decode: (v) => {
+    try {
+      const ids: unknown = JSON.parse(v);
+      return Array.isArray(ids) ? ids.filter(isPhoneCard) : [];
+    } catch {
+      return [];
+    }
+  },
+});
+
+export function togglePhoneMinimized(id: PhoneCard): void {
+  const current = $phoneMinimized.get();
+  $phoneMinimized.set(current.includes(id) ? current.filter((c) => c !== id) : [...current, id]);
 }
 
 function isDefaultPhoneLayout(layout: PhoneLayout): boolean {

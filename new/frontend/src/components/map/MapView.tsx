@@ -28,6 +28,7 @@ import DesignPanel from "./DesignPanel";
 import Draggable from "./Draggable";
 import MapCanvas from "./MapCanvas";
 import MapToolbar from "./MapToolbar";
+import useMapShortcuts from "./useMapShortcuts";
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -36,7 +37,6 @@ function errorMessage(e: unknown): string {
 function WhoIsHere({ me }: { me: string }) {
   const players = useStore($mapPlayers) ?? {};
   const { user_list: users = [] } = useStore($metrics, { keys: ["user_list"] });
-  const canSeeNames = useStore($can("agentNames"));
   const [open, setOpen] = useState(false);
   const statusOf = new Map(
     users.map((u) => [u.user.username.toLowerCase(), u.status.name]),
@@ -64,14 +64,9 @@ function WhoIsHere({ me }: { me: string }) {
       </button>
       {open && (
         <ul className="flex flex-col divide-y divide-secondary-100 overflow-y-auto border-t border-secondary-100 text-sm dark:divide-secondary-800 dark:border-secondary-800">
-          {names.map((name, i) => {
+          {names.map((name) => {
             const status = statusOf.get(name.toLowerCase()) ?? "Offline";
-            const label =
-              name === me
-                ? "You"
-                : canSeeNames
-                  ? agentName(name)
-                  : `Agent ${i + 1}`;
+            const label = name === me ? "You" : agentName(name);
             return (
               <li
                 key={name}
@@ -128,6 +123,7 @@ export default function MapView() {
   const me = agent?.getConfiguration().username ?? "";
 
   useEffect(() => $myUsername.set(me), [me]);
+  useMapShortcuts();
   // Voice starts the first time the Map is opened and keeps running in other
   // sections; App stops it on logout or when the map feature goes away.
   useEffect(() => {

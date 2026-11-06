@@ -10,15 +10,18 @@ export default function Segmented<T extends string>({
   value,
   onChange,
   row,
+  title,
 }: {
   label: string;
+  /** Tooltip for the whole row. */
+  title?: string;
   row?: boolean;
   options: { value: T; label: ReactNode }[];
   value: T;
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" title={title}>
       <span className={`text-xs font-semibold text-secondary-500 uppercase dark:text-secondary-400 ${row ? ROW_LABEL : ''}`}>{label}</span>
       <div role="radiogroup" aria-label={label} className="inline-flex overflow-hidden rounded-lg border border-secondary-200 dark:border-secondary-700">
         {options.map((o) => (

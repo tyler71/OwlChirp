@@ -44,7 +44,7 @@ import {
   type Pet,
   type Ride,
 } from '../../lib/map';
-import { $can, $metrics } from '../../lib/stores';
+import { $metrics } from '../../lib/stores';
 import { isSpeaking, VOICE_RANGE } from '../../lib/voice';
 import { Icon } from '../ui';
 import {
@@ -68,6 +68,7 @@ import { sceneOf } from './scenes';
 import {
   BUILDING_SIZE,
   EDGE_ENTRIES,
+  FLOWER_KINDS,
   HQ,
   TILE,
   World,
@@ -80,8 +81,16 @@ import {
   type Door,
   type Point,
   type Prop,
+  type PropKind,
   type Rect,
 } from './world';
+
+/** Low flowers that sort under whoever stands on them; tall irises and alliums don't. */
+const LOW_FLOWERS: ReadonlySet<PropKind> = new Set<PropKind>([
+  'flowerpot',
+  'wildflowers',
+  ...FLOWER_KINDS.filter((k) => k !== 'irises' && k !== 'alliums'),
+]);
 
 const SPEED: Record<Ride, number> = { walk: 72, bike: 140, car: 220 }; // px per second
 // Half-width of the box at a character's feet used for collisions.
@@ -813,7 +822,6 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
     });
 
     // ---- Drawing ----
-    const canSeeNames = $can('agentNames');
     let raf = 0;
     let last = performance.now();
     let frameNo = 0;
@@ -828,7 +836,7 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
         mctx.fillRect(HQ.x * TILE * k, HQ.y * TILE * k, HQ.w * TILE * k, HQ.h * TILE * k);
       }
       for (const b of sceneBuildings()) {
-        mctx.fillStyle = BUILDING_STYLES[b.style % BUILDING_STYLES.length].roof;
+        mctx.fillStyle = BUILDING_STYLES[b.style % BUILDING_STYLES.length].color;
         mctx.fillRect(b.x * TILE * k, b.y * TILE * k, BUILDING_SIZE * TILE * k, BUILDING_SIZE * TILE * k);
       }
       for (const [name, s] of sprites) {
@@ -922,7 +930,7 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
         if (p.id === propDrag?.prop.id) continue;
         if (!inRect(viewTiles, p.x, p.y) || world.buildingAt(p.x, p.y)) continue;
         // Flat things (rugs, flowers) go under whoever stands on them.
-        const flat = p.kind === 'rug' ? -1e6 : p.kind === 'flowerpot' || p.kind === 'wildflowers' ? -8 : 0;
+        const flat = p.kind === 'rug' ? -1e6 : LOW_FLOWERS.has(p.kind) ? -8 : 0;
         const same = (dx: number) => world.props.get(world.key(p.x + dx, p.y))?.kind === p.kind;
         drawables.push({ y: (p.y + 1) * TILE + flat, draw: () => drawProp(ctx, p.kind, p.x, p.y, motion, same) });
       }
@@ -1106,13 +1114,13 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
             ctx.setLineDash([]);
           }
         }
-        const label = isMe ? 'You' : canSeeNames.get() ? agentName(name) : '';
+        const label = isMe ? 'You' : agentName(name);
         const dot = status && (pose === 'stand' || riding) ? STATUS_DOT[status] : undefined;
         if (!label && !dot) continue;
-        ctx.font = `${isMe ? 'bold ' : ''}${11 * dpr}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.font = `${isMe ? 'bold ' : ''}${13 * dpr}px ui-sans-serif, system-ui, sans-serif`;
         const w = label ? ctx.measureText(label).width + 8 * dpr : 0;
         const dotW = dot ? 10 * dpr : 0;
-        const h = 14 * dpr;
+        const h = 16 * dpr;
         const bx = x - (w + dotW) / 2;
         const by = top - h - 2 * dpr;
         ctx.fillStyle = isMe ? 'rgba(41, 182, 168, 0.92)' : 'rgba(30, 27, 38, 0.72)';

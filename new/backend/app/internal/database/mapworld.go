@@ -16,7 +16,7 @@ const (
 	// MapBuildingSize is the width and height of a building's footprint.
 	MapBuildingSize = 4
 	// MapStyleCount is how many building sprite styles the frontend draws.
-	MapStyleCount = 4
+	MapStyleCount = 16
 )
 
 // MapRect is a rectangle in tiles.
@@ -39,6 +39,8 @@ var MapTiles = []string{"grass", "flowers", "road", "path", "plaza", "sand", "wa
 var MapPropKinds = []string{
 	"tree", "pine", "bush", "rock", "flowerpot", "bench", "lamp", "fountain", "fence", "sign",
 	"fruittree", "stump", "boulder", "ruin", "wildflowers",
+	"bluebells", "lilies", "alliums", "starflowers", "poppies", "phlox", "tulips",
+	"daisies", "irises", "violets", "buttercups", "heather", "lavender", "forgetmenots",
 }
 
 var defaultLots = sync.OnceValue(func() []MapRect {
