@@ -279,8 +279,8 @@ func TestSocketMapLook(t *testing.T) {
 		"avatar": map[string]any{"skin": 1, "eyes": 2, "pants": 4, "hair": 5},
 		"car":    map[string]any{"color": 5, "style": "truck"},
 		"bike":   map[string]any{"color": 6},
-		"dog":    map[string]any{"coat": 1, "marking": "spots"},
-		"cat":    map[string]any{"coat": 2, "marking": "socks"},
+		"dog":    map[string]any{"coat": 1, "color": 3},
+		"cat":    map[string]any{"coat": 1, "color": 5},
 	}
 	reply := c.call("map.look", look)
 	assert.Equal(t, reply.Type, "result")
@@ -322,7 +322,7 @@ func TestSocketMapLook(t *testing.T) {
 	assert.Equal(t, me.Pet, "cat")
 	assert.Equal(t, me.Ride, "bike")
 	assert.True(t, me.Look != nil)
-	assert.Equal(t, me.Look.Dog.Marking, "spots")
+	assert.Equal(t, me.Look.Dog.Color, 3)
 
 	// null resets to the derived look.
 	reply = c.call("map.look", nil)

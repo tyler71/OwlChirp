@@ -13,15 +13,14 @@ import (
 // components/map/sprites.ts.
 const (
 	VehicleColorCount = 8
-	DogCoatCount      = 5
-	CatCoatCount      = 5
+	DogCoatCount      = 2
+	CatCoatCount      = 2
+	PetColorCount     = 8
 )
 
 // Styles a MapLook can pick.
 var (
-	CarStyles   = []string{"sedan", "truck"}
-	DogMarkings = []string{"none", "spots", "patch"}
-	CatMarkings = []string{"none", "stripes", "socks"}
+	CarStyles = []string{"sedan", "truck"}
 )
 
 // AvatarParts is how many layers each avatar part offers. Mirrors the
@@ -66,12 +65,12 @@ type MapLook struct {
 		Color int `json:"color"`
 	} `json:"bike"`
 	Dog struct {
-		Coat    int    `json:"coat"`
-		Marking string `json:"marking"`
+		Coat  int `json:"coat"`
+		Color int `json:"color"`
 	} `json:"dog"`
 	Cat struct {
-		Coat    int    `json:"coat"`
-		Marking string `json:"marking"`
+		Coat  int `json:"coat"`
+		Color int `json:"color"`
 	} `json:"cat"`
 }
 
@@ -86,6 +85,8 @@ func (l MapLook) Validate() error {
 		{"bike color", l.Bike.Color, VehicleColorCount},
 		{"dog coat", l.Dog.Coat, DogCoatCount},
 		{"cat coat", l.Cat.Coat, CatCoatCount},
+		{"dog color", l.Dog.Color, PetColorCount},
+		{"cat color", l.Cat.Color, PetColorCount},
 	}
 	for _, c := range colors {
 		if c.value < 0 || c.value >= c.count {
@@ -98,8 +99,6 @@ func (l MapLook) Validate() error {
 		valid []string
 	}{
 		{"car style", l.Car.Style, CarStyles},
-		{"dog marking", l.Dog.Marking, DogMarkings},
-		{"cat marking", l.Cat.Marking, CatMarkings},
 	}
 	for _, s := range styles {
 		if !slices.Contains(s.valid, s.value) {

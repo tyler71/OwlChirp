@@ -9,10 +9,8 @@ import { AVATAR_PARTS, LAYERS, REQUIRED_PARTS, loadMapAssets, type AvatarPart } 
 import Segmented from './Segmented';
 import {
   CAR_STYLES,
-  CAT_COATS,
-  CAT_MARKINGS,
-  DOG_COATS,
-  DOG_MARKINGS,
+  PET_COATS,
+  PET_COLORS,
   VEHICLE_COLORS,
   defaultLook,
   randomAvatar,
@@ -61,6 +59,25 @@ function Swatches({ label, colors, value, onChange }: { label: string; colors: {
         ))}
       </div>
     </div>
+  );
+}
+
+/** A pet's sprite (coat) and fur colour. */
+function PetEditor({ pet, value, onChange }: { pet: Exclude<Pet, ''>; value: MapLook['dog']; onChange: (v: MapLook['dog']) => void }) {
+  const coats = PET_COATS[pet];
+  const coat = coats[value.coat] ?? coats[0];
+  // Natural shows the coat's own fur colour.
+  const colors = PET_COLORS.map((c, i) => (i === 0 ? { ...c, hex: coat.fur[0] } : c));
+  return (
+    <>
+      <Segmented
+        label="Coat"
+        options={coats.map((c) => ({ value: String(c.value), label: c.label }))}
+        value={String(coat.value)}
+        onChange={(v) => onChange({ ...value, coat: Number(v) })}
+      />
+      <Swatches label="Color" colors={colors} value={value.color ?? 0} onChange={(color) => onChange({ ...value, color })} />
+    </>
   );
 }
 
@@ -139,7 +156,9 @@ function Preview({ username, look, tab, facing }: { username: string; look: MapL
       } else if (tab === 'car' || tab === 'bike') {
         drawCharacter(ctx, username, look, x, y, facing, 'walk', t, tab);
       } else {
-        drawPet(ctx, tab, username, look, x, y, facing, true, t);
+        // Pets only have side views: up and down show them sitting and calling.
+        const side = facing === 'left' ? 'left' : 'right';
+        drawPet(ctx, tab, username, look, x, y, side, facing === 'up' ? 'sit' : facing === 'down' ? 'speak' : 'walk', t);
       }
       raf = requestAnimationFrame(frame);
     };
@@ -293,15 +312,13 @@ export default function DesignPanel({ username, onClose }: { username: string; o
           )}
           {tab === 'dog' && (
             <>
-              <Swatches label="Coat" colors={DOG_COATS} value={draft.dog.coat} onChange={(coat) => set({ dog: { ...draft.dog, coat } })} />
-              <Segmented label="Markings" options={DOG_MARKINGS} value={draft.dog.marking} onChange={(marking) => set({ dog: { ...draft.dog, marking } })} />
+              <PetEditor pet="dog" value={draft.dog} onChange={(dog) => set({ dog })} />
               {petHint('dog')}
             </>
           )}
           {tab === 'cat' && (
             <>
-              <Swatches label="Coat" colors={CAT_COATS} value={draft.cat.coat} onChange={(coat) => set({ cat: { ...draft.cat, coat } })} />
-              <Segmented label="Markings" options={CAT_MARKINGS} value={draft.cat.marking} onChange={(marking) => set({ cat: { ...draft.cat, marking } })} />
+              <PetEditor pet="cat" value={draft.cat} onChange={(cat) => set({ cat })} />
               {petHint('cat')}
             </>
           )}

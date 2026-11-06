@@ -12,8 +12,8 @@ func validLook() MapLook {
 	l.Avatar = MapAvatar{"skin": 1, "eyes": 2, "pants": 3, "hair": 4, "beard": -1, "glasses": 0}
 	l.Car.Color, l.Car.Style = 5, "truck"
 	l.Bike.Color = 6
-	l.Dog.Coat, l.Dog.Marking = 1, "spots"
-	l.Cat.Coat, l.Cat.Marking = 2, "socks"
+	l.Dog.Coat, l.Dog.Color = 1, 3
+	l.Cat.Coat, l.Cat.Color = 1, 7
 	return l
 }
 
@@ -65,7 +65,8 @@ func TestMapLookValidate(t *testing.T) {
 		func(l *MapLook) { l.Car.Color = VehicleColorCount },
 		func(l *MapLook) { l.Cat.Coat = CatCoatCount },
 		func(l *MapLook) { l.Car.Style = "" },
-		func(l *MapLook) { l.Dog.Marking = "stripes" },
+		func(l *MapLook) { l.Dog.Color = PetColorCount },
+		func(l *MapLook) { l.Cat.Color = -1 },
 	} {
 		l := validLook()
 		broken(&l)

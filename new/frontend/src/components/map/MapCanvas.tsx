@@ -60,6 +60,7 @@ import {
   emptyLots,
   paintGround,
   renderGround,
+  type PetAnim,
   type Pose,
 } from './sprites';
 import { assetsReady, loadMapAssets } from './assets';
@@ -71,6 +72,7 @@ import {
   TILE,
   World,
   buildingRect,
+  hash,
   inRect,
   overlaps,
   pathLength,
@@ -121,7 +123,16 @@ const KEY_DIRS: Record<string, Dir> = {
   D: 'right',
 };
 
-type PetState = { x: number; y: number; dir: Dir; movingUntil: number };
+type PetState = {
+  x: number;
+  y: number;
+  /** Which way it faces: the sheets only have side views. */
+  side: 'left' | 'right';
+  anim: PetAnim;
+  movingUntil: number;
+  /** When it last settled beside its owner, for idle → sit → sleep. */
+  stillSince: number;
+};
 
 /** A character as drawn: where it is now, easing toward where it should be. */
 type Sprite = {
@@ -379,7 +390,7 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
             pet: p.pet ?? '',
             ride: rideHere(p.ride ?? 'walk'),
             look: p.look ?? null,
-            petState: { x: p.x + 12, y: p.y + 1, dir: 'down', movingUntil: 0 },
+            petState: { x: p.x + 16, y: p.y + 1, side: 'left', anim: 'sit', movingUntil: 0, stillSince: 0 },
           });
         } else {
           s.pet = p.pet ?? '';
@@ -493,31 +504,52 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
       }
     };
 
-    /** Pets trail behind their owner and sit beside them when they stop. */
-    const movePet = (s: Sprite, dt: number, now: number) => {
+    /** Pets follow their owner like on a leash: while the owner moves the pet
+     * heads toward them, keeping a short gap, from whichever side it's on.
+     * When the owner stops, so does the pet, right where it is. Once still it
+     * stands, then sits, now and then barks or meows, and after a while curls
+     * up asleep. */
+    const movePet = (s: Sprite, name: string, dt: number, now: number) => {
       const p = s.petState;
       const moving = now < s.movingUntil;
-      const behind: Record<Dir, [number, number]> = { left: [20, 1], right: [-20, 1], up: [12, 10], down: [12, -8] };
-      const [bx, by] = moving ? behind[s.dir] : [16, 1];
-      const ox = bx * avatarScale;
-      const oy = by * avatarScale;
-      const tx = s.x + ox;
-      const ty = s.y + oy;
-      const dx = tx - p.x;
-      const dy = ty - p.y;
+      const gap = 18 * avatarScale;
+      const dx = s.x - p.x;
+      const dy = s.y + 1 - p.y;
       const d = Math.hypot(dx, dy);
       if (d > 240) {
-        p.x = tx;
-        p.y = ty;
-      } else if (d > 1.5) {
-        const step = Math.min(d, Math.max(50, d * 6) * dt);
+        // Too far to walk (teleport, map change): drop in just behind them.
+        const behind: Record<Dir, [number, number]> = { left: [22, 1], right: [-22, 1], up: [0, 10], down: [0, -8] };
+        const [bx, by] = behind[s.dir];
+        p.x = s.x + bx * avatarScale;
+        p.y = s.y + by * avatarScale;
+      } else if (moving && d > gap) {
+        const lag = d - gap;
+        const step = Math.min(lag, Math.max(50, lag * 8) * dt);
         p.x += (dx / d) * step;
         p.y += (dy / d) * step;
-        p.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
-        if (step > 0.3) p.movingUntil = now + 80;
-      } else if (!moving) {
-        // Settled beside their owner: face the way the owner is facing.
-        p.dir = s.dir;
+        if (Math.abs(dx) > 0.5) p.side = dx < 0 ? 'left' : 'right';
+        if (step > 0.3) {
+          p.movingUntil = now + 80;
+          // Faster than a stroll (owner on a bike or in a car, or catching up): run.
+          p.anim = step / dt > 90 ? 'run' : 'walk';
+          p.stillSince = 0;
+        }
+      }
+      if (moving && now < p.movingUntil) return;
+      if (!p.stillSince) {
+        p.stillSince = now;
+        // Settled: face the owner.
+        if (Math.abs(dx) > 0.5) p.side = dx < 0 ? 'left' : 'right';
+      }
+      const still = (now - p.stillSince) / 1000;
+      if (still < 2) p.anim = 'idle';
+      else if (still > 45) p.anim = 'sleep';
+      else {
+        // A short bark or meow in some 6-second slots, different per owner.
+        const slot = Math.floor(still / 6);
+        let seed = 0;
+        for (let i = 0; i < name.length; i++) seed = (seed * 31 + name.charCodeAt(i)) | 0;
+        p.anim = slot > 0 && hash(slot, 0, seed) < 0.35 && still % 6 < 1 ? 'speak' : 'sit';
       }
     };
 
@@ -831,7 +863,7 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
           s.x += (s.tx - s.x) * k;
           s.y += (s.ty - s.y) * k;
         }
-        if (s.pet) movePet(s, dt, now);
+        if (s.pet) movePet(s, name, dt, now);
       }
 
       // Camera: on you, or wherever you're looking.
@@ -916,7 +948,7 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
         if (s.pet) {
           const pet = s.pet;
           const p = s.petState;
-          drawables.push({ y: p.y, draw: () => scaledAt(p.x, p.y, () => drawPet(ctx, pet, name, s.look, p.x, p.y, p.dir, now < p.movingUntil, motion)) });
+          drawables.push({ y: p.y, draw: () => scaledAt(p.x, p.y, () => drawPet(ctx, pet, name, s.look, p.x, p.y, p.side, p.anim, motion)) });
         }
       }
       drawables.sort((a, b) => a.y - b.y);

@@ -2,7 +2,7 @@
 // in src/assets/map/sprite (see assets.ts); vehicles, pets, buildings and
 // the rest are grids of palette keys drawn in code, rendered once per colour
 // scheme to an offscreen canvas and cached.
-import type { CatMarking, DogMarking, MapLook, Pet, Ride } from '../../lib/map';
+import type { MapLook, Pet, Ride } from '../../lib/map';
 import { AVATAR_PARTS, LAYERS, REQUIRED_PARTS, SHEET_FRAME, SHEET_ROWS, img, type AvatarPart } from './assets';
 import { BUILDING_SIZE, DEFAULT_LOTS, HQ, TILE, hash, type PropKind, type Rect, type Tile, type World } from './world';
 
@@ -30,38 +30,38 @@ export const VEHICLE_COLORS: Swatch[] = [
 ];
 
 
-type DogCoat = Swatch & { ear: string; mark: string };
-type CatCoat = Swatch & { stripe: string; sock: string };
-export const DOG_COATS: DogCoat[] = [
-  { hex: '#b07a46', ear: '#6b4423', mark: '#f4ead8', label: 'Brown' },
-  { hex: '#e0b366', ear: '#b5813a', mark: '#fff4dc', label: 'Golden' },
-  { hex: '#3a3340', ear: '#211c26', mark: '#d8d2c8', label: 'Black' },
-  { hex: '#f1ece4', ear: '#c9b9a6', mark: '#6b4423', label: 'White' },
-  { hex: '#8d939c', ear: '#5f646c', mark: '#f1ece4', label: 'Grey' },
+/** Fur colours for pets: Natural keeps the sprite's own colours, the rest
+ * are main/shade/deep ramps swapped in for the coat's fur tones. */
+export const PET_COLORS: (Swatch & { ramp: readonly [string, string, string] | null })[] = [
+  { hex: '#ffffff', label: 'Natural', ramp: null },
+  { hex: '#e8843c', label: 'Ginger', ramp: ['#e8843c', '#b35f1d', '#7a3c14'] },
+  { hex: '#9a6238', label: 'Brown', ramp: ['#9a6238', '#6b4423', '#3f2716'] },
+  { hex: '#e3b863', label: 'Golden', ramp: ['#e3b863', '#b5813a', '#7c5524'] },
+  { hex: '#f0dfb8', label: 'Cream', ramp: ['#f0dfb8', '#c9b48a', '#8f7a58'] },
+  { hex: '#9aa0aa', label: 'Grey', ramp: ['#9aa0aa', '#6b707a', '#454a54'] },
+  { hex: '#3a3340', label: 'Black', ramp: ['#3a3340', '#26212b', '#15121a'] },
+  { hex: '#f6f3ee', label: 'White', ramp: ['#f6f3ee', '#cfc8bd', '#9c948a'] },
 ];
-export const CAT_COATS: CatCoat[] = [
-  { hex: '#9aa0aa', stripe: '#6b707a', sock: '#ffffff', label: 'Grey' },
-  { hex: '#e08a3c', stripe: '#b35f1d', sock: '#ffffff', label: 'Ginger' },
-  { hex: '#3a3340', stripe: '#211c26', sock: '#f1ece4', label: 'Black' },
-  { hex: '#f4f1ec', stripe: '#c9c2b8', sock: '#c9c2b8', label: 'White' },
-  { hex: '#e8d2a6', stripe: '#b99b68', sock: '#ffffff', label: 'Cream' },
-];
+
+/** Pet coats: one craftpix sheet each (src/assets/map/pets/N/N.png). fur
+ * lists the sheet's fur colours, lightest first; each maps onto the same
+ * step of a PET_COLORS ramp. */
+type PetCoat = { value: number; label: string; file: string; fur: readonly string[] };
+export const PET_COATS: Record<Exclude<Pet, ''>, PetCoat[]> = {
+  dog: [
+    { value: 0, label: 'Corgi', file: 'pets/1/1.png', fur: ['#ff8142', '#a36d3e'] },
+    { value: 1, label: 'Patched', file: 'pets/2/2.png', fur: ['#a36d3e', '#683c34', '#341e1a'] },
+  ],
+  cat: [
+    { value: 0, label: 'Light', file: 'pets/3/3.png', fur: ['#cce2e1', '#8babbf', '#566a89'] },
+    { value: 1, label: 'Dark', file: 'pets/4/4.png', fur: ['#222a5c', '#38002c'] },
+  ],
+};
 
 export const CAR_STYLES: { value: MapLook['car']['style']; label: string }[] = [
   { value: 'sedan', label: 'Car' },
   { value: 'truck', label: 'Truck' },
 ];
-export const DOG_MARKINGS: { value: DogMarking; label: string }[] = [
-  { value: 'none', label: 'Plain' },
-  { value: 'spots', label: 'Spots' },
-  { value: 'patch', label: 'Eye patch' },
-];
-export const CAT_MARKINGS: { value: CatMarking; label: string }[] = [
-  { value: 'none', label: 'Plain' },
-  { value: 'stripes', label: 'Stripes' },
-  { value: 'socks', label: 'Socks' },
-];
-
 // ---- Characters ----
 // A 48x48 sheet frame is drawn at half size: 24x24 world px, feet on its
 // bottom row, so 2x zoom shows every sprite pixel.
@@ -143,8 +143,8 @@ export function defaultLook(username: string): MapLook {
     avatar: defaultAvatar(username),
     car: { color, style: 'sedan' },
     bike: { color },
-    dog: { coat: 0, marking: 'none' },
-    cat: { coat: 0, marking: 'none' },
+    dog: { coat: pickIndex(PET_COATS.dog.length, username, 3266489917), color: 0 },
+    cat: { coat: pickIndex(PET_COATS.cat.length, username, 374761393), color: 0 },
   };
 }
 
@@ -168,8 +168,17 @@ const at = <T>(list: T[], i: number): T => list[i] ?? list[0];
  * avatars came from sprite layers have no avatar and get the default one. */
 export function resolveLook(username: string, look: MapLook | null | undefined): MapLook {
   if (!look) return defaultLook(username);
-  if (!look.avatar || look.avatar.skin === undefined) return { ...look, avatar: defaultAvatar(username) };
-  return look;
+  let out = look;
+  if (!look.avatar || look.avatar.skin === undefined) out = { ...out, avatar: defaultAvatar(username) };
+  // Pets saved before the sprite sheets had more coats and no colour.
+  const pet = (p: MapLook['dog'] | undefined, coats: number) => ({
+    coat: p && p.coat >= 0 && p.coat < coats ? p.coat : 0,
+    color: p && p.color >= 0 && p.color < PET_COLORS.length ? p.color : 0,
+  });
+  const dog = pet(out.dog, PET_COATS.dog.length);
+  const cat = pet(out.cat, PET_COATS.cat.length);
+  if (JSON.stringify([dog, cat]) !== JSON.stringify([out.dog, out.cat])) out = { ...out, dog, cat };
+  return out;
 }
 
 /** A layer index for part, or -1 when none (or out of range). */
@@ -468,57 +477,49 @@ export function drawVehicle(ctx: CanvasRenderingContext2D, username: string, loo
 
 // ---- Pets ----
 
-const PET_SIDE: Record<Exclude<Pet, ''>, [Grid, Grid]> = {
-  dog: [
-    ['.oo.......', 'oEAo.....o', 'oeAAooooAo', 'nAAAAAAAAo', '.oAAAAAAo.', '.oAo..oAo.', '.oo...oo..'],
-    ['.oo.......', 'oEAo.....o', 'oeAAooooAo', 'nAAAAAAAAo', '.oAAAAAAo.', '..oAooAo..', '..oo.oo...'],
-  ],
-  cat: [
-    ['o.o.......', 'oAAo.....o', 'eAAAoooo.o', 'oAAAAAAAoo', '.oAAAAAAo.', '.oAo..oAo.', '.oo...oo..'],
-    ['o.o.......', 'oAAo.....o', 'eAAAoooo.o', 'oAAAAAAAoo', '.oAAAAAAo.', '..oAooAo..', '..oo.oo...'],
-  ],
-};
-const PET_FRONT: Record<Exclude<Pet, ''>, Grid> = {
-  dog: ['oo....oo', 'oEooooEo', '.oeAAeo.', '.oAnnAo.', '.oAAAAo.', '.oAooAo.', '.oo..oo.'],
-  cat: ['o......o', 'oo....oo', 'oAAAAAAo', 'oAeAAeAo', '.oAnnAo.', '.oAAAAo.', '.oo..oo.'],
-};
-const PET_BACK: Record<Exclude<Pet, ''>, Grid> = {
-  dog: ['oo....oo', 'oEooooEo', '.oAAAAo.', '.oAAAAo.', '.oAAAAo.', '.oAooAo.', '.oo..oo.'],
-  cat: ['o......o', 'oo....oo', 'oAAAAAAo', 'oAAAAAAo', '.oAAAAo.', '.oAAAAo.', '.oo..oo.'],
-};
+// Sheets are 6x6 grids of 48x48 frames facing right, one animation per row,
+// feet on each frame's bottom row. Pets are drawn 1:1, a little coarser
+// than the half-size characters, so they read at map zoom.
 
-/** Paint markings onto a pet grid: chosen coat pixels ('A') become 'M'. */
-function marked(grid: Grid, marking: DogMarking | CatMarking, view: 'side' | 'front' | 'back'): Grid {
-  if (marking === 'none') return grid;
-  const last = grid.length - 1;
-  return grid.map((row, y) =>
-    [...row]
-      .map((ch, x) => {
-        if (ch !== 'A') return ch;
-        const mark =
-          marking === 'spots'
-            ? (x * 7 + y * 3) % 5 === 0
-            : marking === 'patch'
-              ? view !== 'back' && y >= 1 && y <= 3 && (view === 'side' ? x <= 3 : x <= 3 && x >= 1)
-              : marking === 'stripes'
-                ? y >= 2 && y < last - 1 && x % 2 === (view === 'side' ? 1 : 0)
-                : y >= last - 1; // socks
-        return mark ? 'M' : ch;
-      })
-      .join(''),
-  );
+export type PetAnim = 'idle' | 'sleep' | 'walk' | 'run' | 'sit' | 'speak';
+const PET_ROWS: Record<PetAnim, number> = { idle: 0, sleep: 1, walk: 2, run: 3, sit: 4, speak: 5 };
+const PET_FPS: Record<PetAnim, number> = { idle: 5, sleep: 3, walk: 10, run: 14, sit: 4, speak: 8 };
+const PET_COLS = 6;
+
+const hexRGB = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+/** The coat's sheet with its fur recoloured, or the sheet itself for
+ * Natural. Undefined until the image has loaded. */
+function petSheet(coat: PetCoat, colorIndex: number): CanvasImageSource | undefined {
+  const src = img(coat.file);
+  if (!src) return undefined;
+  const ramp = at(PET_COLORS, colorIndex).ramp;
+  if (!ramp) return src;
+  return cached(`pet:${coat.file}:${colorIndex}`, () => {
+    const c = document.createElement('canvas');
+    c.width = src.width;
+    c.height = src.height;
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(src, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    const swap = new Map<number, number[]>();
+    coat.fur.forEach((hex, i) => {
+      const [r, g, b] = hexRGB(hex);
+      swap.set((r << 16) | (g << 8) | b, hexRGB(ramp[Math.min(i, ramp.length - 1)]));
+    });
+    const d = data.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (!d[i + 3]) continue;
+      const to = swap.get((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+      if (to) [d[i], d[i + 1], d[i + 2]] = to;
+    }
+    ctx.putImageData(data, 0, 0);
+    return c;
+  });
 }
 
-function petPalette(pet: Exclude<Pet, ''>, l: MapLook): Palette {
-  if (pet === 'dog') {
-    const coat = at(DOG_COATS, l.dog.coat);
-    return { o: '#2b2233', A: coat.hex, E: coat.ear, M: coat.mark, e: '#2b2233', n: '#2b2233' };
-  }
-  const coat = at(CAT_COATS, l.cat.coat);
-  return { o: '#2b2233', A: coat.hex, E: coat.hex, M: l.cat.marking === 'socks' ? coat.sock : coat.stripe, e: '#6ee07a', n: '#f28fb0' };
-}
-
-/** A pet with its feet at (x, y), coloured by its owner's look. */
+/** A pet with its feet at (x, y), styled by its owner's look. The sheets
+ * only have side views: facing up or down shows it facing right. */
 export function drawPet(
   ctx: CanvasRenderingContext2D,
   pet: Exclude<Pet, ''>,
@@ -527,23 +528,30 @@ export function drawPet(
   x: number,
   y: number,
   facing: Facing,
-  moving: boolean,
+  anim: PetAnim,
   t: number,
 ) {
   const l = resolve(owner, lookIn);
-  const frame = moving ? Math.floor(t * 10) % 2 : 0;
-  const flip = facing === 'right';
-  const view = facing === 'down' ? 'front' : facing === 'up' ? 'back' : 'side';
-  const base = view === 'front' ? PET_FRONT[pet] : view === 'back' ? PET_BACK[pet] : PET_SIDE[pet][frame];
-  const coat = pet === 'dog' ? l.dog : l.cat;
-  const sprite = cached(`pet:${pet}:${coat.coat}:${coat.marking}:${facing}:${frame}`, () =>
-    render(marked(base, coat.marking, view), petPalette(pet, l), flip),
-  );
-  // 2x, to keep pace with the characters.
-  const w = sprite.width * 2;
+  const style = pet === 'dog' ? l.dog : l.cat;
+  const coat = at(PET_COATS[pet], style?.coat ?? 0);
+  const sheet = petSheet(coat, style?.color ?? 0);
+  if (!sheet) return;
+  const col = Math.floor(t * PET_FPS[anim]) % PET_COLS;
+  const row = PET_ROWS[anim];
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.fillRect(Math.round(x - w / 2) + 2, Math.round(y) - 2, w - 4, 3);
-  blit2(ctx, sprite, x - w / 2, y - sprite.height * 2 - (moving && frame ? 2 : 0));
+  ctx.fillRect(Math.round(x) - 8, Math.round(y) - 2, 16, 3);
+  const dx = Math.round(x - SHEET_FRAME / 2);
+  const dy = Math.round(y - SHEET_FRAME);
+  const src = [col * SHEET_FRAME, row * SHEET_FRAME, SHEET_FRAME, SHEET_FRAME] as const;
+  if (facing === 'left') {
+    ctx.save();
+    ctx.translate(dx + SHEET_FRAME, dy);
+    ctx.scale(-1, 1);
+    ctx.drawImage(sheet, ...src, 0, 0, SHEET_FRAME, SHEET_FRAME);
+    ctx.restore();
+  } else {
+    ctx.drawImage(sheet, ...src, dx, dy, SHEET_FRAME, SHEET_FRAME);
+  }
 }
 
 // ---- Buildings ----

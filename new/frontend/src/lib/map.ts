@@ -36,8 +36,6 @@ export type MapPlayer = {
 };
 
 export type CarStyle = "sedan" | "truck";
-export type DogMarking = "none" | "spots" | "patch";
-export type CatMarking = "none" | "stripes" | "socks";
 
 /** How someone designed their character, vehicles and pets. Colours are
  * indexes into the palettes in components/map/sprites.ts. */
@@ -46,8 +44,9 @@ export type MapLook = {
   avatar: Partial<Record<AvatarPart, number>>;
   car: { color: number; style: CarStyle };
   bike: { color: number };
-  dog: { coat: number; marking: DogMarking };
-  cat: { coat: number; marking: CatMarking };
+  /** coat picks the sprite sheet, color a fur colour (0 keeps its own). */
+  dog: { coat: number; color: number };
+  cat: { coat: number; color: number };
 };
 
 export type Pet = "" | "dog" | "cat";
