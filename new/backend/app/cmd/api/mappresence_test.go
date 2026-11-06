@@ -154,9 +154,12 @@ func TestMapPresenceTabs(t *testing.T) {
 	assert.True(t, joined)
 	_, joined = p.join("a", database.MapGear{})
 	assert.False(t, joined)
-	assert.False(t, p.leave("a"))
-	assert.True(t, p.leave("a"))
-	assert.False(t, p.leave("a"))
+	_, left := p.leave("a")
+	assert.False(t, left)
+	_, left = p.leave("a")
+	assert.True(t, left)
+	_, left = p.leave("a")
+	assert.False(t, left)
 
 	p.join("b", database.MapGear{})
 	now := time.Now()
@@ -168,6 +171,32 @@ func TestMapPresenceTabs(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = p.move("nobody", 1, 1, "up", now)
 	assert.False(t, ok)
+}
+
+func TestMapPresenceSavedSpot(t *testing.T) {
+	var p mapPresence
+	pl, _ := p.join("a", database.MapGear{Spot: &database.MapSpot{Scene: database.SceneOffice, X: 40, Y: 50, Dir: "left"}})
+	assert.Equal(t, pl.Scene, database.SceneOffice)
+	assert.Equal(t, [2]float64{pl.X, pl.Y}, [2]float64{40, 50})
+	assert.Equal(t, pl.Dir, "left")
+
+	// Leaving with the last connection reports where they were.
+	p.move("a", 60, 70, "up", time.Now())
+	last, left := p.leave("a")
+	assert.True(t, left)
+	assert.Equal(t, [2]float64{last.X, last.Y}, [2]float64{60, 70})
+	assert.Equal(t, last.Dir, "up")
+
+	// Off the edge is clamped; a bad scene or facing falls back to the spawn.
+	w, _ := sceneBounds(database.SceneTown)
+	pl, _ = p.join("b", database.MapGear{Spot: &database.MapSpot{Scene: database.SceneTown, X: 1e9, Y: -5, Dir: "right"}})
+	assert.Equal(t, [2]float64{pl.X, pl.Y}, [2]float64{w, 0})
+	for i, bad := range []database.MapSpot{{Scene: "moon", X: 1, Y: 1, Dir: "up"}, {Scene: database.SceneTown, X: 1, Y: 1, Dir: "sideways"}} {
+		pl, _ = p.join(string(rune('c'+i)), database.MapGear{Spot: &bad})
+		assert.Equal(t, pl.Scene, database.SceneTown)
+		assert.Equal(t, pl.Dir, "down")
+		assert.True(t, pl.X >= mapSpawn.minX && pl.X <= mapSpawn.maxX)
+	}
 }
 
 func TestMapPresenceScenes(t *testing.T) {

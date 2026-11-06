@@ -6,10 +6,9 @@
 // phone call nothing is sent and everyone else is silenced.
 // Mute self stops sending; Mute all silences everyone else. With the
 // Proximity chat setting off, both start on each time voice starts.
-// The mic either opens on its own above a level threshold (set in Settings,
-// applied live), or only while
-// Space (or the toolbar's hold button) is held: push to talk. Each session
-// starts in the mode chosen in Settings; the toolbar can switch it.
+// The mic either opens on its own above a level threshold, or only while
+// Space (or the toolbar's hold button) is held: push to talk. The mode and
+// threshold are chosen in Settings and apply live.
 import { persistentAtom } from '@nanostores/persistent';
 import { atom, computed } from 'nanostores';
 
@@ -17,7 +16,7 @@ import { apiKey } from './auth';
 import { API } from './const';
 import { $mapPlayers } from './map';
 import { $contactSnapshot } from './stores';
-import { $proximityChat, $voiceModeDefault, $voiceThreshold, type VoiceMode } from './theme';
+import { $proximityChat, $voiceModeDefault, $voiceThreshold } from './theme';
 
 /** How far a voice carries, in world px (5 tiles). Mirrors voiceRange in backend voice.go. */
 export const VOICE_RANGE = 5 * 16;
@@ -40,8 +39,6 @@ export const $voiceDeafened = persistentAtom<boolean>('owlchirp:voice:deafened',
   encode: (v) => (v ? '1' : ''),
   decode: (v) => v === '1',
 });
-/** How the mic opens this session: level threshold or push to talk. */
-export const $voiceMode = atom<VoiceMode>('threshold');
 /** True while push to talk is held (Space or the toolbar button). */
 export const $voicePttHeld = atom(false);
 
@@ -148,7 +145,6 @@ export function startVoice(me: string): void {
     $voiceMuted.set(true);
     $voiceDeafened.set(true);
   }
-  $voiceMode.set($voiceModeDefault.get());
   setPttHeld(false);
   if (!voiceSupported()) {
     $voiceStatus.set('unsupported');
@@ -192,7 +188,7 @@ export function startVoice(me: string): void {
 
   // Push to talk: hold Space anywhere in the app, except while typing.
   const onPttKey = (e: KeyboardEvent) => {
-    if (e.code !== 'Space' || $voiceMode.get() !== 'ptt' || isTyping(e.target)) return;
+    if (e.code !== 'Space' || $voiceModeDefault.get() !== 'ptt' || isTyping(e.target)) return;
     e.preventDefault();
     setPttHeld(e.type === 'keydown');
   };
@@ -203,7 +199,7 @@ export function startVoice(me: string): void {
   }
   window.addEventListener('blur', releasePtt);
   s.cleanups.push(() => window.removeEventListener('blur', releasePtt));
-  s.cleanups.push($voiceMode.listen(releasePtt));
+  s.cleanups.push($voiceModeDefault.listen(releasePtt));
   s.cleanups.push(releasePtt);
 
   void startMic(s);
@@ -324,7 +320,7 @@ async function startMic(s: Session): Promise<void> {
       preroll.length = 0;
       return;
     }
-    const open = $voiceMode.get() === 'ptt' ? $voicePttHeld.get() : db > $voiceThreshold.get();
+    const open = $voiceModeDefault.get() === 'ptt' ? $voicePttHeld.get() : db > $voiceThreshold.get();
     if (open) sendUntil = now + HANGOVER_MS;
     const talking = now < sendUntil;
     if ($voiceTalking.get() !== talking) $voiceTalking.set(talking);

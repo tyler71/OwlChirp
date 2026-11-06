@@ -106,6 +106,11 @@ func (p *mapPresence) join(username string, saved database.MapGear) (player mapP
 		if !validRides[pl.Ride] {
 			pl.Ride = "walk"
 		}
+		// Back where they last stood, if it's still a valid spot.
+		if sp := saved.Spot; sp != nil && database.ValidScene(sp.Scene) && validDirs[sp.Dir] {
+			w, h := sceneBounds(sp.Scene)
+			pl.Scene, pl.X, pl.Y, pl.Dir = sp.Scene, clamp(sp.X, 0, w), clamp(sp.Y, 0, h), sp.Dir
+		}
 		p.players[username] = pl
 	}
 	pl.conns++
@@ -113,20 +118,20 @@ func (p *mapPresence) join(username string, saved database.MapGear) (player mapP
 }
 
 // leave drops a connection for username. left is true when it was their
-// last one and they are no longer on the map.
-func (p *mapPresence) leave(username string) (left bool) {
+// last one and they are no longer on the map; last is then where they were.
+func (p *mapPresence) leave(username string) (last mapPlayer, left bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	pl, ok := p.players[username]
 	if !ok {
-		return false
+		return mapPlayer{}, false
 	}
 	pl.conns--
 	if pl.conns > 0 {
-		return false
+		return mapPlayer{}, false
 	}
 	delete(p.players, username)
-	return true
+	return *pl, true
 }
 
 // move updates username's position. ok is false when the user isn't on the
@@ -225,7 +230,8 @@ func clamp(v, lo, hi float64) float64 {
 var validDirs = map[string]bool{"up": true, "down": true, "left": true, "right": true}
 
 // mapJoin puts user on the map for one connection, in their saved pet, ride
-// and look, and returns the matching leave, to defer.
+// and look at the spot they last left from, and returns the matching leave,
+// to defer. Leaving with the last connection saves where they stood.
 func (app *application) mapJoin(ctx context.Context, user connect.RegisteredUser) func() {
 	saved, err := app.db.GetMapGear(ctx, user.Username)
 	if err != nil {
@@ -236,7 +242,13 @@ func (app *application) mapJoin(ctx context.Context, user connect.RegisteredUser
 		app.broadcast("map.joined", player)
 	}
 	return func() {
-		if app.presence.leave(user.Username) {
+		last, left := app.presence.leave(user.Username)
+		if left {
+			// The connection's context is already done; save on a fresh one.
+			spot := database.MapSpot{Scene: last.Scene, X: last.X, Y: last.Y, Dir: last.Dir}
+			if err := app.db.SaveMapSpot(context.Background(), user.Username, spot); err != nil {
+				app.logger.Warn("save map spot", "user", user.Username, "error", err)
+			}
 			app.broadcast("map.left", map[string]string{"username": user.Username})
 		}
 	}

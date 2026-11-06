@@ -23,10 +23,9 @@ import {
 } from "../../lib/map";
 import { $can } from "../../lib/stores";
 import { Button } from "../ui";
-import type { VoiceMode } from "../../lib/theme";
+import { $voiceModeDefault } from "../../lib/theme";
 import {
   $voiceDeafened,
-  $voiceMode,
   $voiceMuted,
   $voiceOnCall,
   $voicePttHeld,
@@ -134,23 +133,6 @@ function Palette() {
   );
 }
 
-const VOICE_MODES: { value: VoiceMode; label: ReactNode }[] = [
-  {
-    value: "threshold",
-    label: (
-      <span title="Your mic opens on its own when you speak">🎚️ Auto</span>
-    ),
-  },
-  {
-    value: "ptt",
-    label: (
-      <span title="Hold Space (or the Talk button) to talk">
-        ⌨️ Push to talk
-      </span>
-    ),
-  },
-];
-
 const VOICE_LABEL: Record<string, { text: string; title: string }> = {
   off: { text: "Voice off", title: "Voice is off" },
   connecting: { text: "Connecting…", title: "Connecting to map voice" },
@@ -212,7 +194,7 @@ function VoiceControl() {
   const deafened = useStore($voiceDeafened);
   const onCall = useStore($voiceOnCall);
   const talking = useStore($voiceTalking);
-  const mode = useStore($voiceMode);
+  const mode = useStore($voiceModeDefault);
   const pttHeld = useStore($voicePttHeld);
   const canTalk = status === "live";
   const canHear = status === "live" || status === "listenOnly";
@@ -255,14 +237,6 @@ function VoiceControl() {
           >
             {muted ? "🔇 Mic off" : "🎙️ Mic on"}
           </ToggleButton>
-        )}
-        {canTalk && (
-          <Segmented
-            label="Mode"
-            options={VOICE_MODES}
-            value={mode}
-            onChange={(m) => $voiceMode.set(m)}
-          />
         )}
         {canTalk && mode === "ptt" && !muted && (
           <button

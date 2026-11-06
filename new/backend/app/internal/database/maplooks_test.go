@@ -53,6 +53,35 @@ func TestMapGear(t *testing.T) {
 	assert.Equal(t, gear.Pet, "cat")
 }
 
+func TestMapSpot(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+
+	gear, err := db.GetMapGear(ctx, "amy")
+	assert.Nil(t, err)
+	assert.True(t, gear.Spot == nil)
+
+	// Saving a spot keeps pet, ride and look, and the other way round.
+	assert.Nil(t, db.SaveMapGear(ctx, "amy", "dog", "car"))
+	look := validLook()
+	assert.Nil(t, db.SaveMapLook(ctx, "amy", &look))
+	spot := MapSpot{Scene: SceneOffice, X: 12.5, Y: 40, Dir: "left"}
+	assert.Nil(t, db.SaveMapSpot(ctx, "amy", spot))
+	assert.Nil(t, db.SaveMapGear(ctx, "amy", "cat", "bike"))
+	gear, err = db.GetMapGear(ctx, "amy")
+	assert.Nil(t, err)
+	assert.Equal(t, *gear.Spot, spot)
+	assert.Equal(t, gear.Pet, "cat")
+	assert.Equal(t, *gear.Look, look)
+
+	// A spot saved first gets the default ride.
+	assert.Nil(t, db.SaveMapSpot(ctx, "bob", spot))
+	gear, err = db.GetMapGear(ctx, "bob")
+	assert.Nil(t, err)
+	assert.Equal(t, gear.Ride, "walk")
+	assert.Equal(t, gear.Spot.Dir, "left")
+}
+
 func TestMapLookValidate(t *testing.T) {
 	assert.Nil(t, validLook().Validate())
 	for _, broken := range []func(*MapLook){

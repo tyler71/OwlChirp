@@ -163,66 +163,83 @@ export default function Settings() {
         }
       </div>
     </Card>
-    <Card title="Phone layout">
-      <label className="flex cursor-pointer items-start gap-3 p-4">
-        <input
-          type="checkbox"
-          className="toggle toggle-primary mt-0.5"
-          checked={phoneEditMode}
-          onChange={(e) => setPhoneEditMode(e.target.checked)}
-        />
-        <span className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold">Phone Edit Mode</span>
-          <span className="text-xs text-secondary-500 dark:text-secondary-400">
-            Enable to rearrange cards on the Phone tab.
-          </span>
+    <Card title="Phone Section">
+      <div className={"flex flex-row justify-between"}>
+        <label className="flex cursor-pointer items-start gap-3 p-4">
+          <input
+              type="checkbox"
+              className="toggle toggle-primary mt-0.5"
+              checked={phoneEditMode}
+              onChange={(e) => setPhoneEditMode(e.target.checked)}
+          />
+          <span className="flex flex-col gap-0.5">
+          <div className={"flex flex-col"}>
+            <span className="text-sm font-semibold">Phone Edit Mode</span>
+            <span className="text-xs text-secondary-500 dark:text-secondary-400">
+              Enable to rearrange cards on the Phone tab.
+            </span>
+          </div>
         </span>
-      </label>
-      <div className="flex items-start justify-between gap-3 px-4 pb-4">
-        <span className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold">Card arrangement</span>
-          <span className="text-xs text-secondary-500 dark:text-secondary-400">
-            While Phone Edit Mode is on, drag the grip at the top of a Phone card to move it, or click the grip for move options.
-          </span>
-        </span>
-        <Button size="sm" disabled={!customLayout} onClick={() => void resetPhoneLayout()}>
+        </label>
+        <Button size="sm" className={"m-2"} disabled={!customLayout} onClick={() => void resetPhoneLayout()}>
           Reset
         </Button>
       </div>
-    </Card>
-    <Card title="Status">
-      <label className="flex cursor-pointer items-start gap-3 p-4">
-        <input
-          type="checkbox"
-          className="toggle toggle-primary mt-0.5"
-          checked={followTeamMeeting}
-          onChange={(e) => void setFollowTeamMeeting(e.target.checked)}
-        />
+      <div className="flex items-start justify-start gap-3 px-4 pb-4">
         <span className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold">Reset Card arrangement</span>
+        </span>
+      </div>
+        <label className="flex cursor-pointer items-start gap-3 p-4">
+          <input
+              type="checkbox"
+              className="toggle toggle-primary mt-0.5"
+              checked={followTeamMeeting}
+              onChange={(e) => void setFollowTeamMeeting(e.target.checked)}
+          />
+          <span className="flex flex-col gap-0.5">
           <span className="text-sm font-semibold">Auto switch to in a meeting</span>
           <span className="text-xs text-secondary-500 dark:text-secondary-400">
-            Switches when 75% of users are "In a Meeting"
+            Switches when 50% of users are "In a Meeting"
           </span>
         </span>
-      </label>
-      <label className="flex cursor-pointer items-start gap-3 px-4 pb-4">
-        <input
-          type="number"
-          min={0}
-          step={1}
-          className="input input-sm w-20"
-          value={helpQueueThreshold}
-          onChange={(e) => {
-            if (e.target.value !== '') void setHelpQueueThreshold(e.target.valueAsNumber);
-          }}
-        />
-        <span className="flex flex-col gap-0.5">
+        </label>
+        <label className="flex cursor-pointer items-start gap-3 px-4 pb-4">
+          <input
+              type="number"
+              min={0}
+              step={1}
+              className="input input-sm w-20"
+              value={helpQueueThreshold}
+              onChange={(e) => {
+                if (e.target.value !== '') void setHelpQueueThreshold(e.target.valueAsNumber);
+              }}
+          />
+          <span className="flex flex-col gap-0.5">
           <span className="text-sm font-semibold">High queue count alert</span>
           <span className="text-xs text-secondary-500 dark:text-secondary-400">
             When you're not taking calls and the queue rises, this will send an alert. 0 to disable
           </span>
         </span>
-      </label>
+        </label>
+      {canTranscribe && (
+          <Card title="Transcription">
+            <label className="flex cursor-pointer items-start gap-3 p-4">
+              <input
+                  type="checkbox"
+                  className="toggle toggle-primary mt-0.5"
+                  checked={autoTranscribe}
+                  onChange={(e) => void setAutoTranscribe(e.target.checked)}
+              />
+              <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold">Auto start transcription</span>
+            <span className="text-xs text-secondary-500 dark:text-secondary-400">
+              Start transcribing the caller as soon as a call connects.
+            </span>
+          </span>
+            </label>
+          </Card>
+      )}
     </Card>
     <Card title="Caller ID">
       <label className="flex cursor-pointer items-start gap-3 p-4">
@@ -275,24 +292,6 @@ export default function Settings() {
           </span>
         </label>
         <VoiceThresholdSetting disabled={voiceMode !== 'threshold'} />
-      </Card>
-    )}
-    {canTranscribe && (
-      <Card title="Transcription">
-        <label className="flex cursor-pointer items-start gap-3 p-4">
-          <input
-            type="checkbox"
-            className="toggle toggle-primary mt-0.5"
-            checked={autoTranscribe}
-            onChange={(e) => void setAutoTranscribe(e.target.checked)}
-          />
-          <span className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold">Auto start transcription</span>
-            <span className="text-xs text-secondary-500 dark:text-secondary-400">
-              Start transcribing the caller as soon as a call connects.
-            </span>
-          </span>
-        </label>
       </Card>
     )}
     <Card title="Troubleshooting">

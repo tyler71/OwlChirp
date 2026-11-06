@@ -143,6 +143,15 @@ type MapGear struct {
 	Pet  string
 	Ride string
 	Look *MapLook
+	// Spot is where they last stood, or nil when never saved.
+	Spot *MapSpot
+}
+
+// MapSpot is a saved place on the map: scene, pixel position and facing.
+type MapSpot struct {
+	Scene string
+	X, Y  float64
+	Dir   string
 }
 
 // GetMapGear returns username's saved pet, ride and look, or a walker with
@@ -152,11 +161,15 @@ func (db *DB) GetMapGear(ctx context.Context, username string) (MapGear, error) 
 	defer cancel()
 
 	var row struct {
-		Pet  string         `db:"pet"`
-		Ride string         `db:"ride"`
-		Look sql.NullString `db:"look"`
+		Pet   string          `db:"pet"`
+		Ride  string          `db:"ride"`
+		Look  sql.NullString  `db:"look"`
+		Scene sql.NullString  `db:"scene"`
+		X     sql.NullFloat64 `db:"x"`
+		Y     sql.NullFloat64 `db:"y"`
+		Dir   sql.NullString  `db:"dir"`
 	}
-	err := db.GetContext(ctx, &row, `SELECT pet, ride, look FROM map_looks WHERE username = ?`, username)
+	err := db.GetContext(ctx, &row, `SELECT pet, ride, look, scene, x, y, dir FROM map_looks WHERE username = ?`, username)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MapGear{Ride: "walk"}, nil
 	}
@@ -164,6 +177,9 @@ func (db *DB) GetMapGear(ctx context.Context, username string) (MapGear, error) 
 		return MapGear{}, err
 	}
 	gear := MapGear{Pet: row.Pet, Ride: row.Ride}
+	if row.Scene.Valid && row.X.Valid && row.Y.Valid && row.Dir.Valid {
+		gear.Spot = &MapSpot{Scene: row.Scene.String, X: row.X.Float64, Y: row.Y.Float64, Dir: row.Dir.String}
+	}
 	if row.Look.Valid && row.Look.String != "" {
 		var look MapLook
 		if err := json.Unmarshal([]byte(row.Look.String), &look); err != nil {
@@ -205,5 +221,18 @@ func (db *DB) SaveMapLook(ctx context.Context, username string, look *MapLook) e
 		`INSERT INTO map_looks (username, look, updated_on) VALUES (?, ?, ?)
 		 ON CONFLICT (username) DO UPDATE SET look = excluded.look, updated_on = excluded.updated_on`,
 		username, data, now())
+	return err
+}
+
+// SaveMapSpot saves where username last stood, keeping their pet, ride and
+// look.
+func (db *DB) SaveMapSpot(ctx context.Context, username string, spot MapSpot) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	_, err := db.ExecContext(ctx,
+		`INSERT INTO map_looks (username, scene, x, y, dir, updated_on) VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (username) DO UPDATE SET scene = excluded.scene, x = excluded.x, y = excluded.y, dir = excluded.dir, updated_on = excluded.updated_on`,
+		username, spot.Scene, spot.X, spot.Y, spot.Dir, now())
 	return err
 }

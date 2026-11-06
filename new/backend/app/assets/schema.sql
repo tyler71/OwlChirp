@@ -151,5 +151,9 @@ CREATE TABLE IF NOT EXISTS map_looks (
 	pet VARCHAR(10) NOT NULL DEFAULT '',
 	ride VARCHAR(10) NOT NULL DEFAULT 'walk',
 	look TEXT,
+	scene VARCHAR(10),
+	x REAL,
+	y REAL,
+	dir VARCHAR(5),
 	updated_on DATETIME
 );

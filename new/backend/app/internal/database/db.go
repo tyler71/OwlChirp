@@ -68,6 +68,12 @@ func migrate(ctx context.Context, db *sqlx.DB) error {
 	if err != nil {
 		return err
 	}
+	// Where each user last stood on the map.
+	for _, col := range [][2]string{{"scene", "VARCHAR(10)"}, {"x", "REAL"}, {"y", "REAL"}, {"dir", "VARCHAR(5)"}} {
+		if err := ensureColumn(ctx, db, "map_looks", col[0], col[1]); err != nil {
+			return err
+		}
+	}
 	if err := migrateBuildings(ctx, db); err != nil {
 		return err
 	}
