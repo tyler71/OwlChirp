@@ -1,85 +1,44 @@
-FROM python:3.10-slim AS init
+FROM webdevops/base-app:ubuntu-22.04 AS init
+LABEL authors="Tyler Yeager"
 
-RUN apt-get update && apt-get install -y \
-    curl \
- && rm -r /var/lib/apt/lists/* \
- && apt-get clean
-
-RUN mkdir /app /data               \
- && groupadd application           \
-      --gid 1000                   \
- && useradd application            \
-      --base-dir /app              \
-      --home-dir /home/application \
-      --create-home                \
-      --uid 1000                   \
-      --gid 1000                   \
-      --system
-
-# This stage installs all the requirements for the main app to /usr/local.
-# This will be copied later to the production stage
-FROM init AS build_server_environment
-COPY ./requirements.txt .
-RUN python -m pip install --no-cache-dir -r requirements.txt
-
-FROM node:18.14-slim AS build_client_environment
-# When run in prod, the webpack configuration puts built assets in ./dist
-# So this should be in /build/dist/
-# build args CONNECT_INSTANCE and TIME_ZONE are required
-ARG CONNECT_DOMAIN
-ARG CONNECT_INSTANCE
-ARG TIME_ZONE
-ARG TELEMETRY_URL
-
+FROM node:24-slim AS frontend
 WORKDIR /build
 
-COPY ./app/client /build
+RUN corepack enable
 
-RUN npm install
-RUN npm run prod
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
-# caddy handles http/s termination. It is built from scratch
-# We are using it as a standardized reverse proxy to the app.
-# This also allows for additional modules later if we need it.
-FROM caddy:2.6.2-builder AS build_reverse_proxy
-ENV XCADDY_SKIP_CLEANUP=1
-ENV BUILD_VERSION=v2.6.2
+COPY frontend/ ./
 
-RUN xcaddy build $BUILD_VERSION
+ARG VERSION=unknown
+RUN pnpm build
 
-RUN mkdir -p /opt/reverse_proxy  \
-&& mv /usr/bin/caddy /opt/reverse_proxy/caddy
 
-# Copy files from previous stages
-# We also copy in config files
-# While the image doesn't force non-root, Supervisor drops root for all apps it handles
-# We also label the sha and build number. This causes Docker Swarm to notice it is a different image.
-FROM init AS production
+FROM golang:1.26 AS backend
+ARG VERSION=unknown
+WORKDIR /build
 
-ARG SET_GIT_SHA=dev
-ARG SET_BUILD_NUMBER=9999
+COPY backend/go.mod backend/go.sum backend/build.sh ./
 
-ENV GIT_SHA=$SET_GIT_SHA
+RUN go mod download
 
-LABEL GIT_SHA=$SET_GIT_SHA
-LABEL BUILD_NUMBER=$SET_BUILD_NUMBER
+COPY backend/app/ ./app/
+COPY --from=frontend /build/dist/ ./app/assets/web/
 
-ENV TZ=$TIME_ZONE
+RUN NO_COMPRESS=1 VERSION=$VERSION ./build.sh linux/amd64 \
+ && mv build/owlchirp-linux-amd64* server
 
-ENV DATA_DIR /data
 
-RUN python -m pip install --no-cache-dir install supervisor
+FROM init AS prod
 
-COPY ./config/init/supervisord.conf   /etc/supervisord.conf
-COPY ./config/init.sh                 /init.sh
-COPY ./config/reverse_proxy/Caddyfile /etc/Caddyfile
+COPY --from=backend /build/server /usr/local/bin/owlchirp
 
-EXPOSE 8080
+USER application
 
-COPY --from=build_reverse_proxy      /opt/reverse_proxy /opt/reverse_proxy
-COPY --from=build_client_environment /build/dist        /app/server/static/dist
-COPY --from=build_server_environment /usr/local         /usr/local
+ENV APP_PORT=4444 \
+    DB_DSN=/data/owlchirp.sqlite3
+VOLUME /data
+EXPOSE 4444
 
-COPY --chown=application:application ./app /app
-
-CMD bash /init.sh
+ENTRYPOINT ["/usr/local/bin/owlchirp"]

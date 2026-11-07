@@ -41,10 +41,6 @@ embed: build-frontend
     find backend/app/assets/web -mindepth 1 ! -name .gitkeep -delete
     cp -r frontend/dist/. backend/app/assets/web/
 
-# Build the single binary (frontend embedded) into backend/build/
-build os_arch="linux/amd64": embed
-    cd backend && NO_COMPRESS=1 VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo dev)" ./build.sh {{ os_arch }}
-
 # Build and run the embedded binary
 run: build
     "$(ls -t backend/build/owlchirp-linux-amd64* | head -1)"

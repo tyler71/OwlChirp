@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="ALL" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="4b6931e9-4b18-49bf-b2cb-4e0434e473de" name="Changes" comment="Keep spot on the map">
+      <change beforePath="$PROJECT_DIR$/new/backend/app/cmd/api/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/new/backend/app/cmd/api/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/backend/app/cmd/api/routes.go" beforeDir="false" afterPath="$PROJECT_DIR$/new/backend/app/cmd/api/routes.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/components/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/components/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/components/map/MapCanvas.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/components/map/MapCanvas.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/components/map/MapToolbar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/components/map/MapToolbar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/components/map/MapView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/components/map/MapView.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/components/map/office.ts" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/components/map/office.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/components/map/sprites.ts" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/components/map/sprites.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/components/map/world.ts" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/components/map/world.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/lib/map.ts" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/lib/map.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/new/frontend/src/lib/voice.ts" beforeDir="false" afterPath="$PROJECT_DIR$/new/frontend/src/lib/voice.ts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_/home/z/Dev/development/project/Owlchirp" value="3LhNr0qvAp0v0Y4YOoI59zl0hC7" />
+    </persistenceIdMap>
+  </component>
+  <component name="GOROOT" url="file://$USER_HOME$/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.5.linux-amd64" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;tyler71&quot;
+  }
+}</component>
+  <component name="GitRewordedCommitMessages">
+    <option name="commitMessagesMapping">
+      <RewordedCommitMessageMapping>
+        <option name="originalMessage" value="Granular permissions" />
+        <option name="rewordedMessage" value="Granular permissions" />
+      </RewordedCommitMessageMapping>
+    </option>
+    <option name="currentCommit" value="1" />
+    <option name="onto" value="2ff3e2b5362d17efb609f9b7d96df29e7d45604a" />
+  </component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/tyler71/OwlChirp&quot;,
+    &quot;accountId&quot;: &quot;5568ba99-787d-4830-be82-3bffc559dc93&quot;
+  }
+}</component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.2836127260033332" />
+      <entry key="MS500" value="4.2479218057211074" />
+      <entry key="S2" value="9.163567214935911" />
+      <entry key="S5" value="11.232542168767452" />
+      <entry key="S10" value="12.071267772653211" />
+      <entry key="S30" value="12.679761990109444" />
+      <entry key="S60" value="12.839480794902277" />
+      <entry key="M2" value="13.035023699191367" />
+      <entry key="M5" value="15.757245862768599" />
+      <entry key="M10" value="21.777164816279786" />
+      <entry key="M15" value="26.16110303774822" />
+      <entry key="M30" value="35.150816835476476" />
+      <entry key="H1" value="52.17578672348776" />
+      <entry key="H2" value="85.48175320607298" />
+      <entry key="H4" value="139.6372787499287" />
+      <entry key="D1" value="286.10973284925876" />
+      <entry key="W1" value="337.9731632247584" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="1.6319389658192484E-117" />
+      <entry key="S5" value="1.9278869557963218E-47" />
+      <entry key="S10" value="4.390781558086267E-24" />
+      <entry key="S30" value="1.6596825023083676E-8" />
+      <entry key="S60" value="1.4425604991159907E-4" />
+      <entry key="M2" value="0.016374110340913295" />
+      <entry key="M5" value="0.34282971364309833" />
+      <entry key="M10" value="0.9980017123666384" />
+      <entry key="M15" value="1.4350810409892119" />
+      <entry key="M30" value="2.0710981136075435" />
+      <entry key="H1" value="2.4914987832811137" />
+      <entry key="H2" value="2.7336369307111092" />
+      <entry key="H4" value="2.8636405557018603" />
+      <entry key="D1" value="2.9768187167656777" />
+      <entry key="W1" value="2.99667707418304" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.7514827123938899" />
+      <entry key="MS500" value="4.019996150722985" />
+      <entry key="S2" value="9.069706016188896" />
+      <entry key="S5" value="11.189114997596812" />
+      <entry key="S10" value="12.04837526240139" />
+      <entry key="S30" value="12.671847361006414" />
+      <entry key="S60" value="12.835627528266176" />
+      <entry key="M2" value="13.04915233133042" />
+      <entry key="M5" value="16.096637031321066" />
+      <entry key="M10" value="22.77046745308698" />
+      <entry key="M15" value="27.591562102366886" />
+      <entry key="M30" value="37.21810984856395" />
+      <entry key="H1" value="54.6642724950116" />
+      <entry key="H2" value="88.21303068392841" />
+      <entry key="H4" value="142.4991769659486" />
+      <entry key="D1" value="289.08605006660247" />
+      <entry key="W1" value="340.9697586535668" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3LHVp4Imh7XVaZASoL97f8NbQ7P" />
+  <component name="ProjectSessionTemplates">
+    <option name="version" value="1" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="false" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.GoLinterPluginOnboardingV2&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoLinterPluginStorageMigration&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.GoOptimizationToolWindowEnableInLayout.v333333&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.analysis.ui.options.defaults&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;copilot.chat.legacySessionMetadata.migrated&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;v2&quot;,
+    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
+    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/z&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;python.packages.toolwindow.project.migrated.to.right.top.v2&quot;: &quot;true&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/media/cache/dot.cache/JetBrains/RemoteDev/dist/59b387a6addc6_goland-2025.3.4/plugins/javascript-plugin/jsLanguageServicesImpl/external&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-gosdk-63c95d513abe-08e7ff217c2b-org.jetbrains.plugins.go.sharedIndexes.bundled-GO-262.11879.101" />
+        <option value="bundled-js-predefined-d6986cc7102b-4abd2a77f808-JavaScript-GO-262.11879.101" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="4b6931e9-4b18-49bf-b2cb-4e0434e473de" name="Changes" comment="" />
+      <created>1793111226828</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1793111226828</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <ignored-roots>
+      <path value="$PROJECT_DIR$/new/backend" />
+    </ignored-roots>
+    <MESSAGE value="Update recent calls" />
+    <MESSAGE value="Add in timeline" />
+    <MESSAGE value="Add in perms" />
+    <MESSAGE value="mini call bar" />
+    <MESSAGE value="Ask for help button" />
+    <MESSAGE value="Add in Admin page and for help button" />
+    <MESSAGE value="PWA and button for auto meeting" />
+    <MESSAGE value="Use similar sources for calls" />
+    <MESSAGE value="Timeline card" />
+    <MESSAGE value="Add in subdirectory variable" />
+    <MESSAGE value="Caller id" />
+    <MESSAGE value="Better sizes for agent list" />
+    <MESSAGE value="Add in CallFlow and improve VisualAgentList" />
+    <MESSAGE value="Add in call flow card" />
+    <MESSAGE value="Embed version into frontend" />
+    <MESSAGE value="Try to fix update button" />
+    <MESSAGE value="Granular permissions" />
+    <MESSAGE value="Put in a map" />
+    <MESSAGE value="Transcriptions and maps" />
+    <MESSAGE value="caller id and auto import schools in maps" />
+    <MESSAGE value="Call pulses" />
+    <MESSAGE value="Map audio" />
+    <MESSAGE value="Move voice transcription to its own card" />
+    <MESSAGE value="Improve sprites" />
+    <MESSAGE value="Keep spot on the map" />
+    <option name="LAST_COMMIT_MESSAGE" value="Keep spot on the map" />
+  </component>
+</project>

@@ -1,10 +1,13 @@
-*.sqlite3
-__pycache__/
-node_modules/
-venv/
+.env
 
-.idea/dataSources.xml
+_data/
+build/
+tmp/
+build-errors.log
 
-main.*.js
+.serena/
+.vscode/
 
-.idea/
+# Astro build output copied in by `just embed`
+app/assets/web/*
+!app/assets/web/.gitkeep
