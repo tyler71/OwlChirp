@@ -22,10 +22,9 @@ import {
   $flowCalls,
   $view,
   $wsStatus,
-  type Feature,
-  type View,
 } from "../lib/stores";
 import { stopVoice } from "../lib/voice";
+import { stopShare } from "../lib/screenshare";
 import "../lib/theme";
 import "../lib/pwa";
 import Admin from "./Admin";
@@ -48,7 +47,8 @@ import StatusBar from "./StatusBar";
 import SystemLog from "./SystemLog";
 import Timeline from "./Timeline";
 import UpdateButton from "./UpdateButton";
-import { Icon, type IconName, stateDotClass } from "./ui";
+import { NAV, canView } from "./nav";
+import { Icon, stateDotClass } from "./ui";
 
 function Brand() {
   return (
@@ -61,18 +61,6 @@ function Brand() {
     </a>
   );
 }
-
-const NAV: { view: View; label: string; icon: IconName }[] = [
-  { view: "phone", label: "Phone", icon: "phone" },
-  { view: "feed", label: "Feed", icon: "chat" },
-  { view: "flow", label: "Flow Calls", icon: "queue" },
-  { view: "timeline", label: "Timeline", icon: "timeline" },
-  { view: "map", label: "Map", icon: "map" },
-  { view: "calls", label: "Recent Calls", icon: "clock" },
-  { view: "callerids", label: "Caller IDs", icon: "user" },
-  { view: "admin", label: "Admin", icon: "shield" },
-  { view: "settings", label: "Settings", icon: "cog" },
-];
 
 function initialsOf(name: string): string {
   return name
@@ -199,22 +187,6 @@ function FlowQueueBadge() {
   );
 }
 
-// Views that need a feature; the rest are open to everyone.
-const VIEW_FEATURE: Partial<Record<View, Feature>> = {
-  calls: "calls",
-  feed: "feed",
-  flow: "flow",
-  timeline: "timeline",
-  map: "map",
-  callerids: "callerIds",
-  admin: "admin",
-};
-
-function canView(view: View, features: Feature[]): boolean {
-  const needed = VIEW_FEATURE[view];
-  return !needed || features.includes(needed);
-}
-
 export default function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const agent = useStore($agent);
@@ -226,9 +198,18 @@ export default function App() {
   // Map voice outlives MapView (it keeps running in other sections), so stop
   // it here once the user can't be on the map.
   useEffect(() => {
-    if (!canMap) stopVoice();
+    if (!canMap) {
+      stopVoice();
+      stopShare();
+    }
   }, [canMap]);
-  useEffect(() => stopVoice, []);
+  useEffect(
+    () => () => {
+      stopVoice();
+      stopShare();
+    },
+    [],
+  );
 
   return (
     <div

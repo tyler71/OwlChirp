@@ -68,6 +68,9 @@ export type SceneDef = {
   /** Tiles that can't be painted or decorated. */
   locked: (x: number, y: number) => boolean;
   doors: readonly Door[];
+  /** Where someone lands coming in through a door, in pixels. Mirrors the
+   * backend's sceneArrivals (app/cmd/api/mappresence.go). */
+  arrival: Point;
   /** Canvas colour around the scene. */
   backdrop: string;
   /** Whether bikes and cars can be used here; if not, everyone walks. */
@@ -213,6 +216,7 @@ export const TOWN: SceneDef = {
   locked: (x, y) => inRect(HQ, x, y),
   // Walk up into HQ's glass doors (the row just below them).
   doors: [{ to: 'office', trigger: { x: HQ_GLASS.x, y: HQ_DOOR.y, w: HQ_GLASS.w, h: TILE }, dir: 'up', click: HQ_GLASS }],
+  arrival: { x: 65 * TILE, y: 52 * TILE + 14 },
   backdrop: '#5c5f6b',
   rides: true,
 };

@@ -87,6 +87,7 @@ type application struct {
 	help        helpLimiter
 	presence    mapPresence
 	voice       voiceRoom
+	video       videoRoom
 	transcriber *transcribe.Service
 	logger      *slog.Logger
 	wg          sync.WaitGroup

@@ -9,11 +9,14 @@
 // The mic either opens on its own above a level threshold, or only while
 // Space (or the toolbar's hold button) is held: push to talk. The mode and
 // threshold are chosen in Settings and apply live.
+// In Office Space a wall between speaker and listener muffles the voice:
+// quieter, with the highs cut, as if from the next room.
 import { persistentAtom } from '@nanostores/persistent';
 import { atom, computed } from 'nanostores';
 
 import { apiKey } from './auth';
 import { API } from './const';
+import { wallBetween } from '../components/map/occlusion';
 import { $mapPlayers } from './map';
 import { $contactSnapshot } from './stores';
 import { $proximityChat, $voiceModeDefault, $voiceThreshold } from './theme';
@@ -76,6 +79,10 @@ const GAIN_EVERY_MS = 100;
 const MAX_BUFFERED = 16 * 1024;
 const MIN_RETRY_S = 2;
 const MAX_RETRY_S = 30;
+/** Volume kept, and the lowpass cutoff, for a voice heard through a wall. */
+const WALL_VOLUME = 0.45;
+const WALL_CUTOFF_HZ = 700;
+const OPEN_CUTOFF_HZ = 20000;
 
 // Close codes from backend voice.go / websocket.go.
 const CLOSE_UNAUTHORIZED = 4401;
@@ -106,6 +113,8 @@ type Speaker = {
   username: string;
   decoder: AudioDecoder | null;
   gain: GainNode;
+  /** Lowpass after gain: muffles a voice heard through a wall. */
+  filter: BiquadFilterNode;
   nextTime: number;
   ts: number;
 };
@@ -422,8 +431,13 @@ function addSpeaker(s: Session, id: number, username: string): void {
   if (old) dropSpeaker(old);
   const gain = s.ctx.createGain();
   gain.gain.value = 0;
-  gain.connect(s.master);
-  const sp: Speaker = { username, decoder: null, gain, nextTime: 0, ts: 0 };
+  const filter = s.ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = OPEN_CUTOFF_HZ;
+  filter.Q.value = 0.7;
+  gain.connect(filter);
+  filter.connect(s.master);
+  const sp: Speaker = { username, decoder: null, gain, filter, nextTime: 0, ts: 0 };
   sp.decoder = new AudioDecoder({
     output: (data) => play(s, sp, data),
     error: (e) => console.error('voice decoder', e),
@@ -437,6 +451,7 @@ function dropSpeaker(sp: Speaker): void {
   if (sp.decoder && sp.decoder.state !== 'closed') sp.decoder.close();
   sp.decoder = null;
   sp.gain.disconnect();
+  sp.filter.disconnect();
 }
 
 function onAudio(s: Session, buf: ArrayBuffer): void {
@@ -472,15 +487,19 @@ function play(s: Session, sp: Speaker, data: AudioData): void {
   }
 }
 
-/** Set every speaker's volume from how far they are from me right now. */
+/** Set every speaker's volume from how far they are from me right now, muffled through office walls. */
 function updateGains(s: Session): void {
   const players = $mapPlayers.get() ?? {};
   const me = players[s.me];
+  const now = s.ctx.currentTime;
   for (const sp of s.speakers.values()) {
     const p = players[sp.username];
     // Only people in the same scene (town or office) can hear each other.
     const sameScene = me && p && (p.scene || 'town') === (me.scene || 'town');
-    const v = sameScene ? volumeAt(Math.hypot(p.x - me.x, p.y - me.y)) : 0;
-    sp.gain.gain.setTargetAtTime(v / 100, s.ctx.currentTime, 0.05);
+    let v = sameScene ? volumeAt(Math.hypot(p.x - me.x, p.y - me.y)) : 0;
+    const walled = v > 0 && me.scene === 'office' && wallBetween(me, p);
+    if (walled) v *= WALL_VOLUME;
+    sp.gain.gain.setTargetAtTime(v / 100, now, 0.08);
+    sp.filter.frequency.setTargetAtTime(walled ? WALL_CUTOFF_HZ : OPEN_CUTOFF_HZ, now, 0.08);
   }
 }

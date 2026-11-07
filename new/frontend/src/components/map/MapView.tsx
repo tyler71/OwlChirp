@@ -28,6 +28,7 @@ import DesignPanel from "./DesignPanel";
 import Draggable from "./Draggable";
 import MapCanvas from "./MapCanvas";
 import MapToolbar from "./MapToolbar";
+import DeskComputer from "./DeskComputer";
 import useMapShortcuts from "./useMapShortcuts";
 
 function errorMessage(e: unknown): string {
@@ -236,6 +237,7 @@ export default function MapView() {
           </Draggable>
         )}
       </div>
+      {me && <DeskComputer me={me} />}
     </div>
   );
 }

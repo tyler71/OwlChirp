@@ -76,8 +76,8 @@ export type Facing = 'up' | 'down' | 'left' | 'right';
 
 const BURGER: Grid = ['.oooo.', 'oyyyyo', 'oggggo', 'orrrro', 'oyyyyo', '.oooo.'];
 const PHONE: Grid = ['ooo', 'oRo', 'oRo', '.oR', '.oR', 'oRo', 'ooo'];
-const LAPTOP: Grid = ['.oooooooo.', '.oddddddo.', '.oddddddo.', 'ommmmmmmmo', 'oooooooooo'];
-const DESK: Grid = ['tttttttttttt', 'oooooooooooo', '.t........t.', '.t........t.'];
+// Open journal, ruled pages either side of the spine, cover peeking below. 9x6.
+const JOURNAL: Grid = ['ooooooooo', 'owwwowwwo', 'ollwollwo', 'owwwowwwo', 'olwwolllo', 'obbbbbbbo'];
 
 const ITEM_COLORS: Palette = {
   y: '#e6a23c',
@@ -87,6 +87,8 @@ const ITEM_COLORS: Palette = {
   d: '#20344f',
   m: '#b8c2cc',
   t: '#a0703f',
+  l: '#9fb3c8',
+  b: '#3f6fb5',
 };
 
 // ---- Rendering helpers ----
@@ -285,7 +287,7 @@ function blit2(ctx: CanvasRenderingContext2D, c: HTMLCanvasElement, x: number, y
   ctx.drawImage(c, Math.round(x), Math.round(y), c.width * 2, c.height * 2);
 }
 
-export type Pose = 'stand' | 'walk' | 'phone' | 'typing' | 'eating' | 'sleeping';
+export type Pose = 'stand' | 'walk' | 'phone' | 'writing' | 'eating' | 'sleeping';
 
 /**
  * Draw one character with its feet at (x, y). t is seconds, for idle
@@ -323,18 +325,6 @@ export function drawCharacter(
     return;
   }
 
-  if (pose === 'typing') {
-    // Seated behind a desk facing the viewer, head and shoulders over the laptop.
-    blitFrame(ctx, sheet, 'down', 1, left, top + 2, 30);
-    blit2(ctx, cached('laptop', () => render(LAPTOP, items)), x - 10, y - 15);
-    blit2(ctx, cached('desk', () => render(DESK, items)), x - 12, y - 7);
-    // Screen flicker.
-    const tap = Math.floor(t * 8) % 4;
-    ctx.fillStyle = '#7fe3ff';
-    ctx.fillRect(Math.round(x - 6 + tap * 2), Math.round(y - 12 + (tap % 2)), 3, 1);
-    return;
-  }
-
   if (pose === 'walk' || pose === 'stand') {
     blitFrame(ctx, sheet, facing, pose === 'walk' ? walkCol(t) : 1, left, top);
     return;
@@ -348,7 +338,9 @@ export function drawCharacter(
       ? { c: cached('burger', () => render(BURGER, items)), dx: 2, dy: -10 - bob * 2 }
       : pose === 'phone'
         ? { c: cached('phone', () => render(PHONE, items)), dx: 5, dy: -17 }
-        : undefined;
+        : pose === 'writing'
+          ? { c: cached('journal', () => render(JOURNAL, items)), dx: 0, dy: -11 }
+          : undefined;
   const drawHeld = () => {
     if (!prop) return;
     const px = facing === 'left' ? x - prop.dx - prop.c.width : x + prop.dx;
@@ -357,6 +349,13 @@ export function drawCharacter(
   if (facing === 'up') drawHeld();
   blitFrame(ctx, sheet, facing, 1, left, top);
   if (facing !== 'up') drawHeld();
+  if (pose === 'writing' && prop && facing !== 'up') {
+    // Pen nib scribbling along the right-hand page.
+    const px = facing === 'left' ? x - prop.dx - prop.c.width : x + prop.dx;
+    const step = Math.floor(t * 6) % 3;
+    ctx.fillStyle = '#2b2233';
+    ctx.fillRect(Math.round(px + 5 + step), Math.round(y + prop.dy + 1 + (step % 2) * 2), 1, 2);
+  }
   if (pose === 'phone') {
     // Sound waves.
     const phase = (t * 1.5) % 1;

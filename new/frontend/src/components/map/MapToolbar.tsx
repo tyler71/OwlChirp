@@ -21,6 +21,7 @@ import {
   type Pet,
   type Ride,
 } from "../../lib/map";
+import { $myShare, stopShare } from "../../lib/screenshare";
 import { $can } from "../../lib/stores";
 import { Button } from "../ui";
 import { $voiceModeDefault } from "../../lib/theme";
@@ -361,6 +362,7 @@ export default function MapToolbar({
   const canDesign = useStore($can("mapDesign"));
   const isAdmin = useStore($can("admin"));
   const [confirmReset, setConfirmReset] = useState(false);
+  const sharing = useStore($myShare) !== null;
   const size = useStore($mapSize);
   const hint = MODES.find((m) => m.value === mode)?.hint;
   const minimized = useStore($mapPanelsMinimized);
@@ -411,6 +413,22 @@ export default function MapToolbar({
             </div>
           )}
           <VoiceControl />
+          {sharing && (
+            <div className="flex items-center gap-2">
+              <span className={`${LABEL} ${ROW_LABEL}`}>Screen</span>
+              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                🔴 Sharing
+              </span>
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={stopShare}
+                className="rounded-lg border border-secondary-200 px-2.5 py-1 text-xs font-semibold hover:bg-secondary-100 dark:border-secondary-700 dark:hover:bg-secondary-700"
+              >
+                Stop
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <Segmented

@@ -49,6 +49,7 @@ export const OFFICE: SceneDef = {
       click: { x: EXIT.x * TILE, y: EXIT.y * TILE, w: EXIT.w * TILE, h: TILE },
     },
   ],
+  arrival: { x: 12 * TILE, y: 13 * TILE + 12 },
   backdrop: '#2b2233',
   rides: false,
 };

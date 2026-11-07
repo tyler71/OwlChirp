@@ -1,6 +1,6 @@
 // The Map canvas: one requestAnimationFrame loop draws the part of the scene
 // you're in around you (the camera follows your character), everyone in it
-// with their pet and ride, and in town pulses for incoming calls, plus a
+// with their pet and ride, and callers walking in for incoming calls, plus a
 // minimap of the whole scene. Walking into a door (HQ's glass doors, the
 // office's doormat) takes you to the other scene, and the loop starts over.
 // With Map design it also paints ground, places and removes decorations, and
@@ -28,29 +28,27 @@ import {
   createProp,
   enterScene,
   deleteProp,
-  callAgent,
-  liveCalls,
-  matchBuilding,
   moveBuilding,
   moveProp,
-  onCallEnd,
-  onCallPulse,
   paintTiles,
   sendMove,
-  type CallPulse,
   type Dir,
   type MapTile,
   type MapLook,
   type Pet,
   type Ride,
 } from '../../lib/map';
+import { $callerNames, ensureCallerName } from '../../lib/callerId';
+import { formatPhoneNumber } from '../../lib/helpers';
 import { $metrics } from '../../lib/stores';
+import { $hideCallerIds } from '../../lib/theme';
 import { isSpeaking, VOICE_RANGE } from '../../lib/voice';
 import { Icon } from '../ui';
 import {
   BUILDING_STYLES,
   drawBuilding,
   drawCharacter,
+  drawVehicle,
   drawEmptyLot,
   drawHQ,
   drawPet,
@@ -64,10 +62,11 @@ import {
   type Pose,
 } from './sprites';
 import { assetsReady, loadMapAssets } from './assets';
+import { callerCarsIn, callersIn, onCallerEvent, updateCallers } from './callers';
 import { sceneOf } from './scenes';
+import { $atDesk } from '../../lib/screenshare';
 import {
   BUILDING_SIZE,
-  EDGE_ENTRIES,
   FLOWER_KINDS,
   HQ,
   TILE,
@@ -76,8 +75,6 @@ import {
   hash,
   inRect,
   overlaps,
-  pathLength,
-  pointAlong,
   type Door,
   type Point,
   type Prop,
@@ -96,10 +93,10 @@ const SPEED: Record<Ride, number> = { walk: 72, bike: 140, car: 220 }; // px per
 // Half-width of the box at a character's feet used for collisions.
 const FOOT_W: Record<Ride, number> = { walk: 4, bike: 5, car: 9 };
 const SEND_INTERVAL_MS = 100;
+/** How close (px) your feet must be to a desk to use its computer. */
+const DESK_REACH = 10;
 const PAINT_FLUSH_MS = 150;
 const MAX_PAINT_BATCH = 400;
-const PULSE_TRAVEL_MS = 3200;
-const PULSE_GAP_MS = 5000; // pause between laps of a live call
 const RING_MS = 1200;
 const BUILDING_FLASH_MS = 3500;
 const MINIMAP_SCALE = 1.5; // css px per tile; small scenes get bigger tiles
@@ -157,21 +154,6 @@ type Sprite = {
   petState: PetState;
 };
 
-/**
- * A live call's pulse, lapping from its building to HQ (or, once answered,
- * to the answering agent if they're on the map) until the call ends.
- */
-type ActivePulse = {
-  pulse: CallPulse;
-  route: Point[];
-  length: number;
-  start: number;
-  /** Sprite name this lap runs to, or '' for HQ. */
-  target: string;
-  /** The call disconnected: finish this lap, then stop. */
-  ended: boolean;
-};
-
 const STATUS_DOT: Record<string, string> = {
   available: '#3fbf5f',
   'on call': '#5b7fde',
@@ -188,7 +170,7 @@ function poseFor(status: string | undefined): Pose {
     case STATUS_ON_CALL:
       return 'phone';
     case STATUS_TICKET_BREAK:
-      return 'typing';
+      return 'writing';
     case STATUS_LUNCH:
       return 'eating';
     case STATUS_OFFLINE:
@@ -418,6 +400,16 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
     const offPlayers = $mapPlayers.listen(syncPlayers);
 
     const blocked = (x: number, y: number, footW: number) => world.blocked(x, y, footW);
+    /** Whether feet at (x, y) are within DESK_REACH of a desk tile. */
+    const nearDesk = (x: number, y: number) => {
+      for (const p of world.props.values()) {
+        if (p.kind !== 'desk') continue;
+        const cx = Math.max(p.x * TILE, Math.min((p.x + 1) * TILE, x));
+        const cy = Math.max(p.y * TILE, Math.min((p.y + 1) * TILE, y));
+        if (Math.hypot(x - cx, y - cy) <= DESK_REACH) return true;
+      }
+      return false;
+    };
 
     const moveMe = (dt: number, now: number) => {
       const s = sprites.get(me);
@@ -776,50 +768,27 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
     mini.addEventListener('pointerup', onMiniUp);
     mini.addEventListener('pointercancel', onMiniUp);
 
-    // ---- Pulses ----
-    const pulses: ActivePulse[] = [];
+    // ---- Calls ----
+    // Callers flash their building as they set off, ring HQ going in, and
+    // ring their agent when they reach them.
     const rings: number[] = []; // start times
     const flashes = new Map<number, number>(); // building id → start time
     const agentRings = new Map<string, number>(); // sprite name → start time
-    /** Where a pulse meets an agent: their middle, not their feet. */
-    const agentSpot = (s: Sprite): Point => ({ x: s.x, y: s.y - 12 * avatarScale });
-
-    /**
-     * Route the next lap (re-matched each time, so moved or new buildings and
-     * a newly answered call count) and flash its building. An answered call
-     * runs to its agent when they're on the map, otherwise to HQ.
-     */
-    const lap = (p: ActivePulse, start: number) => {
-      const agent = callAgent(p.pulse.contactId);
-      const found = agent ? [...sprites].find(([name]) => name.toLowerCase() === agent) : undefined;
-      p.target = found?.[0] ?? '';
-      const dest = found && agentSpot(found[1]);
-      const building = matchBuilding(p.pulse.phoneNumber, $buildings.get() ?? []);
-      if (building) {
-        flashes.set(building.id, performance.now());
-        p.route = world.routeFromBuilding(building, dest);
+    const offCallers = onCallerEvent((e) => {
+      const at = performance.now();
+      if (e.kind === 'building') flashes.set(e.id, at);
+      else if (e.kind === 'hq') {
+        if (isTown) rings.push(at);
       } else {
-        let h = 0;
-        for (const ch of p.pulse.contactId) h = (h * 31 + ch.charCodeAt(0)) | 0;
-        const edge = EDGE_ENTRIES[Math.abs(h) % EDGE_ENTRIES.length];
-        const from = { x: edge.x === 0 ? -8 : WORLD_W + 8, y: edge.y * TILE + TILE / 2 };
-        p.route = dest ? world.routeTo(dest, edge, from) : world.routeToHQ(edge, from);
+        const found = [...sprites.keys()].find((name) => name.toLowerCase() === e.name.toLowerCase());
+        if (found) agentRings.set(found, at);
       }
-      p.length = pathLength(p.route);
-      p.start = start;
-    };
-    const startPulse = (pulse: CallPulse) => {
-      if (pulses.some((p) => p.pulse.contactId === pulse.contactId)) return;
-      const p: ActivePulse = { pulse, route: [], length: 0, start: 0, target: '', ended: false };
-      lap(p, performance.now());
-      pulses.push(p);
-    };
-    // Calls only show in town.
-    if (isTown) for (const pulse of liveCalls()) startPulse(pulse);
-    const offPulse = isTown ? onCallPulse(startPulse) : () => undefined;
-    const offEnd = onCallEnd((contactId) => {
-      for (const p of pulses) if (p.pulse.contactId === contactId) p.ended = true;
     });
+    /** A caller's name tag: their saved name, or the number. */
+    const callerLabel = (phone: string) => {
+      ensureCallerName(phone);
+      return (!$hideCallerIds.get() && $callerNames.get()[phone]) || formatPhoneNumber(phone) || 'Caller';
+    };
 
     // ---- Drawing ----
     let raf = 0;
@@ -849,6 +818,15 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
         mctx.fill();
         mctx.stroke();
       }
+      for (const c of callersIn(world.def.id)) {
+        mctx.fillStyle = '#f2a541';
+        mctx.strokeStyle = '#2b2233';
+        mctx.lineWidth = dpr;
+        mctx.beginPath();
+        mctx.arc(c.x * k, c.y * k, 2.5 * dpr, 0, Math.PI * 2);
+        mctx.fill();
+        mctx.stroke();
+      }
       mctx.strokeStyle = 'rgba(255,255,255,0.95)';
       mctx.lineWidth = 1.5 * dpr;
       mctx.strokeRect(camX * k, camY * k, viewW * k, viewH * k);
@@ -863,7 +841,14 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
       frameNo++;
 
       moveMe(dt, now);
+      updateCallers();
+      const callers = callersIn(world.def.id);
       flushPaint(now);
+      if (frameNo % 6 === 0) {
+        const mine = sprites.get(me);
+        const near = scene === 'office' && !!mine && nearDesk(mine.x, mine.y);
+        if ($atDesk.get() !== near) $atDesk.set(near);
+      }
       for (const [name, s] of sprites) {
         if (name !== me) {
           // Ease toward the last reported spot.
@@ -959,50 +944,33 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
           drawables.push({ y: p.y, draw: () => scaledAt(p.x, p.y, () => drawPet(ctx, pet, name, s.look, p.x, p.y, p.side, p.anim, motion)) });
         }
       }
+      for (const c of callers) {
+        if (!inView(c.x, c.y)) continue;
+        drawables.push({
+          y: c.y,
+          draw: () => {
+            ctx.globalAlpha = c.alpha;
+            scaledAt(c.x, c.y, () => drawCharacter(ctx, `caller:${c.contactId}`, null, c.x, c.y, c.dir, c.moving ? 'walk' : 'phone', motion, c.ride));
+            ctx.globalAlpha = 1;
+          },
+        });
+      }
+      // Callers' cars, parked at the curb while they're inside.
+      for (const car of callerCarsIn(world.def.id)) {
+        if (!inView(car.x, car.y)) continue;
+        drawables.push({
+          y: car.y,
+          draw: () => {
+            ctx.globalAlpha = car.alpha;
+            scaledAt(car.x, car.y, () => drawVehicle(ctx, `caller:${car.contactId}`, null, 'car', car.x, car.y, car.dir));
+            ctx.globalAlpha = 1;
+          },
+        });
+      }
       drawables.sort((a, b) => a.y - b.y);
       for (const d of drawables) d.draw();
 
-      // Pulses travel the roads to HQ (or their agent), ring it, and go again
-      // until the call ends.
-      for (let i = pulses.length - 1; i >= 0; i--) {
-        const p = pulses[i];
-        const f = (now - p.start) / PULSE_TRAVEL_MS;
-        if (f < 0) continue; // between laps
-        // Chase an agent who's walking; if they left, finish on the old route.
-        const chased = p.target ? sprites.get(p.target) : undefined;
-        if (chased && p.route.length) {
-          p.route[p.route.length - 1] = agentSpot(chased);
-          p.length = pathLength(p.route);
-        }
-        if (f >= 1) {
-          if (p.target) agentRings.set(p.target, now);
-          else rings.push(now);
-          if (p.ended) pulses.splice(i, 1);
-          else lap(p, now + PULSE_GAP_MS);
-          continue;
-        }
-        if (reduced) continue; // no moving dot; the flash and ring still mark each lap
-        const eased = 1 - (1 - f) * (1 - f);
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        for (let j = 6; j >= 0; j--) {
-          const pt = pointAlong(p.route, eased - j * 0.008, p.length);
-          if (!inView(pt.x, pt.y)) continue;
-          const a = j === 0 ? 1 : 0.5 - j * 0.07;
-          const r = j === 0 ? 5 : 3.5 - j * 0.35;
-          const g = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, r * 2.5);
-          g.addColorStop(0, `rgba(255, 236, 140, ${a})`);
-          g.addColorStop(0.4, `rgba(255, 196, 40, ${a * 0.7})`);
-          g.addColorStop(1, 'rgba(255, 196, 40, 0)');
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, r * 2.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
-
-      // An agent a pulse reached rings like HQ does.
+      // An agent a caller reached rings like HQ does.
       const agentRingMs = reduced ? BUILDING_FLASH_MS : RING_MS;
       for (const [name, startedAt] of agentRings) {
         const age = (now - startedAt) / agentRingMs;
@@ -1139,6 +1107,24 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
         }
       }
 
+      // Callers' name tags, in amber so they stand out from the team.
+      for (const c of callers) {
+        if (!inView(c.x, c.y)) continue;
+        const label = `📞 ${callerLabel(c.phoneNumber)}`;
+        ctx.globalAlpha = c.alpha;
+        ctx.font = `${13 * dpr}px ui-sans-serif, system-ui, sans-serif`;
+        const w = ctx.measureText(label).width + 8 * dpr;
+        const h = 16 * dpr;
+        const by = sy(c.y - (c.ride === 'car' ? 29 : 25) * avatarScale) - h - 2 * dpr;
+        ctx.fillStyle = 'rgba(214, 134, 16, 0.92)';
+        ctx.beginPath();
+        ctx.roundRect(sx(c.x) - w / 2, by, w, h, 4 * dpr);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label, sx(c.x), by + h - 2 * dpr);
+        ctx.globalAlpha = 1;
+      }
+
       // Building names above their roofs.
       ctx.font = `600 ${10 * dpr}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textBaseline = 'top';
@@ -1169,14 +1155,14 @@ export default function MapCanvas({ me, children }: { me: string; children?: Rea
 
     return () => {
       cancelAnimationFrame(raf);
+      $atDesk.set(false);
       flushPaint(Infinity);
       observer.disconnect();
       offZoom();
       wrap.removeEventListener('wheel', onWheel);
       offFocus();
       offPlayers();
-      offPulse();
-      offEnd();
+      offCallers();
       offTiles();
       offProps();
       offBuildings();

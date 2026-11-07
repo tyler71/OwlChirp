@@ -26,6 +26,8 @@ func (app *application) routes() http.Handler {
 		r.Get("/ws", app.socket)
 		// Map proximity voice relay; authenticates like /ws. See voiceSocket.
 		r.Get("/voice", app.voiceSocket)
+		// Office screenshare relay; authenticates like /ws. See videoSocket.
+		r.Get("/video", app.videoSocket)
 
 		r.NotFound(app.notFound)
 	})

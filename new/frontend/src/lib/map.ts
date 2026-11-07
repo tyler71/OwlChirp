@@ -454,7 +454,13 @@ export function formatPattern(p: string): string {
 // ---- New-call pulses ----
 
 /** A call that just arrived, for the canvas to animate. */
-export type CallPulse = { contactId: string; phoneNumber: string; at: number };
+export type CallPulse = {
+  contactId: string;
+  phoneNumber: string;
+  at: number;
+  /** When the call came in (ms since the epoch). */
+  initiatedAt: number;
+};
 
 // Calls older than this when first pushed started before the map was open
 // and don't pulse.
@@ -491,10 +497,11 @@ function endCall(contactId: string): void {
 export function liveCalls(): CallPulse[] {
   const cutoff = Date.now() - LIVE_MAX_MS;
   for (const [id, c] of live) if (c.initiatedAt < cutoff) endCall(id);
-  return [...live.values()].map(({ contactId, phoneNumber, at }) => ({
+  return [...live.values()].map(({ contactId, phoneNumber, at, initiatedAt }) => ({
     contactId,
     phoneNumber,
     at,
+    initiatedAt,
   }));
 }
 
@@ -570,5 +577,6 @@ onEvent<FlowCall>("flowcall.updated", (call) => {
       contactId: pulse.contactId,
       phoneNumber: pulse.phoneNumber,
       at: pulse.at,
+      initiatedAt: pulse.initiatedAt,
     });
 });
